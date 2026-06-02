@@ -134,6 +134,19 @@ class AppointmentUpdate(BaseModel):
         "ready_for_pharmacy", "dispensed", "cancelled",
     ]] = None
     queue_number: Optional[int] = None
+    scheduled_at: Optional[str] = None
+    doctor_id: Optional[str] = None
+    reason: Optional[str] = None
+
+
+class KioskRegisterIn(BaseModel):
+    ic_number: str
+    name: str
+    phone: Optional[str] = None
+    dob: Optional[str] = None
+    gender: Optional[str] = None
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None  # optional, kiosk-only patients can use NFC tap
 
 
 class KioskCheckinIn(BaseModel):
@@ -147,6 +160,12 @@ class KioskPayIn(BaseModel):
     ic_number: str
     appointment_id: str
     method: Literal["card", "wallet", "fpx"] = "card"
+
+
+class BlockTimeIn(BaseModel):
+    scheduled_at: str
+    reason: Optional[str] = "Blocked"
+    duration_minutes: int = 30
 
 
 class VitalSigns(BaseModel):
@@ -1013,6 +1032,42 @@ async def files_for_record(record_id: str, user=Depends(get_current_user)):
     return files
 
 
+@api.post("/kiosk/register")
+async def kiosk_register(body: KioskRegisterIn):
+    """
+    Public — walk-in patient can self-register at the kiosk by entering their IC + basic details.
+    Optionally accepts an email/password if they want online access too; otherwise a
+    placeholder email is generated and the patient can later reset password via staff.
+    """
+    ic = body.ic_number.strip()
+    existing = await db.users.find_one({"role": "patient", "ic_number": ic})
+    if existing:
+        raise HTTPException(400, "A patient with this IC already exists")
+
+    email = (body.email or f"{ic.lower().replace(' ', '')}@kiosk.medilink.io").lower()
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(400, "Email already in use")
+
+    # auto-generate a password if none supplied — kiosk-only patients identify via IC
+    pwd = body.password or f"kiosk-{uuid.uuid4().hex[:10]}"
+
+    user = {
+        "id": uid(),
+        "email": email,
+        "password_hash": hash_password(pwd),
+        "name": body.name,
+        "role": "patient",
+        "ic_number": ic,
+        "phone": body.phone,
+        "dob": body.dob,
+        "gender": body.gender,
+        "created_at": now_iso(),
+        "source": "kiosk",
+    }
+    await db.users.insert_one(user)
+    return {"patient": clean(dict(user)), "email": email}
+
+
 # ------------------------------------------------------------
 # Kiosk (public, unauthenticated) endpoints
 # Real-world: a tamper-proof kiosk on the clinic floor. We trust the
@@ -1234,6 +1289,30 @@ async def kiosk_appointment(appointment_id: str, ic_number: str = Query(...)):
     if not appt or appt["patient_id"] != p["id"]:
         raise HTTPException(404, "Appointment not found")
     return clean(appt)
+
+
+@api.post("/appointments/block")
+async def block_time(body: BlockTimeIn, user=Depends(require_role("doctor"))):
+    """Doctor blocks a time slot (creates a special appointment record)."""
+    q = await next_queue_number()
+    doc = {
+        "id": uid(),
+        "patient_id": None,
+        "doctor_id": user["id"],
+        "scheduled_at": body.scheduled_at,
+        "reason": body.reason or "Blocked",
+        "fee": 0,
+        "status": "cancelled",  # never shown in queue
+        "queue_number": q,
+        "payment_status": "n/a",
+        "is_block": True,
+        "duration_minutes": body.duration_minutes,
+        "created_at": now_iso(),
+        "created_by": user["id"],
+    }
+    await db.appointments.insert_one(doc)
+    schedule_broadcast({"type": "appointment.created", "appointment_id": doc["id"]})
+    return clean(doc)
 
 
 # ------------------------------------------------------------

@@ -13,6 +13,7 @@ import NFCScanner from "@/components/NFCScanner";
 import BluetoothVitals from "@/components/BluetoothVitals";
 import { AttachmentUploader, AttachmentList } from "@/components/Attachments";
 import AvailabilityCard from "@/components/AvailabilityCard";
+import DoctorScheduler from "@/components/DoctorScheduler";
 import useQueueSocket from "@/hooks/useQueueSocket";
 import {
   WaveTriangle,
@@ -324,6 +325,10 @@ export default function DoctorDashboard() {
 
         <SyncIndicator />
         <AvailabilityCard doctorId={user.id} />
+
+        <div className="lg:col-span-3">
+          <DoctorScheduler doctorId={user.id} />
+        </div>
       </div>
 
       <NFCScanner open={nfcOpen} onOpenChange={setNfcOpen} onMatch={onNFCMatch} />

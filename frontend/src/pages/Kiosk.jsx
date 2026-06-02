@@ -141,10 +141,12 @@ export default function Kiosk() {
 /* ----------------------------------------------------- */
 function CheckinFlow({ onPrint }) {
   const [ic, setIc] = useState("");
-  const [step, setStep] = useState("scan"); // scan | found | booked
+  const [step, setStep] = useState("scan"); // scan | found | register | booked
   const [data, setData] = useState(null); // lookup or checkin response
   const [tapping, setTapping] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const [regForm, setRegForm] = useState({ name: "", phone: "", gender: "", dob: "" });
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
@@ -155,9 +157,42 @@ function CheckinFlow({ onPrint }) {
       setData(r.data);
       setStep("found");
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Patient not found");
+      // No patient → offer registration
+      if (e?.response?.status === 404) {
+        setStep("register");
+        setRegForm({ name: "", phone: "", gender: "", dob: "" });
+      } else {
+        toast.error(e?.response?.data?.detail || "Lookup failed");
+      }
     } finally {
       setTapping(false);
+    }
+  };
+
+  const registerAndCheckin = async () => {
+    if (!regForm.name.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
+    setRegistering(true);
+    try {
+      await kioskAxios.post("/kiosk/register", {
+        ic_number: ic,
+        name: regForm.name,
+        phone: regForm.phone || null,
+        gender: regForm.gender || null,
+        dob: regForm.dob || null,
+      });
+      toast.success("Registered · proceeding to check-in");
+      // immediately lookup + checkin
+      const r = await kioskAxios.post("/kiosk/checkin", { ic_number: ic });
+      setData(r.data);
+      setStep("booked");
+      onPrint(r.data.chit);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Registration failed");
+    } finally {
+      setRegistering(false);
     }
   };
 
@@ -206,6 +241,85 @@ function CheckinFlow({ onPrint }) {
     setStep("scan");
     setData(null);
   };
+
+  if (step === "register") {
+    return (
+      <div data-testid="kiosk-register-screen">
+        <div className="overline">First time here</div>
+        <h2 className="font-display text-3xl mt-1">Quick register</h2>
+        <p className="text-sm text-[#5C6661] mt-1 mb-6">
+          We couldn&apos;t find your IC <span className="font-mono text-[#0A0F0D]">{ic}</span> in our system.
+          Fill these basics and we&apos;ll check you in right after.
+        </p>
+
+        <div className="grid sm:grid-cols-2 gap-4 max-w-2xl">
+          <div className="space-y-1.5">
+            <Label>Full name *</Label>
+            <Input
+              data-testid="kiosk-reg-name"
+              value={regForm.name}
+              onChange={(e) => setRegForm({ ...regForm, name: e.target.value })}
+              className="border-[#E2DDD7]"
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Phone</Label>
+            <Input
+              data-testid="kiosk-reg-phone"
+              value={regForm.phone}
+              onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })}
+              placeholder="+60 12-345 6789"
+              className="border-[#E2DDD7]"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Date of birth</Label>
+            <Input
+              type="date"
+              data-testid="kiosk-reg-dob"
+              value={regForm.dob}
+              onChange={(e) => setRegForm({ ...regForm, dob: e.target.value })}
+              className="border-[#E2DDD7]"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Gender</Label>
+            <select
+              data-testid="kiosk-reg-gender"
+              value={regForm.gender}
+              onChange={(e) => setRegForm({ ...regForm, gender: e.target.value })}
+              className="w-full h-10 px-3 rounded-md border border-[#E2DDD7] bg-white text-sm"
+            >
+              <option value="">Select</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex gap-2 mt-6">
+          <Button
+            variant="outline"
+            data-testid="kiosk-reg-back"
+            onClick={reset}
+            className="border-[#E2DDD7] text-[#1C3F39] rounded-full"
+          >
+            <ArrowLeft size={14} className="mr-1.5" /> Back
+          </Button>
+          <Button
+            data-testid="kiosk-reg-submit"
+            onClick={registerAndCheckin}
+            disabled={!regForm.name || registering}
+            className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full flex-1"
+          >
+            <Ticket size={14} className="mr-1.5" /> {registering ? "Setting up…" : "Register & get my ticket"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (step === "found") {
     const existing = (data.today_appointments || []).find(
