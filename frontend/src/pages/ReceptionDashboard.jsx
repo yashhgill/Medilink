@@ -56,7 +56,7 @@ export default function ReceptionDashboard() {
 
   const setStatus = async (id, status) => {
     await api.patch(`/appointments/${id}`, { status });
-    toast.success(`Updated → ${status.replace("_", " ")}`);
+    toast.success(`Updated → ${status.replaceAll("_", " ")}`);
     load();
   };
 
@@ -179,7 +179,7 @@ export default function ReceptionDashboard() {
                         </SelectTrigger>
                         <SelectContent>
                           {statusOptions.map((s) => (
-                            <SelectItem key={s} value={s}>{s.replace("_", " ")}</SelectItem>
+                            <SelectItem key={s} value={s}>{s.replaceAll("_", " ")}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

@@ -225,7 +225,7 @@ export default function DoctorDashboard() {
                   <div className="text-sm font-medium">{a.patient?.name}</div>
                   <div className="text-xs text-[#5C6661]">{a.reason}</div>
                 </div>
-                <Badge className={statusColors[a.status]}>{a.status.replace("_", " ")}</Badge>
+                <Badge className={statusColors[a.status]}>{a.status.replaceAll("_", " ")}</Badge>
               </button>
             ))}
           </div>

@@ -222,7 +222,7 @@ function CheckinFlow({ onPrint }) {
             <div className="overline">Existing appointment today</div>
             <div className="mt-2 font-display text-2xl">{existing.doctor?.name || "Doctor"}</div>
             <div className="text-sm text-[#5C6661]">{existing.reason}</div>
-            <Badge className={`mt-3 ${statusBadge[existing.status]}`}>{existing.status.replace("_", " ")}</Badge>
+            <Badge className={`mt-3 ${statusBadge[existing.status]}`}>{existing.status.replaceAll("_", " ")}</Badge>
             <div className="text-xs text-[#5C6661] mt-2">Queue #{String(existing.queue_number).padStart(3, "0")}</div>
           </div>
         ) : (
@@ -465,7 +465,7 @@ function PayFlow({ onPrint }) {
               <div>
                 <div className="text-sm font-medium">{a.doctor?.name} <span className="text-[#5C6661] font-normal">· {a.doctor?.specialty || "General"}</span></div>
                 <div className="text-xs text-[#5C6661] font-mono">#{a.queue_number} · {a.reason}</div>
-                <Badge className={`mt-1 ${statusBadge[a.status]}`}>{a.status.replace("_", " ")}</Badge>
+                <Badge className={`mt-1 ${statusBadge[a.status]}`}>{a.status.replaceAll("_", " ")}</Badge>
               </div>
               <div className="text-right">
                 <div className="font-display text-xl">RM {Number(a.fee || 50).toFixed(2)}</div>
@@ -496,7 +496,7 @@ function PayFlow({ onPrint }) {
                   <div className="text-sm font-medium">{a.doctor?.name}</div>
                   <div className="text-xs text-[#5C6661] font-mono">#{a.queue_number}</div>
                 </div>
-                <Badge className={statusBadge[a.status]}>{a.status.replace("_", " ")}</Badge>
+                <Badge className={statusBadge[a.status]}>{a.status.replaceAll("_", " ")}</Badge>
               </div>
             ))}
           </div>
@@ -595,7 +595,7 @@ function StatusFlow() {
                 <div className="text-xs text-[#5C6661]">{a.reason}</div>
               </div>
               <Badge className={statusBadge[a.status]} data-testid={`kiosk-status-pill-${a.id}`}>
-                {a.status.replace("_", " ")}
+                {a.status.replaceAll("_", " ")}
               </Badge>
             </motion.div>
           ))}

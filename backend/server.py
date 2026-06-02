@@ -1169,6 +1169,9 @@ async def kiosk_pay(body: KioskPayIn):
             "status": "ready_for_pharmacy",
         }},
     )
+    appt["payment_status"] = "paid"
+    appt["paid_amount"] = amount
+    appt["status"] = "ready_for_pharmacy"
     schedule_broadcast({
         "type": "appointment.updated",
         "appointment_id": appt["id"],

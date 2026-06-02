@@ -116,7 +116,7 @@ export default function PatientDashboard() {
               <div className="text-sm text-[#5C6661] mt-3">
                 with <span className="font-medium text-[#0A0F0D]">{nextAppt.doctor?.name}</span>
               </div>
-              <Badge className={`mt-3 ${statusColors[nextAppt.status]}`}>{nextAppt.status.replace("_", " ")}</Badge>
+              <Badge className={`mt-3 ${statusColors[nextAppt.status]}`}>{nextAppt.status.replaceAll("_", " ")}</Badge>
             </>
           ) : (
             <div className="text-sm text-[#5C6661]">No upcoming appointments.</div>
@@ -166,7 +166,7 @@ export default function PatientDashboard() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className={statusColors[a.status]}>{a.status.replace("_", " ")}</Badge>
+                  <Badge className={statusColors[a.status]}>{a.status.replaceAll("_", " ")}</Badge>
                   {a.payment_status === "paid" ? (
                     <Badge className="bg-[#2D6A4F]/20 text-[#2D6A4F]">Paid · RM{a.paid_amount}</Badge>
                   ) : (

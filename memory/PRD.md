@@ -22,25 +22,29 @@
 - **Reception/Admin** — manages live queue & statuses, NFC check-in, books appointments, triggers manual cloud sync.
 
 ## Implemented (2026-02)
-- Auth: register/login/me, JWT with role enforcement
+- Auth: register/login/me, JWT with role enforcement (patient/doctor/admin/**pharmacist**)
 - NFC: manual IC modal + webcam QR scan (simulated decode after 3s)
 - Appointments: booking, queue numbers (per-day counter), status workflow
 - Mock payments
-- Medical records: CRUD with vitals + prescriptions, allergies
+- Medical records: CRUD with vitals + prescriptions, allergies, **file attachments via object storage**
 - SSD-first storage with simulated cloud sync (background asyncio task)
 - AI: streaming symptom triage (SSE), patient history summary, drug interaction analysis
-- Auto-seeded demo data (3 patients, 2 doctors, 1 admin)
-- Three role-aware dashboards with bento-grid layouts, Organic & Earthy palette
-- Compact + full sync status indicators with tracing-beam animation
-- 100% pass rate on backend (16/16 pytest) and frontend (Playwright)
+- **WebSocket real-time queue** (no more polling) at `/api/ws/queue`
+- **IoT vitals via Web Bluetooth** (HR, Temp, SpO₂) with Simulated-device fallback
+- **Doctor availability calendar** with slot picker; weekly hours editor on Doctor dashboard
+- **Public Kiosk terminal** (/kiosk) — check-in → queue ticket chit; pay → receipt + medicine chit; printable via `window.print()`
+- **Pharmacy dashboard** (/pharmacy) — sees prescriptions for paid patients, "Dispense" marks treatment complete (status=dispensed)
+- New statuses: `ready_for_pharmacy`, `dispensed`
+- Auto-seeded demo data (3 patients, 2 doctors, 1 admin, 1 pharmacist)
+- Four role-aware dashboards + public kiosk
+- 21/21 backend pytest pass · 100% frontend pass on iteration 3
 
 ## Backlog (P1 — next phase)
-- Real-time queue updates via WebSocket (currently polled)
-- File attachments for records (lab reports, X-rays) → object storage
-- Doctor calendar / availability windows for booking
-- IoT vitals integration (Bluetooth BP cuff, SpO₂ — Web Bluetooth API)
-- Patient AI assistant memory across sessions
-- Audit log for record edits
+- Print integration with a real ESC/POS receipt printer (network printer or WebUSB)
+- SMS/WhatsApp queue notification (Twilio) — "Your number is being called"
+- Insurance / panel-card flow at the kiosk
+- Doctor calendar drag-and-drop block scheduler
+- Audit log + edit history for records
 
 ## Backlog (P2 — polish)
 - Multi-tenant clinics
