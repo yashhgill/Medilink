@@ -25,6 +25,11 @@ export default function AppShell({ children, title, subtitle, navItems = [] }) {
   const nav = useNavigate();
   const loc = useLocation();
   const [aiOpen, setAiOpen] = useState(false);
+  const [live, setLive] = useState(false);
+
+  useQueueSocket((ev) => {
+    if (ev?.type === "hello") setLive(true);
+  });
 
   return (
     <div className="min-h-screen bg-[#F9F9F6]">
@@ -67,6 +72,17 @@ export default function AppShell({ children, title, subtitle, navItems = [] }) {
           </div>
 
           <div className="flex items-center gap-3">
+            <div
+              data-testid="ws-status"
+              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-white text-xs font-mono ${
+                live ? "text-[#2D6A4F]" : "text-[#5C6661]"
+              }`}
+              style={{ borderColor: "var(--ml-border)" }}
+              title={live ? "Real-time channel connected" : "Connecting…"}
+            >
+              <Broadcast size={12} weight={live ? "fill" : "regular"} className={live ? "breathe" : ""} />
+              {live ? "Live" : "Sync"}
+            </div>
             <SyncIndicator compact />
             {user?.role === "patient" && (
               <Button

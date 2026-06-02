@@ -10,6 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import SyncIndicator from "@/components/SyncIndicator";
 import NFCScanner from "@/components/NFCScanner";
+import BluetoothVitals from "@/components/BluetoothVitals";
+import { AttachmentUploader, AttachmentList } from "@/components/Attachments";
+import AvailabilityCard from "@/components/AvailabilityCard";
+import useQueueSocket from "@/hooks/useQueueSocket";
 import {
   WaveTriangle,
   Sparkle,
@@ -53,6 +57,7 @@ export default function DoctorDashboard() {
     weight: "",
     spo2: "",
     prescriptions: [{ medicine: "", dosage: "", frequency: "", duration: "" }],
+    attachments: [],
   });
 
   const load = async () => {
@@ -155,6 +160,7 @@ export default function DoctorDashboard() {
           spo2: form.spo2 ? Number(form.spo2) : null,
         },
         prescriptions: form.prescriptions.filter((p) => p.medicine),
+        attachment_ids: form.attachments.map((a) => a.id),
       });
       toast.success("Record saved · syncing to cloud");
       setRecOpen(false);
@@ -168,6 +174,7 @@ export default function DoctorDashboard() {
         weight: "",
         spo2: "",
         prescriptions: [{ medicine: "", dosage: "", frequency: "", duration: "" }],
+        attachments: [],
       });
       openPatient(activePatientId);
     } catch (e) {
@@ -303,6 +310,7 @@ export default function DoctorDashboard() {
                         ))}
                       </div>
                     )}
+                    {r.attachments?.length > 0 && <AttachmentList files={r.attachments} />}
                   </div>
                 ))}
               </div>
@@ -311,6 +319,7 @@ export default function DoctorDashboard() {
         </div>
 
         <SyncIndicator />
+        <AvailabilityCard doctorId={user.id} />
       </div>
 
       <NFCScanner open={nfcOpen} onOpenChange={setNfcOpen} onMatch={onNFCMatch} />
@@ -340,6 +349,16 @@ export default function DoctorDashboard() {
             </div>
 
             <div className="overline">Vitals</div>
+            <BluetoothVitals
+              onVital={(p) =>
+                setForm((f) => ({
+                  ...f,
+                  hr: p.hr != null ? String(p.hr) : f.hr,
+                  temp: p.temp != null ? String(p.temp) : f.temp,
+                  spo2: p.spo2 != null ? String(p.spo2) : f.spo2,
+                }))
+              }
+            />
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               <div className="space-y-1"><Label className="text-xs">BP</Label><Input data-testid="rec-bp" placeholder="120/80" value={form.bp} onChange={(e) => setForm({ ...form, bp: e.target.value })} className="border-[#E2DDD7] font-mono" /></div>
               <div className="space-y-1"><Label className="text-xs">HR</Label><Input data-testid="rec-hr" value={form.hr} onChange={(e) => setForm({ ...form, hr: e.target.value })} className="border-[#E2DDD7] font-mono" /></div>
@@ -397,6 +416,11 @@ export default function DoctorDashboard() {
                 <Plus size={14} className="mr-1" /> Add medicine
               </Button>
             </div>
+
+            <AttachmentUploader
+              value={form.attachments}
+              onChange={(atts) => setForm((f) => ({ ...f, attachments: atts }))}
+            />
           </div>
 
           <DialogFooter>

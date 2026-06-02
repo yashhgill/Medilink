@@ -10,6 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import SyncIndicator from "@/components/SyncIndicator";
+import SlotPicker from "@/components/SlotPicker";
+import { AttachmentList } from "@/components/Attachments";
+import useQueueSocket from "@/hooks/useQueueSocket";
 import { Calendar, CreditCard, FileText, Pill, Plus, Stethoscope, WaveTriangle } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
@@ -44,9 +47,11 @@ export default function PatientDashboard() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 8000);
-    return () => clearInterval(t);
   }, []);
+
+  useQueueSocket((ev) => {
+    if (ev?.type?.startsWith("appointment.")) load();
+  });
 
   const book = async () => {
     setLoading(true);
@@ -202,6 +207,7 @@ export default function PatientDashboard() {
                     ))}
                   </div>
                 )}
+                {r.attachments?.length > 0 && <AttachmentList files={r.attachments} />}
                 <div className="mt-2 text-[10px] font-mono text-[#5C6661] flex items-center gap-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full ${r.sync_status === "cloud" ? "bg-[#2D6A4F]" : "bg-[#D4A373]"} breathe`} />
                   {r.sync_status}
@@ -214,7 +220,7 @@ export default function PatientDashboard() {
 
       {/* Book dialog */}
       <Dialog open={openBook} onOpenChange={setOpenBook}>
-        <DialogContent data-testid="book-dialog" className="bg-[#F9F9F6] border-[#E2DDD7]">
+        <DialogContent data-testid="book-dialog" className="bg-[#F9F9F6] border-[#E2DDD7] max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl">Book an appointment</DialogTitle>
             <DialogDescription>Pick a doctor and time.</DialogDescription>
@@ -236,13 +242,11 @@ export default function PatientDashboard() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Date & time</Label>
-              <Input
-                type="datetime-local"
-                data-testid="book-datetime"
+              <Label>Pick a slot</Label>
+              <SlotPicker
+                doctorId={booking.doctor_id}
                 value={booking.scheduled_at}
-                onChange={(e) => setBooking({ ...booking, scheduled_at: e.target.value })}
-                className="border-[#E2DDD7]"
+                onChange={(iso) => setBooking({ ...booking, scheduled_at: iso })}
               />
             </div>
             <div className="space-y-1.5">

@@ -3,6 +3,8 @@ import AppShell from "@/components/AppShell";
 import api from "@/lib/api";
 import SyncIndicator from "@/components/SyncIndicator";
 import NFCScanner from "@/components/NFCScanner";
+import SlotPicker from "@/components/SlotPicker";
+import useQueueSocket from "@/hooks/useQueueSocket";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,9 +46,11 @@ export default function ReceptionDashboard() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 5000);
-    return () => clearInterval(t);
   }, []);
+
+  useQueueSocket((ev) => {
+    if (ev?.type?.startsWith("appointment.")) load();
+  });
 
   const setStatus = async (id, status) => {
     await api.patch(`/appointments/${id}`, { status });
@@ -209,7 +213,7 @@ export default function ReceptionDashboard() {
       <NFCScanner open={nfcOpen} onOpenChange={setNfcOpen} onMatch={onNFCMatch} />
 
       <Dialog open={bookOpen} onOpenChange={(o) => { setBookOpen(o); if (!o) setScannedPatient(null); }}>
-        <DialogContent data-testid="recep-book-dialog" className="bg-[#F9F9F6] border-[#E2DDD7]">
+        <DialogContent data-testid="recep-book-dialog" className="bg-[#F9F9F6] border-[#E2DDD7] max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl">New appointment</DialogTitle>
             <DialogDescription>
@@ -240,8 +244,12 @@ export default function ReceptionDashboard() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Date & time</Label>
-              <Input type="datetime-local" data-testid="book-datetime-r" value={booking.scheduled_at} onChange={(e) => setBooking({ ...booking, scheduled_at: e.target.value })} className="border-[#E2DDD7]" />
+              <Label>Pick a slot</Label>
+              <SlotPicker
+                doctorId={booking.doctor_id}
+                value={booking.scheduled_at}
+                onChange={(iso) => setBooking({ ...booking, scheduled_at: iso })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Reason</Label>

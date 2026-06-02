@@ -2,17 +2,21 @@
 MediLink PHR — Cloud + AI + IoT Personal Health Records
 FastAPI backend with JWT auth, MongoDB persistence, Gemini AI integration.
 """
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, Header
-from fastapi.responses import StreamingResponse
+from fastapi import (
+    FastAPI, APIRouter, HTTPException, Depends, status, Header,
+    UploadFile, File, Query, WebSocket, WebSocketDisconnect,
+)
+from fastapi.responses import StreamingResponse, Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 import asyncio
+import requests
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
-from typing import List, Optional, Literal, Dict, Any
+from typing import List, Optional, Literal, Dict, Any, Set
 import uuid
 from datetime import datetime, timezone, timedelta
 import bcrypt
@@ -154,6 +158,24 @@ class MedicalRecordIn(BaseModel):
     notes: Optional[str] = None
     prescriptions: List[PrescriptionItem] = []
     allergies: Optional[str] = None
+    attachment_ids: List[str] = []
+
+
+class AvailabilityIn(BaseModel):
+    # day-of-week → "HH:MM-HH:MM" (empty string means off)
+    hours: Dict[str, str] = Field(default_factory=dict)
+    slot_minutes: int = 30
+
+
+DEFAULT_AVAILABILITY = {
+    "mon": "09:00-17:00",
+    "tue": "09:00-17:00",
+    "wed": "09:00-17:00",
+    "thu": "09:00-17:00",
+    "fri": "09:00-17:00",
+    "sat": "10:00-13:00",
+    "sun": "",
+}
 
 
 class MockPaymentIn(BaseModel):
@@ -184,6 +206,112 @@ def clean(doc):
     doc.pop("_id", None)
     doc.pop("password_hash", None)
     return doc
+
+
+# ------------------------------------------------------------
+# Object Storage (Emergent)
+# ------------------------------------------------------------
+STORAGE_URL = "https://integrations.emergentagent.com/objstore/api/v1/storage"
+APP_NAME = "medilink-phr"
+_storage_key: Optional[str] = None
+
+
+def init_storage() -> Optional[str]:
+    global _storage_key
+    if _storage_key:
+        return _storage_key
+    if not EMERGENT_LLM_KEY:
+        log.warning("EMERGENT_LLM_KEY missing — storage disabled")
+        return None
+    try:
+        r = requests.post(
+            f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_LLM_KEY}, timeout=30
+        )
+        r.raise_for_status()
+        _storage_key = r.json()["storage_key"]
+        log.info("Object storage initialised")
+        return _storage_key
+    except Exception as e:
+        log.error(f"Storage init failed: {e}")
+        return None
+
+
+def put_object(path: str, data: bytes, content_type: str) -> dict:
+    key = init_storage()
+    if not key:
+        raise HTTPException(503, "Storage not available")
+    r = requests.put(
+        f"{STORAGE_URL}/objects/{path}",
+        headers={"X-Storage-Key": key, "Content-Type": content_type},
+        data=data,
+        timeout=120,
+    )
+    if r.status_code == 403:
+        # refresh and retry once
+        globals()["_storage_key"] = None
+        key = init_storage()
+        r = requests.put(
+            f"{STORAGE_URL}/objects/{path}",
+            headers={"X-Storage-Key": key, "Content-Type": content_type},
+            data=data,
+            timeout=120,
+        )
+    r.raise_for_status()
+    return r.json()
+
+
+def get_object(path: str) -> tuple:
+    key = init_storage()
+    if not key:
+        raise HTTPException(503, "Storage not available")
+    r = requests.get(
+        f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60
+    )
+    if r.status_code == 403:
+        globals()["_storage_key"] = None
+        key = init_storage()
+        r = requests.get(
+            f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60
+        )
+    r.raise_for_status()
+    return r.content, r.headers.get("Content-Type", "application/octet-stream")
+
+
+# ------------------------------------------------------------
+# WebSocket Manager
+# ------------------------------------------------------------
+class WSManager:
+    def __init__(self):
+        self.active: Set[WebSocket] = set()
+        self.lock = asyncio.Lock()
+
+    async def connect(self, ws: WebSocket):
+        await ws.accept()
+        async with self.lock:
+            self.active.add(ws)
+
+    def disconnect(self, ws: WebSocket):
+        self.active.discard(ws)
+
+    async def broadcast(self, event: dict):
+        if not self.active:
+            return
+        dead = []
+        for ws in list(self.active):
+            try:
+                await ws.send_json(event)
+            except Exception:
+                dead.append(ws)
+        for d in dead:
+            self.active.discard(d)
+
+
+ws_manager = WSManager()
+
+
+def schedule_broadcast(event: dict):
+    """Fire-and-forget broadcast (safe inside async handlers)."""
+    asyncio.create_task(ws_manager.broadcast(event))
 
 
 # ------------------------------------------------------------
@@ -334,6 +462,7 @@ async def update_appointment(appt_id: str, body: AppointmentUpdate, user=Depends
     )
     if not res:
         raise HTTPException(404, "Appointment not found")
+    schedule_broadcast({"type": "appointment.updated", "appointment_id": appt_id, "changes": update})
     return clean(res)
 
 
@@ -356,6 +485,19 @@ async def todays_queue(user=Depends(get_current_user)):
 # ------------------------------------------------------------
 @api.post("/records")
 async def create_record(body: MedicalRecordIn, user=Depends(require_role("doctor"))):
+    # link any uploaded files to this record
+    attachments = []
+    if body.attachment_ids:
+        files = await db.files.find(
+            {"id": {"$in": body.attachment_ids}, "uploaded_by": user["id"], "is_deleted": False},
+            {"_id": 0},
+        ).to_list(50)
+        attachments = files
+        await db.files.update_many(
+            {"id": {"$in": [f["id"] for f in files]}},
+            {"$set": {"linked_record_pending": True}},
+        )
+
     doc = {
         "id": uid(),
         "patient_id": body.patient_id,
@@ -366,10 +508,16 @@ async def create_record(body: MedicalRecordIn, user=Depends(require_role("doctor
         "notes": body.notes,
         "prescriptions": [p.model_dump() for p in body.prescriptions],
         "allergies": body.allergies,
+        "attachments": attachments,
         "created_at": now_iso(),
         "sync_status": "local",  # local | syncing | cloud
     }
     await db.records.insert_one(doc)
+    if attachments:
+        await db.files.update_many(
+            {"id": {"$in": [f["id"] for f in attachments]}},
+            {"$set": {"record_id": doc["id"], "patient_id": body.patient_id}},
+        )
     # simulate sync to cloud after a short delay (background)
     asyncio.create_task(_sync_to_cloud(doc["id"]))
     return clean(doc)
@@ -417,6 +565,7 @@ async def mock_payment(body: MockPaymentIn, user=Depends(get_current_user)):
     await db.appointments.update_one(
         {"id": body.appointment_id}, {"$set": {"payment_status": "paid", "paid_amount": body.amount}}
     )
+    schedule_broadcast({"type": "appointment.updated", "appointment_id": body.appointment_id, "changes": {"payment_status": "paid"}})
     return clean(payment)
 
 
@@ -650,10 +799,223 @@ async def seed_demo_data():
             "license_no": u.get("license_no"),
             "created_at": now_iso(),
         }
+        if u["role"] == "doctor":
+            doc["availability"] = DEFAULT_AVAILABILITY
+            doc["slot_minutes"] = 30
         await db.users.insert_one(doc)
         seeded["created"].append(u["email"])
 
     return seeded
+
+
+# ------------------------------------------------------------
+# Doctor Availability + Slot generation
+# ------------------------------------------------------------
+def _parse_window(window: str):
+    """'09:00-17:00' → (datetime.time(9,0), datetime.time(17,0)); empty → None."""
+    if not window or "-" not in window:
+        return None
+    try:
+        a, b = window.split("-")
+        sh, sm = map(int, a.split(":"))
+        eh, em = map(int, b.split(":"))
+        return (sh * 60 + sm, eh * 60 + em)
+    except Exception:
+        return None
+
+
+@api.get("/availability/{doctor_id}")
+async def get_availability(doctor_id: str):
+    d = await db.users.find_one({"id": doctor_id, "role": "doctor"}, {"_id": 0, "password_hash": 0})
+    if not d:
+        raise HTTPException(404, "Doctor not found")
+    return {
+        "doctor_id": doctor_id,
+        "hours": d.get("availability") or DEFAULT_AVAILABILITY,
+        "slot_minutes": d.get("slot_minutes", 30),
+    }
+
+
+@api.patch("/availability/me")
+async def update_my_availability(body: AvailabilityIn, user=Depends(require_role("doctor"))):
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"availability": body.hours, "slot_minutes": body.slot_minutes}},
+    )
+    return {"hours": body.hours, "slot_minutes": body.slot_minutes}
+
+
+@api.get("/availability/{doctor_id}/slots")
+async def get_slots(doctor_id: str, date: str = Query(...)):
+    """Return 30-min slots for a given date, marking booked ones."""
+    d = await db.users.find_one({"id": doctor_id, "role": "doctor"}, {"_id": 0, "password_hash": 0})
+    if not d:
+        raise HTTPException(404, "Doctor not found")
+    try:
+        the_date = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        raise HTTPException(400, "date must be YYYY-MM-DD")
+
+    dow = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][the_date.weekday()]
+    hours_map = d.get("availability") or DEFAULT_AVAILABILITY
+    win = _parse_window(hours_map.get(dow, ""))
+    slot_min = int(d.get("slot_minutes", 30))
+
+    if not win:
+        return {"date": date, "doctor_id": doctor_id, "slots": [], "off": True}
+
+    start_min, end_min = win
+
+    # find booked slots for this doctor on this date
+    booked_appts = await db.appointments.find(
+        {
+            "doctor_id": doctor_id,
+            "scheduled_at": {"$regex": f"^{date}"},
+            "status": {"$ne": "cancelled"},
+        },
+        {"_id": 0, "scheduled_at": 1},
+    ).to_list(500)
+    booked_set = set()
+    for a in booked_appts:
+        try:
+            t = datetime.fromisoformat(a["scheduled_at"].replace("Z", "+00:00"))
+            booked_set.add(t.hour * 60 + t.minute)
+        except Exception:
+            pass
+
+    slots = []
+    cur = start_min
+    while cur + slot_min <= end_min:
+        hh, mm = divmod(cur, 60)
+        slot_iso = the_date.replace(hour=hh, minute=mm).isoformat()
+        slots.append(
+            {
+                "time": f"{hh:02d}:{mm:02d}",
+                "iso": slot_iso,
+                "booked": cur in booked_set,
+            }
+        )
+        cur += slot_min
+
+    return {"date": date, "doctor_id": doctor_id, "slots": slots, "off": False}
+
+
+# ------------------------------------------------------------
+# File attachments
+# ------------------------------------------------------------
+MIME_TYPES = {
+    "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+    "gif": "image/gif", "webp": "image/webp", "pdf": "application/pdf",
+    "txt": "text/plain", "csv": "text/csv",
+}
+MAX_FILE_BYTES = 10 * 1024 * 1024  # 10MB
+
+
+@api.post("/files/upload")
+async def upload_file(file: UploadFile = File(...), user=Depends(require_role("doctor", "admin"))):
+    raw = await file.read()
+    if len(raw) > MAX_FILE_BYTES:
+        raise HTTPException(413, "File exceeds 10MB limit")
+    fname = file.filename or "file.bin"
+    ext = (fname.rsplit(".", 1)[-1] if "." in fname else "bin").lower()
+    ctype = file.content_type or MIME_TYPES.get(ext, "application/octet-stream")
+    file_id = uid()
+    path = f"{APP_NAME}/uploads/{user['id']}/{file_id}.{ext}"
+    try:
+        result = put_object(path, raw, ctype)
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.exception("upload failed")
+        raise HTTPException(500, f"Upload failed: {e}")
+
+    rec = {
+        "id": file_id,
+        "storage_path": result["path"],
+        "original_filename": fname,
+        "content_type": ctype,
+        "size": result.get("size", len(raw)),
+        "uploaded_by": user["id"],
+        "uploaded_at": now_iso(),
+        "is_deleted": False,
+        "record_id": None,
+        "patient_id": None,
+    }
+    await db.files.insert_one(rec)
+    return clean(rec)
+
+
+@api.get("/files/{file_id}/download")
+async def download_file(
+    file_id: str,
+    authorization: Optional[str] = Header(None),
+    auth: Optional[str] = Query(None),
+):
+    # support either Authorization header or ?auth=<token>
+    token = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.split(" ", 1)[1]
+    elif auth:
+        token = auth
+    if not token:
+        raise HTTPException(401, "Missing token")
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+    except jwt.PyJWTError:
+        raise HTTPException(401, "Invalid token")
+    requester = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
+    if not requester:
+        raise HTTPException(401, "User not found")
+
+    rec = await db.files.find_one({"id": file_id, "is_deleted": False}, {"_id": 0})
+    if not rec:
+        raise HTTPException(404, "File not found")
+
+    # patient access restricted to own files
+    if requester["role"] == "patient" and rec.get("patient_id") != requester["id"]:
+        raise HTTPException(403, "Forbidden")
+
+    data, ctype = get_object(rec["storage_path"])
+    return Response(content=data, media_type=rec.get("content_type") or ctype)
+
+
+@api.get("/files/record/{record_id}")
+async def files_for_record(record_id: str, user=Depends(get_current_user)):
+    rec = await db.records.find_one({"id": record_id}, {"_id": 0})
+    if not rec:
+        raise HTTPException(404, "Record not found")
+    if user["role"] == "patient" and rec["patient_id"] != user["id"]:
+        raise HTTPException(403, "Forbidden")
+    files = await db.files.find({"record_id": record_id, "is_deleted": False}, {"_id": 0}).to_list(100)
+    return files
+
+
+# ------------------------------------------------------------
+# WebSocket — real-time queue updates
+# ------------------------------------------------------------
+@app.websocket("/api/ws/queue")
+async def ws_queue(ws: WebSocket, token: str = Query(...)):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+    except jwt.PyJWTError:
+        await ws.close(code=1008)
+        return
+    user = await db.users.find_one({"id": payload["sub"]})
+    if not user:
+        await ws.close(code=1008)
+        return
+    await ws_manager.connect(ws)
+    try:
+        await ws.send_json({"type": "hello", "role": user["role"]})
+        while True:
+            # keep-alive ping (client may ignore)
+            msg = await ws.receive_text()
+            if msg == "ping":
+                await ws.send_json({"type": "pong"})
+    except WebSocketDisconnect:
+        ws_manager.disconnect(ws)
+    except Exception:
+        ws_manager.disconnect(ws)
 
 
 @api.get("/")
@@ -674,11 +1036,18 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def _startup():
+    # init object storage (best-effort)
+    init_storage()
     # auto-seed once
     n = await db.users.count_documents({})
     if n == 0:
         await seed_demo_data()
         log.info("Seeded demo users on startup")
+    # backfill availability for existing doctors
+    await db.users.update_many(
+        {"role": "doctor", "availability": {"$exists": False}},
+        {"$set": {"availability": DEFAULT_AVAILABILITY, "slot_minutes": 30}},
+    )
 
 
 @app.on_event("shutdown")
