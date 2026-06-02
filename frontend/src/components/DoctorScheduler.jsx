@@ -56,7 +56,8 @@ export default function DoctorScheduler({ doctorId }) {
       ]);
       setSlots(s.data.slots || []);
       const list = (a.data || [])
-        .filter((x) => x.doctor_id === doctorId && (x.scheduled_at || "").startsWith(date));
+        .filter((x) => x.doctor_id === doctorId && (x.scheduled_at || "").startsWith(date))
+        .filter((x) => x.is_block || x.status !== "cancelled");
       setAppts(list);
     } finally {
       setLoading(false);
@@ -104,8 +105,7 @@ export default function DoctorScheduler({ doctorId }) {
 
   const unblock = async (a) => {
     try {
-      await api.patch(`/appointments/${a.id}`, { status: "cancelled" });
-      // hide from view by removing locally (it's already cancelled in backend; load will filter blocks-as-cancelled)
+      await api.delete(`/appointments/${a.id}`);
       load();
     } catch (e) {
       toast.error("Could not remove block");

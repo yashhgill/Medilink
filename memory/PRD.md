@@ -32,8 +32,9 @@
 - **WebSocket real-time queue** (no more polling) at `/api/ws/queue`
 - **IoT vitals via Web Bluetooth** (HR, Temp, SpO₂) with Simulated-device fallback
 - **Doctor availability calendar** with slot picker; weekly hours editor on Doctor dashboard
-- **Public Kiosk terminal** (/kiosk) — check-in → queue ticket chit; pay → receipt + medicine chit; printable via `window.print()`
+- **Public Kiosk terminal** (/kiosk) — check-in → queue ticket chit; pay → receipt + medicine chit; printable via `window.print()`; **walk-in self-registration** when IC is unknown
 - **Pharmacy dashboard** (/pharmacy) — sees prescriptions for paid patients, "Dispense" marks treatment complete (status=dispensed)
+- **Doctor drag-and-drop day planner** — reschedule by dragging blocks between slots; "+" blocks time; "X" removes blocks (DELETE /api/appointments/{id})
 - New statuses: `ready_for_pharmacy`, `dispensed`
 - Auto-seeded demo data (3 patients, 2 doctors, 1 admin, 1 pharmacist)
 - Four role-aware dashboards + public kiosk

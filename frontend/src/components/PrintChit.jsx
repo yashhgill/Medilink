@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Printer, X, Heartbeat } from "@phosphor-icons/react";
 
@@ -24,7 +24,12 @@ export default function PrintChit({ open, onOpenChange, chit, onClose, secondary
       <DialogContent
         data-testid="print-chit-dialog"
         className="bg-[#F9F9F6] border-[#E2DDD7] max-w-md p-0 overflow-hidden no-print-overlay"
+        aria-describedby="chit-description"
       >
+        <DialogTitle className="sr-only">Printable chit</DialogTitle>
+        <DialogDescription id="chit-description" className="sr-only">
+          Your ticket details. Click Print chit to print.
+        </DialogDescription>
         <div ref={ref} className="chit-print-area bg-white p-8 m-4 rounded-2xl border border-dashed border-[#1C3F39]/40" data-testid="print-chit">
           <ChitContent chit={chit} />
           {secondary && (

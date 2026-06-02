@@ -1315,6 +1315,22 @@ async def block_time(body: BlockTimeIn, user=Depends(require_role("doctor"))):
     return clean(doc)
 
 
+@api.delete("/appointments/{appt_id}")
+async def delete_appointment(appt_id: str, user=Depends(get_current_user)):
+    """Delete an appointment. Doctors may only delete their own blocks."""
+    appt = await db.appointments.find_one({"id": appt_id})
+    if not appt:
+        raise HTTPException(404, "Appointment not found")
+    if user["role"] == "doctor":
+        if appt.get("doctor_id") != user["id"] or not appt.get("is_block"):
+            raise HTTPException(403, "Doctors can only delete their own time blocks")
+    elif user["role"] not in ("admin",):
+        raise HTTPException(403, "Forbidden")
+    await db.appointments.delete_one({"id": appt_id})
+    schedule_broadcast({"type": "appointment.deleted", "appointment_id": appt_id})
+    return {"ok": True, "deleted": appt_id}
+
+
 # ------------------------------------------------------------
 # Pharmacy
 # ------------------------------------------------------------
