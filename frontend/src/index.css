@@ -190,3 +190,27 @@ h1, h2, h3, h4, h5 {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Print chit — print only the chit area */
+@media print {
+  body.chit-print > *:not(.chit-print-area-wrapper) {
+    visibility: hidden !important;
+  }
+  body.chit-print .chit-print-area {
+    visibility: visible !important;
+    position: fixed;
+    top: 0; left: 0;
+    width: 80mm;
+    margin: 8mm;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  body.chit-print .chit-print-area * {
+    visibility: visible !important;
+  }
+  body.chit-print .no-print-overlay {
+    box-shadow: none !important;
+    background: transparent !important;
+    border: none !important;
+  }
+}

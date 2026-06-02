@@ -67,9 +67,11 @@ export default function DoctorDashboard() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 8000);
-    return () => clearInterval(t);
   }, []);
+
+  useQueueSocket((ev) => {
+    if (ev?.type?.startsWith("appointment.")) load();
+  });
 
   const openPatient = async (pid) => {
     setActivePatientId(pid);

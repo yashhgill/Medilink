@@ -18,6 +18,7 @@ const roleLabel = {
   patient: "Patient",
   doctor: "Doctor",
   admin: "Reception · Admin",
+  pharmacist: "Pharmacy",
 };
 
 export default function AppShell({ children, title, subtitle, navItems = [] }) {

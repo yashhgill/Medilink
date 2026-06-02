@@ -9,6 +9,8 @@ import Register from "@/pages/Register";
 import PatientDashboard from "@/pages/PatientDashboard";
 import DoctorDashboard from "@/pages/DoctorDashboard";
 import ReceptionDashboard from "@/pages/ReceptionDashboard";
+import PharmacyDashboard from "@/pages/PharmacyDashboard";
+import Kiosk from "@/pages/Kiosk";
 import { Toaster } from "@/components/ui/sonner";
 
 function HomeGate() {
@@ -25,6 +27,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<HomeGate />} />
+            <Route path="/kiosk" element={<Kiosk />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route
@@ -48,6 +51,14 @@ function App() {
               element={
                 <ProtectedRoute roles={["admin"]}>
                   <ReceptionDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pharmacy"
+              element={
+                <ProtectedRoute roles={["pharmacist", "admin"]}>
+                  <PharmacyDashboard />
                 </ProtectedRoute>
               }
             />

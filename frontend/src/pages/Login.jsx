@@ -11,6 +11,7 @@ const demoAccounts = [
   { role: "Patient", email: "patient1@medilink.io", pwd: "Patient@123" },
   { role: "Doctor", email: "dr.tan@medilink.io", pwd: "Doctor@123" },
   { role: "Reception", email: "admin@medilink.io", pwd: "Admin@123" },
+  { role: "Pharmacy", email: "pharmacy@medilink.io", pwd: "Pharm@123" },
 ];
 
 export default function Login() {
@@ -178,5 +179,6 @@ export default function Login() {
 export function redirectFor(role) {
   if (role === "doctor") return "/doctor";
   if (role === "admin") return "/reception";
+  if (role === "pharmacist") return "/pharmacy";
   return "/patient";
 }

@@ -99,7 +99,7 @@ def require_role(*roles: str):
 # ------------------------------------------------------------
 # Models
 # ------------------------------------------------------------
-Role = Literal["patient", "doctor", "admin"]
+Role = Literal["patient", "doctor", "admin", "pharmacist"]
 
 
 class RegisterIn(BaseModel):
@@ -129,8 +129,24 @@ class AppointmentIn(BaseModel):
 
 
 class AppointmentUpdate(BaseModel):
-    status: Optional[Literal["scheduled", "checked_in", "in_progress", "completed", "cancelled"]] = None
+    status: Optional[Literal[
+        "scheduled", "checked_in", "in_progress", "completed",
+        "ready_for_pharmacy", "dispensed", "cancelled",
+    ]] = None
     queue_number: Optional[int] = None
+
+
+class KioskCheckinIn(BaseModel):
+    ic_number: str
+    doctor_id: Optional[str] = None  # if omitted, pick the first available doctor today
+    reason: Optional[str] = "Walk-in consultation"
+    fee: float = 50.0
+
+
+class KioskPayIn(BaseModel):
+    ic_number: str
+    appointment_id: str
+    method: Literal["card", "wallet", "fpx"] = "card"
 
 
 class VitalSigns(BaseModel):
@@ -431,6 +447,7 @@ async def create_appointment(body: AppointmentIn, user=Depends(get_current_user)
         "created_by": user["id"],
     }
     await db.appointments.insert_one(doc)
+    schedule_broadcast({"type": "appointment.created", "appointment_id": doc["id"]})
     return clean(doc)
 
 
@@ -733,6 +750,12 @@ async def seed_demo_data():
             "role": "admin",
         },
         {
+            "email": "pharmacy@medilink.io",
+            "password": "Pharm@123",
+            "name": "Pn. Lily Lim",
+            "role": "pharmacist",
+        },
+        {
             "email": "dr.tan@medilink.io",
             "password": "Doctor@123",
             "name": "Dr. Wei Tan",
@@ -988,6 +1011,277 @@ async def files_for_record(record_id: str, user=Depends(get_current_user)):
         raise HTTPException(403, "Forbidden")
     files = await db.files.find({"record_id": record_id, "is_deleted": False}, {"_id": 0}).to_list(100)
     return files
+
+
+# ------------------------------------------------------------
+# Kiosk (public, unauthenticated) endpoints
+# Real-world: a tamper-proof kiosk on the clinic floor. We trust the
+# IC-number as the identity proof (just like the NFC tap).
+# ------------------------------------------------------------
+KIOSK_DEFAULT_FEE = 50.0
+
+
+async def _patient_by_ic(ic: str):
+    return await db.users.find_one(
+        {"role": "patient", "ic_number": ic}, {"_id": 0, "password_hash": 0}
+    )
+
+
+async def _todays_appts_for_patient(patient_id: str):
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    items = await db.appointments.find(
+        {"patient_id": patient_id, "scheduled_at": {"$regex": f"^{today}"}},
+        {"_id": 0},
+    ).sort("queue_number", 1).to_list(20)
+    for a in items:
+        d = await db.users.find_one({"id": a["doctor_id"]}, {"_id": 0, "password_hash": 0})
+        a["doctor"] = d
+    return items
+
+
+@api.get("/kiosk/lookup/{ic_number}")
+async def kiosk_lookup(ic_number: str):
+    """Public — used by the kiosk to identify a patient by IC."""
+    p = await _patient_by_ic(ic_number.strip())
+    if not p:
+        raise HTTPException(404, "No patient registered with this IC")
+    appts = await _todays_appts_for_patient(p["id"])
+    return {"patient": p, "today_appointments": appts}
+
+
+@api.post("/kiosk/checkin")
+async def kiosk_checkin(body: KioskCheckinIn):
+    """
+    Public — patient walks up to kiosk, taps IC, this either:
+      - returns the EXISTING scheduled appointment for today (and marks it checked_in), or
+      - creates a NEW walk-in appointment with a fresh queue number.
+    Returns ticket data for the printable chit.
+    """
+    p = await _patient_by_ic(body.ic_number.strip())
+    if not p:
+        raise HTTPException(404, "No patient registered with this IC")
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # find earliest scheduled today
+    existing = await db.appointments.find_one(
+        {
+            "patient_id": p["id"],
+            "scheduled_at": {"$regex": f"^{today}"},
+            "status": {"$in": ["scheduled", "checked_in"]},
+        },
+        {"_id": 0},
+        sort=[("scheduled_at", 1)],
+    )
+
+    if existing:
+        if existing["status"] == "scheduled":
+            await db.appointments.update_one(
+                {"id": existing["id"]}, {"$set": {"status": "checked_in"}}
+            )
+            existing["status"] = "checked_in"
+            schedule_broadcast({
+                "type": "appointment.updated",
+                "appointment_id": existing["id"],
+                "changes": {"status": "checked_in"},
+            })
+        appt = existing
+    else:
+        # walk-in — pick a doctor
+        doctor = None
+        if body.doctor_id:
+            doctor = await db.users.find_one({"id": body.doctor_id, "role": "doctor"})
+        if not doctor:
+            doctor = await db.users.find_one({"role": "doctor"})
+        if not doctor:
+            raise HTTPException(503, "No doctors configured")
+
+        q = await next_queue_number()
+        appt = {
+            "id": uid(),
+            "patient_id": p["id"],
+            "doctor_id": doctor["id"],
+            "scheduled_at": now_iso(),
+            "reason": body.reason or "Walk-in consultation",
+            "fee": body.fee,
+            "status": "checked_in",
+            "queue_number": q,
+            "payment_status": "unpaid",
+            "created_at": now_iso(),
+            "created_by": "kiosk",
+            "source": "kiosk",
+        }
+        await db.appointments.insert_one(appt)
+        schedule_broadcast({"type": "appointment.created", "appointment_id": appt["id"]})
+
+    # enrich for chit
+    d = await db.users.find_one({"id": appt["doctor_id"]}, {"_id": 0, "password_hash": 0})
+
+    chit = {
+        "type": "QUEUE",
+        "clinic_name": "MediLink Clinic",
+        "patient_name": p["name"],
+        "patient_ic": p["ic_number"],
+        "queue_number": appt["queue_number"],
+        "doctor_name": d["name"] if d else "-",
+        "doctor_specialty": (d or {}).get("specialty", "General"),
+        "reason": appt["reason"],
+        "issued_at": now_iso(),
+        "appointment_id": appt["id"],
+    }
+    return {"appointment": clean(dict(appt)), "patient": p, "doctor": d, "chit": chit}
+
+
+@api.post("/kiosk/pay")
+async def kiosk_pay(body: KioskPayIn):
+    """
+    Public — patient pays at the kiosk after seeing the doctor.
+    Marks payment, advances status → ready_for_pharmacy.
+    Returns receipt + medicine collection chit.
+    """
+    p = await _patient_by_ic(body.ic_number.strip())
+    if not p:
+        raise HTTPException(404, "No patient registered with this IC")
+
+    appt = await db.appointments.find_one({"id": body.appointment_id})
+    if not appt or appt["patient_id"] != p["id"]:
+        raise HTTPException(404, "Appointment not found for this patient")
+    if appt.get("payment_status") == "paid":
+        raise HTTPException(400, "Appointment already paid")
+
+    amount = float(appt.get("fee") or KIOSK_DEFAULT_FEE)
+    payment = {
+        "id": uid(),
+        "appointment_id": appt["id"],
+        "amount": amount,
+        "method": body.method,
+        "status": "succeeded",
+        "paid_by": "kiosk",
+        "paid_at": now_iso(),
+        "txn_ref": f"TXN-{uuid.uuid4().hex[:10].upper()}",
+        "source": "kiosk",
+    }
+    await db.payments.insert_one(payment)
+    await db.appointments.update_one(
+        {"id": appt["id"]},
+        {"$set": {
+            "payment_status": "paid",
+            "paid_amount": amount,
+            "status": "ready_for_pharmacy",
+        }},
+    )
+    schedule_broadcast({
+        "type": "appointment.updated",
+        "appointment_id": appt["id"],
+        "changes": {"payment_status": "paid", "status": "ready_for_pharmacy"},
+    })
+
+    # fetch latest record's prescriptions (treatment notes)
+    rec = await db.records.find_one(
+        {"patient_id": p["id"], "appointment_id": appt["id"]}, {"_id": 0},
+        sort=[("created_at", -1)],
+    )
+    if not rec:
+        # fallback — any record by this doctor today
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        rec = await db.records.find_one(
+            {"patient_id": p["id"], "created_at": {"$regex": f"^{today}"}},
+            {"_id": 0}, sort=[("created_at", -1)],
+        )
+    prescriptions = (rec or {}).get("prescriptions", [])
+    diagnosis = (rec or {}).get("diagnosis", "—")
+    doctor = await db.users.find_one({"id": appt["doctor_id"]}, {"_id": 0, "password_hash": 0})
+
+    receipt = {
+        "type": "RECEIPT",
+        "clinic_name": "MediLink Clinic",
+        "patient_name": p["name"],
+        "patient_ic": p["ic_number"],
+        "amount": amount,
+        "method": body.method,
+        "txn_ref": payment["txn_ref"],
+        "paid_at": payment["paid_at"],
+        "appointment_id": appt["id"],
+    }
+    medicine_chit = {
+        "type": "MEDICINE",
+        "clinic_name": "MediLink Pharmacy",
+        "patient_name": p["name"],
+        "patient_ic": p["ic_number"],
+        "queue_number": appt["queue_number"],
+        "doctor_name": doctor["name"] if doctor else "-",
+        "diagnosis": diagnosis,
+        "prescriptions": prescriptions,
+        "appointment_id": appt["id"],
+        "issued_at": now_iso(),
+    }
+    return {
+        "appointment": clean(dict(appt)),
+        "payment": clean(payment),
+        "receipt": receipt,
+        "medicine_chit": medicine_chit,
+    }
+
+
+@api.get("/kiosk/appointment/{appointment_id}")
+async def kiosk_appointment(appointment_id: str, ic_number: str = Query(...)):
+    p = await _patient_by_ic(ic_number)
+    if not p:
+        raise HTTPException(404, "Unknown IC")
+    appt = await db.appointments.find_one({"id": appointment_id}, {"_id": 0})
+    if not appt or appt["patient_id"] != p["id"]:
+        raise HTTPException(404, "Appointment not found")
+    return clean(appt)
+
+
+# ------------------------------------------------------------
+# Pharmacy
+# ------------------------------------------------------------
+@api.get("/pharmacy/queue")
+async def pharmacy_queue(user=Depends(require_role("pharmacist", "admin"))):
+    """Patients whose payment is settled and waiting for medicine."""
+    items = await db.appointments.find(
+        {"status": "ready_for_pharmacy"}, {"_id": 0}
+    ).sort("paid_amount", -1).to_list(200)
+    for a in items:
+        p = await db.users.find_one({"id": a["patient_id"]}, {"_id": 0, "password_hash": 0})
+        d = await db.users.find_one({"id": a["doctor_id"]}, {"_id": 0, "password_hash": 0})
+        rec = await db.records.find_one(
+            {"patient_id": a["patient_id"], "appointment_id": a["id"]}, {"_id": 0},
+            sort=[("created_at", -1)],
+        )
+        if not rec:
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            rec = await db.records.find_one(
+                {"patient_id": a["patient_id"], "created_at": {"$regex": f"^{today}"}},
+                {"_id": 0}, sort=[("created_at", -1)],
+            )
+        a["patient"] = p
+        a["doctor"] = d
+        a["record"] = rec
+    return items
+
+
+@api.post("/pharmacy/dispense/{appointment_id}")
+async def pharmacy_dispense(appointment_id: str, user=Depends(require_role("pharmacist", "admin"))):
+    appt = await db.appointments.find_one({"id": appointment_id})
+    if not appt:
+        raise HTTPException(404, "Appointment not found")
+    if appt.get("status") != "ready_for_pharmacy":
+        raise HTTPException(400, "Appointment is not ready for pharmacy")
+    await db.appointments.update_one(
+        {"id": appointment_id},
+        {"$set": {
+            "status": "dispensed",
+            "dispensed_at": now_iso(),
+            "dispensed_by": user["id"],
+        }},
+    )
+    schedule_broadcast({
+        "type": "appointment.updated",
+        "appointment_id": appointment_id,
+        "changes": {"status": "dispensed"},
+    })
+    return {"ok": True, "appointment_id": appointment_id, "status": "dispensed"}
 
 
 # ------------------------------------------------------------
