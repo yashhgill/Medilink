@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import SyncIndicator from "@/components/SyncIndicator";
 import AIChat from "@/components/AIChat";
+import useQueueSocket from "@/hooks/useQueueSocket";
 import {
   Heartbeat,
   SignOut,
@@ -12,6 +13,7 @@ import {
   ChartLine,
   Calendar,
   Sparkle,
+  Broadcast,
 } from "@phosphor-icons/react";
 
 const roleLabel = {

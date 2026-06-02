@@ -113,6 +113,14 @@ export default function Landing() {
             >
               <Cardholder size={16} className="mr-1.5" weight="duotone" /> Try a demo login
             </Button>
+            <Button
+              data-testid="cta-kiosk"
+              variant="outline"
+              onClick={() => nav("/kiosk")}
+              className="rounded-full px-6 h-12 border-[#1C3F39] text-[#1C3F39] hover:bg-[#1C3F39] hover:text-[#F9F9F6]"
+            >
+              Open Kiosk <ArrowRight size={16} className="ml-1.5" />
+            </Button>
           </div>
 
           <div className="mt-10 flex items-center gap-6 text-xs text-[#5C6661] font-mono">

@@ -21,6 +21,8 @@ const statusColors = {
   checked_in: "bg-[#D4A373]/30 text-[#1C3F39]",
   in_progress: "bg-[#B55B49]/20 text-[#9B2226]",
   completed: "bg-[#2D6A4F]/20 text-[#2D6A4F]",
+  ready_for_pharmacy: "bg-[#1C3F39] text-[#F9F9F6]",
+  dispensed: "bg-[#2D6A4F] text-[#F9F9F6]",
   cancelled: "bg-[#5C6661]/15 text-[#5C6661]",
 };
 

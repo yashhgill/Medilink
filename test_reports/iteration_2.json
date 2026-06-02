@@ -1,0 +1,63 @@
+{
+  "summary": "Iteration 3 (Kiosk + Pharmacy) tested end-to-end. Backend: 21/21 pytest tests PASS (kiosk lookup/checkin/pay, pharmacy queue/dispense, AppointmentUpdate enum, pharmacist seed, regression). Frontend: full kiosk flow works (Landing→/kiosk→identify→walk-in checkin→QUEUE chit→Pay→Receipt+Medicine chit). Pharmacy dashboard, all 4 demo logins, doctor/patient/reception dashboards load cleanly after fixing two missing-import bugs in AppShell.jsx that blocked every authenticated route.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/kiosk/pay",
+        "issue": "Returned `appointment` object is STALE — it reflects pre-update state (status='checked_in', payment_status='unpaid') even though the DB row is correctly updated to status='ready_for_pharmacy'/payment_status='paid'. Cause: handler reads appt dict before the update_one() call and returns the same in-memory dict without re-fetching or mutating it. Fix: re-fetch with `await db.appointments.find_one({'id': appt['id']})` after the update before returning, OR update the local dict in place."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "AppShell.jsx",
+        "issue": "FIXED by testing agent — missing imports `useQueueSocket` and `Broadcast` icon. Threw `ReferenceError: useQueueSocket is not defined`, crashing every authenticated route (pharmacy, doctor, reception, patient dashboards). Patient->Kiosk public flow was unaffected since /kiosk doesn't use AppShell.",
+        "selector": "/app/frontend/src/components/AppShell.jsx",
+        "priority": "CRITICAL (now resolved)"
+      },
+      {
+        "component": "Status badge formatter (Patient/Doctor/Reception dashboards)",
+        "issue": "Status string 'ready_for_pharmacy' is rendered as 'ready for_pharmacy' (only first underscore replaced). Likely using `.replace('_', ' ')` instead of `.replaceAll('_', ' ')` or `/_/g`. Cosmetic only.",
+        "selector": "status badge spans",
+        "priority": "LOW"
+      },
+      {
+        "component": "PrintChit / Radix Dialog",
+        "issue": "Console warnings: DialogContent missing DialogTitle and Description (a11y). Doesn't break tests but should be addressed for screen-reader users (wrap title in VisuallyHidden).",
+        "selector": "[data-testid='print-chit']",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration3.py",
+    "/app/test_reports/pytest/iteration3.xml"
+  ],
+  "action_items": [
+    "Backend (minor): re-fetch or mutate the local appointment dict after the update in POST /api/kiosk/pay so the response payload reflects the new status/payment_status (the frontend in Kiosk.jsx may rely on it).",
+    "Frontend (minor): change `.replace('_', ' ')` → `.replaceAll('_', ' ')` for status badges so 'ready_for_pharmacy' renders 'ready for pharmacy'.",
+    "Frontend (minor): add DialogTitle/Description (or VisuallyHidden) inside PrintChit DialogContent to silence a11y warnings.",
+    "No further critical work needed for iteration 3 — both demo flows (kiosk and pharmacy) work end-to-end with the missing-import fixes applied."
+  ],
+  "critical_code_review_comments": [
+    "/app/frontend/src/components/AppShell.jsx had two unimported identifiers (useQueueSocket, Broadcast). This indicates the file was edited but not lint-checked before commit. Recommend running `yarn lint` (eslint no-undef) as a pre-commit gate.",
+    "/app/backend/server.py is now 1349 lines — exceeds the 700-line guideline. Suggest splitting into routers/modules (auth, appointments, kiosk, pharmacy, ai, records, ws).",
+    "POST /api/kiosk/pay computes the response payload without re-reading the just-updated document, leading to a stale `appointment` object. Pattern repeats anywhere `update_one` is followed by `clean(dict(appt))`.",
+    "Kiosk public endpoints are intentionally unauthenticated but accept any IC string — consider lightweight rate-limiting per IC/IP for production to mitigate enumeration."
+  ],
+  "updated_files": [
+    "/app/frontend/src/components/AppShell.jsx (added missing imports for useQueueSocket and Broadcast)",
+    "/app/backend/tests/test_iteration3.py (NEW test file, 21 tests covering all iteration-3 endpoints + regression)"
+  ],
+  "success_rate": {"backend": "100% (21/21)", "frontend": "100% of tested flows after AppShell fix"},
+  "test_credentials": "Used /app/memory/test_credentials.md as-is. Pharmacy demo: pharmacy@medilink.io / Pharm@123 confirmed working. Other demos unchanged.",
+  "seed_data_creation": "POST /api/seed called from module-scope fixture. Test-created records prefixed TEST_ (TEST_walkin, TEST_Iter3, TEST_enum). Backend tests dispense the paid appointment, so re-running the suite is idempotent (idempotency test passes).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run `cd /app && REACT_APP_BACKEND_URL=$(grep ^REACT_APP_BACKEND_URL frontend/.env | cut -d= -f2) python -m pytest backend/tests/test_iteration3.py -v` for regression. The kiosk flow on /kiosk uses IC-880421-14-5567 and is public (no auth). Pharmacy dashboard requires login as pharmacy@medilink.io / Pharm@123 (role=pharmacist). Be aware that AppShell.jsx had missing imports — if the main agent rewrites that file, double-check `useQueueSocket` and `Broadcast` imports are preserved.",
+  "rca of the issue": "Critical bug RCA — Empty pharmacy/doctor/reception/patient dashboards: AppShell.jsx referenced `useQueueSocket` (line 31) and `Broadcast` (line 85) without importing them. React threw `ReferenceError` at component-mount time, which the route boundary caught and rendered nothing for the dashboard layout. Public /kiosk route was unaffected because it does not wrap children in AppShell. Reproduction: log in as any role; dashboard area stays blank and console shows `ReferenceError: useQueueSocket is not defined`. Mitigation applied: added `import useQueueSocket from \"@/hooks/useQueueSocket\"` and added `Broadcast` to the existing `@phosphor-icons/react` import block. Both dashboards now render and live-sync events trigger the green Live indicator. Recommend adding eslint `no-undef` enforcement to prevent regressions."
+}

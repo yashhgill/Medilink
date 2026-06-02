@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import useQueueSocket from "@/hooks/useQueueSocket";
 import SyncIndicator from "@/components/SyncIndicator";
-import { Pill, CheckCircle, FlaskRound, ListChecks } from "@phosphor-icons/react";
+import { Pill, CheckCircle, Flask, ListChecks } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
 export default function PharmacyDashboard() {
@@ -58,7 +58,7 @@ export default function PharmacyDashboard() {
 
         <div className="rounded-2xl border border-[#E2DDD7] bg-white p-6 lg:col-span-2 flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-[#F3EFE9] flex items-center justify-center">
-            <FlaskRound size={26} weight="duotone" color="#1C3F39" />
+            <Flask size={26} weight="duotone" color="#1C3F39" />
           </div>
           <div className="flex-1">
             <div className="overline">How it works</div>
