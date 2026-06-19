@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  # ── Local PostgreSQL (runs on your SSD server) ──────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: medilink_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: medilink
+      POSTGRES_USER: medilink
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medilink"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI backend ──────────────────────────────────────────────────────────
+  backend:
+    build: ./backend
+    container_name: medilink_api
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://medilink:${DB_PASSWORD:-changeme}@db:5432/medilink
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uvicorn server:app --host 0.0.0.0 --port 8000 --workers 2
+
+  # ── React frontend (dev mode) ───────────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: medilink_web
+    restart: unless-stopped
+    environment:
+      REACT_APP_BACKEND_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

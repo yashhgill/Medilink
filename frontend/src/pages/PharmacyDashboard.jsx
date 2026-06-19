@@ -7,7 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import useQueueSocket from "@/hooks/useQueueSocket";
 import SyncIndicator from "@/components/SyncIndicator";
-import { Pill, CheckCircle, Flask, ListChecks } from "@phosphor-icons/react";
+import { Pill, CheckCircle, Flask, ListChecks, Package } from "@phosphor-icons/react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import PharmacyInventory from "./PharmacyInventory";
+
 import { toast } from "sonner";
 
 export default function PharmacyDashboard() {
@@ -34,7 +37,7 @@ export default function PharmacyDashboard() {
   const dispense = async (appt) => {
     setBusy(appt.id);
     try {
-      await api.post(`/pharmacy/dispense/${appt.id}`);
+      await api.post("/pharmacy/dispense", { appointment_id: appt.id, patient_id: appt.patient_id, items: (appt.record?.prescriptions || []).map(p => ({ name: p.medicine, qty: 1 })) });
       toast.success(`Dispensed to ${appt.patient?.name} · treatment complete`);
       setConfirmOpen(null);
       load();

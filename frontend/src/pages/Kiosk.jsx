@@ -121,7 +121,7 @@ export default function Kiosk() {
         </div>
 
         <div className="mt-6 text-center text-[11px] text-white/50 font-mono">
-          Demo ICs: IC-880421-14-5567 · IC-950311-08-2210 · IC-720915-10-7733
+          Demo ICs: 880421-14-5567 · 950311-08-2210 · 720915-10-7733
         </div>
       </main>
 
@@ -219,7 +219,7 @@ function CheckinFlow({ onPrint }) {
       if (videoRef.current) videoRef.current.srcObject = s;
       setScanning(true);
       setTimeout(() => {
-        const decoded = "IC-880421-14-5567";
+        const decoded = "880421-14-5567";
         toast.info(`QR decoded → ${decoded}`);
         stopCam();
         setIc(decoded);
@@ -433,7 +433,7 @@ function CheckinFlow({ onPrint }) {
               data-testid="kiosk-ic-input"
               value={ic}
               onChange={(e) => setIc(e.target.value)}
-              placeholder="IC-880421-14-5567"
+              placeholder="880421-14-5567"
               className="border-[#E2DDD7] font-mono"
             />
             <Button
@@ -535,7 +535,7 @@ function PayFlow({ onPrint }) {
           data-testid="kiosk-pay-ic"
           value={ic}
           onChange={(e) => setIc(e.target.value)}
-          placeholder="IC-880421-14-5567"
+          placeholder="880421-14-5567"
           className="font-mono border-[#E2DDD7]"
         />
         <Button
@@ -657,7 +657,7 @@ function StatusFlow() {
           data-testid="kiosk-status-ic"
           value={ic}
           onChange={(e) => setIc(e.target.value)}
-          placeholder="IC-880421-14-5567"
+          placeholder="880421-14-5567"
           className="font-mono border-[#E2DDD7] mt-4"
         />
         <Button
