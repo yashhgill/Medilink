@@ -1,7 +1,7 @@
 version: "3.9"
 
 services:
-  # ── Local PostgreSQL (runs on your SSD server) ──────────────────────────────
+  # ── PostgreSQL — local (HP Folio 9470m) ────────────────────────────────────
   db:
     image: postgres:16-alpine
     container_name: medilink_db
@@ -20,7 +20,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── FastAPI backend ──────────────────────────────────────────────────────────
+  # ── FastAPI backend ─────────────────────────────────────────────────────────
   backend:
     build: ./backend
     container_name: medilink_api
@@ -28,14 +28,16 @@ services:
     env_file: ./backend/.env
     environment:
       DATABASE_URL: postgresql://medilink:${DB_PASSWORD:-changeme}@db:5432/medilink
+      IS_CLOUD_NODE: "false"
+      FACILITY_ID: "main"
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
-    command: uvicorn server:app --host 0.0.0.0 --port 8000 --workers 2
+    command: uvicorn server:app --host 0.0.0.0 --port 8000 --workers 2 --reload
 
-  # ── React frontend (dev mode) ───────────────────────────────────────────────
+  # ── React frontend ──────────────────────────────────────────────────────────
   frontend:
     build: ./frontend
     container_name: medilink_web
@@ -49,3 +51,14 @@ services:
 
 volumes:
   pgdata:
+
+# ── Usage notes ────────────────────────────────────────────────────────────────
+# Local (HP Folio 9470m):
+#   docker compose up -d
+#   curl -X POST http://localhost:8000/api/seed
+#
+# iPad Kiosk: open http://<laptop-ip>:3000/kiosk in Safari
+#
+# Patient app: open http://<laptop-ip>:3000 and login with patient credentials
+#
+# Cloud node: deploy backend with IS_CLOUD_NODE=true and your cloud DB URL

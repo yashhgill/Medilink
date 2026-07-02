@@ -1,54 +1,61 @@
 """
-MediLink — High-Availability Hybrid Cloud EHR Platform
-FastAPI backend | PostgreSQL | Groq AI | Malaysian IC parser | Local payments
+MediLink v3.0 — High-Availability Hybrid Cloud EHR Platform
+FastAPI | PostgreSQL | Groq AI (MTS Triage) | Malaysian IC | Local payments
+HP Folio 9470m (local) ↔ Cloud (Supabase/AWS)
 """
 from fastapi import (
-    FastAPI, APIRouter, HTTPException, Depends, status, Header,
-    UploadFile, File, Query, WebSocket, WebSocketDisconnect, Request,
+    FastAPI, APIRouter, HTTPException, Depends, Header,
+    Query, WebSocket, WebSocketDisconnect, Request, BackgroundTasks,
 )
-from fastapi.responses import StreamingResponse, Response, JSONResponse
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from databases import Database
 from sqlalchemy import (
     MetaData, Table, Column, String, Float, Integer, Boolean,
-    DateTime, Text, JSON, create_engine, text,
+    Text, JSON, create_engine, text,
 )
 from dotenv import load_dotenv
 from pathlib import Path
-import os, logging, asyncio, uuid, json, re, io, base64
+import os, logging, asyncio, uuid, json, re, io, base64, httpx
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any, Literal, Set
 from pydantic import BaseModel, Field, EmailStr
-import bcrypt
-import jwt
+import bcrypt, jwt
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
-# ─── Config ───────────────────────────────────────────────────────────────────
-DATABASE_URL  = os.environ["DATABASE_URL"]
-JWT_SECRET    = os.environ["JWT_SECRET"]
-GROQ_API_KEY  = os.environ.get("GROQ_API_KEY", "")
-JWT_ALG       = "HS256"
-JWT_EXP_HOURS = 24 * 7
-CLINIC_NAME   = os.environ.get("CLINIC_NAME", "MediLink Clinic")
-CLINIC_ADDR   = os.environ.get("CLINIC_ADDRESS", "")
-CLINIC_PHONE  = os.environ.get("CLINIC_PHONE", "")
+# ── Config ────────────────────────────────────────────────────────────────────
+DATABASE_URL    = os.environ["DATABASE_URL"]
+JWT_SECRET      = os.environ["JWT_SECRET"]
+GROQ_API_KEY    = os.environ.get("GROQ_API_KEY", "")
+CLOUD_DB_URL    = os.environ.get("CLOUD_DATABASE_URL", "")   # Supabase/AWS RDS
+JWT_ALG         = "HS256"
+JWT_EXP_HOURS   = 24 * 7
+CLINIC_NAME     = os.environ.get("CLINIC_NAME", "MediLink Clinic")
+CLINIC_ADDR     = os.environ.get("CLINIC_ADDRESS", "")
+CLINIC_PHONE    = os.environ.get("CLINIC_PHONE", "")
+FACILITY_ID     = os.environ.get("FACILITY_ID", "main")
+IS_CLOUD        = os.environ.get("IS_CLOUD_NODE", "false").lower() == "true"
+SYNC_INTERVAL   = int(os.environ.get("SYNC_INTERVAL_SECONDS", "30"))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s | %(message)s")
 log = logging.getLogger("medilink")
 
-# ─── Database setup (asyncpg via databases) ────────────────────────────────────
+# ── Database ──────────────────────────────────────────────────────────────────
 database = Database(DATABASE_URL)
 metadata = MetaData()
 
-# Tables
+# Cloud DB for sync (only on local node)
+cloud_db: Optional[Database] = Database(CLOUD_DB_URL) if CLOUD_DB_URL and not IS_CLOUD else None
+
+# ── Tables ────────────────────────────────────────────────────────────────────
 users_t = Table("users", metadata,
     Column("id", String, primary_key=True),
     Column("email", String, unique=True, nullable=False),
     Column("password_hash", String, nullable=False),
     Column("name", String, nullable=False),
-    Column("role", String, nullable=False),           # patient|doctor|admin|pharmacist
+    Column("role", String, nullable=False),
     Column("ic_number", String),
     Column("phone", String),
     Column("dob", String),
@@ -60,6 +67,9 @@ users_t = Table("users", metadata,
     Column("facility_id", String, default="main"),
     Column("source", String, default="web"),
     Column("created_at", String),
+    Column("updated_at", String),
+    Column("sync_status", String, default="local"),
+    Column("synced_at", String),
 )
 
 appointments_t = Table("appointments", metadata,
@@ -78,9 +88,11 @@ appointments_t = Table("appointments", metadata,
     Column("is_block", Boolean, default=False),
     Column("duration_minutes", Integer, default=30),
     Column("created_at", String),
+    Column("updated_at", String),
     Column("created_by", String),
     Column("dispensed_at", String),
     Column("dispensed_by", String),
+    Column("facility_id", String, default="main"),
     Column("source", String, default="web"),
     Column("sync_status", String, default="local"),
     Column("synced_at", String),
@@ -98,9 +110,12 @@ records_t = Table("medical_records", metadata,
     Column("prescriptions", JSON),
     Column("allergies", String),
     Column("triage_category", String),
-    Column("triage_score", Integer),
+    Column("triage_colour", String),
+    Column("triage_target_mins", Integer),
+    Column("triage_red_flags", JSON),
     Column("attachment_ids", JSON),
     Column("created_at", String),
+    Column("updated_at", String),
     Column("sync_status", String, default="local"),
     Column("synced_at", String),
 )
@@ -109,13 +124,16 @@ payments_t = Table("payments", metadata,
     Column("id", String, primary_key=True),
     Column("appointment_id", String),
     Column("amount", Float),
-    Column("method", String),          # duitnow|tng|bank|cash
+    Column("method", String),
     Column("status", String),
     Column("txn_ref", String),
     Column("paid_by", String),
     Column("paid_at", String),
     Column("receipt_data", JSON),
+    Column("facility_id", String, default="main"),
     Column("source", String, default="web"),
+    Column("sync_status", String, default="local"),
+    Column("synced_at", String),
 )
 
 inventory_t = Table("pharmacy_inventory", metadata,
@@ -123,7 +141,7 @@ inventory_t = Table("pharmacy_inventory", metadata,
     Column("name", String, nullable=False),
     Column("generic_name", String),
     Column("category", String),
-    Column("unit", String),            # tablet|capsule|ml|mg|sachet|tube
+    Column("unit", String),
     Column("stock_qty", Integer, default=0),
     Column("reorder_level", Integer, default=50),
     Column("unit_price", Float, default=0.0),
@@ -131,8 +149,11 @@ inventory_t = Table("pharmacy_inventory", metadata,
     Column("batch_no", String),
     Column("supplier", String),
     Column("active", Boolean, default=True),
+    Column("facility_id", String, default="main"),
     Column("created_at", String),
     Column("updated_at", String),
+    Column("sync_status", String, default="local"),
+    Column("synced_at", String),
 )
 
 dispense_t = Table("dispense_records", metadata,
@@ -140,16 +161,19 @@ dispense_t = Table("dispense_records", metadata,
     Column("appointment_id", String),
     Column("patient_id", String),
     Column("pharmacist_id", String),
-    Column("items", JSON),             # [{inventory_id, name, qty, unit_price}]
+    Column("items", JSON),
     Column("total_cost", Float),
     Column("dispensed_at", String),
+    Column("facility_id", String, default="main"),
+    Column("sync_status", String, default="local"),
+    Column("synced_at", String),
 )
 
 audit_t = Table("audit_logs", metadata,
     Column("id", String, primary_key=True),
     Column("user_id", String),
     Column("user_role", String),
-    Column("action", String),          # READ_RECORD|WRITE_RECORD|LOGIN|etc
+    Column("action", String),
     Column("resource", String),
     Column("resource_id", String),
     Column("facility_id", String),
@@ -162,126 +186,133 @@ counters_t = Table("counters", metadata,
     Column("value", Integer, default=0),
 )
 
-# ─── App ──────────────────────────────────────────────────────────────────────
-app = FastAPI(title="MediLink EHR", version="2.0.0")
+sync_queue_t = Table("sync_queue", metadata,
+    Column("id", String, primary_key=True),
+    Column("table_name", String),
+    Column("record_id", String),
+    Column("operation", String),   # INSERT | UPDATE | DELETE
+    Column("payload", JSON),
+    Column("created_at", String),
+    Column("attempted_at", String),
+    Column("attempts", Integer, default=0),
+    Column("synced", Boolean, default=False),
+    Column("error", String),
+)
+
+# ── App ───────────────────────────────────────────────────────────────────────
+app = FastAPI(title="MediLink EHR", version="3.0.0", docs_url="/docs")
 api = APIRouter(prefix="/api")
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
-def uid() -> str:
-    return str(uuid.uuid4())
+# ── Core helpers ──────────────────────────────────────────────────────────────
+def uid() -> str: return str(uuid.uuid4())
+def now_iso() -> str: return datetime.now(timezone.utc).isoformat()
 
-def now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-def hash_password(pw: str) -> str:
+def hash_pw(pw: str) -> str:
     return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
 
-def verify_password(pw: str, hashed: str) -> bool:
-    try:
-        return bcrypt.checkpw(pw.encode(), hashed.encode())
-    except Exception:
-        return False
+def verify_pw(pw: str, hashed: str) -> bool:
+    try: return bcrypt.checkpw(pw.encode(), hashed.encode())
+    except: return False
 
-def create_token(user_id: str, role: str) -> str:
-    payload = {
-        "sub": user_id,
-        "role": role,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXP_HOURS),
-    }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
+def make_token(uid_: str, role: str) -> str:
+    return jwt.encode(
+        {"sub": uid_, "role": role, "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXP_HOURS)},
+        JWT_SECRET, algorithm=JWT_ALG,
+    )
 
-def clean(doc: dict) -> dict:
-    if not doc:
-        return doc
-    d = dict(doc)
-    d.pop("password_hash", None)
-    return d
+def clean(d: dict) -> dict:
+    if not d: return d
+    r = dict(d); r.pop("password_hash", None); return r
 
-# ─── Malaysian IC (NRIC) parser ───────────────────────────────────────────────
+# ── NRIC parser ───────────────────────────────────────────────────────────────
 NRIC_RE = re.compile(r"^(\d{2})(\d{2})(\d{2})-?(\d{2})-?(\d{4})$")
 STATE_MAP = {
-    "01": "Johor", "02": "Kedah", "03": "Kelantan", "04": "Melaka",
-    "05": "Negeri Sembilan", "06": "Pahang", "07": "Pulau Pinang",
-    "08": "Perak", "09": "Perlis", "10": "Selangor", "11": "Terengganu",
-    "12": "Sabah", "13": "Sarawak", "14": "Wilayah Persekutuan Kuala Lumpur",
-    "15": "Wilayah Persekutuan Labuan", "16": "Wilayah Persekutuan Putrajaya",
+    "01":"Johor","02":"Kedah","03":"Kelantan","04":"Melaka",
+    "05":"Negeri Sembilan","06":"Pahang","07":"Pulau Pinang","08":"Perak",
+    "09":"Perlis","10":"Selangor","11":"Terengganu","12":"Sabah","13":"Sarawak",
+    "14":"WP Kuala Lumpur","15":"WP Labuan","16":"WP Putrajaya",
 }
 
 def parse_ic(ic: str) -> dict:
-    """
-    Parse Malaysian NRIC format YYMMDD-SS-NNNN.
-    Returns {valid, dob, age, state, gender_hint, formatted}
-    """
-    cleaned = ic.strip().replace(" ", "")
-    m = NRIC_RE.match(cleaned)
+    cleaned = ic.strip().replace(" ", "").replace("-", "")
+    # re-attach dashes for matching
+    if len(cleaned) == 12:
+        cleaned = f"{cleaned[:6]}-{cleaned[6:8]}-{cleaned[8:]}"
+    m = NRIC_RE.match(cleaned.replace("-","") and cleaned)
     if not m:
-        return {"valid": False, "formatted": cleaned}
+        m = NRIC_RE.match(cleaned)
+    if not m:
+        return {"valid": False, "formatted": ic.strip(), "error": "Format must be YYMMDD-SS-NNNN"}
     yy, mm, dd, state_code, seq = m.groups()
-    year_int = int(yy)
-    current_year = datetime.now().year % 100
-    full_year = (1900 + year_int) if year_int > current_year else (2000 + year_int)
+    curr_yy = datetime.now().year % 100
+    full_year = (1900 + int(yy)) if int(yy) > curr_yy else (2000 + int(yy))
     try:
-        dob = datetime(full_year, int(mm), int(dd))
-        age = (datetime.now() - dob).days // 365
-        dob_str = dob.strftime("%Y-%m-%d")
+        dob_dt = datetime(full_year, int(mm), int(dd))
+        age = (datetime.now() - dob_dt).days // 365
     except ValueError:
-        return {"valid": False, "formatted": cleaned, "error": "Invalid date in IC"}
-    last_digit = int(seq[-1])
-    gender = "Male" if last_digit % 2 == 1 else "Female"
+        return {"valid": False, "formatted": ic.strip(), "error": "Invalid date in IC"}
     return {
         "valid": True,
         "formatted": f"{yy}{mm}{dd}-{state_code}-{seq}",
-        "dob": dob_str,
+        "dob": dob_dt.strftime("%Y-%m-%d"),
         "age": age,
         "state": STATE_MAP.get(state_code, f"State {state_code}"),
         "state_code": state_code,
-        "gender_hint": gender,
+        "gender_hint": "Male" if int(seq[-1]) % 2 == 1 else "Female",
     }
 
-# ─── Auth helpers ─────────────────────────────────────────────────────────────
-async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
+# ── Auth ──────────────────────────────────────────────────────────────────────
+async def current_user(authorization: Optional[str] = Header(None)) -> dict:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Missing token")
-    token = authorization.split(" ", 1)[1]
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+        payload = jwt.decode(authorization.split(" ", 1)[1], JWT_SECRET, algorithms=[JWT_ALG])
     except jwt.PyJWTError:
         raise HTTPException(401, "Invalid or expired token")
-    row = await database.fetch_one(
-        users_t.select().where(users_t.c.id == payload["sub"])
-    )
-    if not row:
-        raise HTTPException(401, "User not found")
+    row = await database.fetch_one(users_t.select().where(users_t.c.id == payload["sub"]))
+    if not row: raise HTTPException(401, "User not found")
     return clean(dict(row))
 
-def require_role(*roles: str):
-    async def dep(user=Depends(get_current_user)):
-        if user["role"] not in roles:
-            raise HTTPException(403, f"Requires role: {roles}")
-        return user
+def role_required(*roles: str):
+    async def dep(u=Depends(current_user)):
+        if u["role"] not in roles:
+            raise HTTPException(403, f"Requires: {roles}")
+        return u
     return dep
 
-# ─── Audit logging ────────────────────────────────────────────────────────────
-async def audit(user_id: str, role: str, action: str, resource: str,
-                resource_id: str = "", facility_id: str = "main", ip: str = ""):
+# ── Audit ─────────────────────────────────────────────────────────────────────
+async def audit_log(user_id: str, role: str, action: str, resource: str,
+                    resource_id: str = "", ip: str = ""):
     try:
         await database.execute(audit_t.insert().values(
-            id=uid(), user_id=user_id, user_role=role,
-            action=action, resource=resource, resource_id=resource_id,
-            facility_id=facility_id, ip_address=ip, timestamp=now_iso(),
+            id=uid(), user_id=user_id, user_role=role, action=action,
+            resource=resource, resource_id=resource_id,
+            facility_id=FACILITY_ID, ip_address=ip, timestamp=now_iso(),
         ))
     except Exception as e:
         log.warning(f"Audit log failed: {e}")
 
-# ─── WebSocket manager ────────────────────────────────────────────────────────
+# ── Sync queue helper ─────────────────────────────────────────────────────────
+async def enqueue_sync(table: str, record_id: str, operation: str, payload: dict):
+    """Add a record to the sync queue for cloud replication."""
+    try:
+        await database.execute(sync_queue_t.insert().values(
+            id=uid(), table_name=table, record_id=record_id,
+            operation=operation, payload=payload,
+            created_at=now_iso(), attempts=0, synced=False,
+        ))
+    except Exception as e:
+        log.warning(f"Sync enqueue failed: {e}")
+
+# ── WebSocket manager ─────────────────────────────────────────────────────────
 class WSManager:
     def __init__(self):
         self.active: Set[WebSocket] = set()
-        self.lock = asyncio.Lock()
+        self._lock = asyncio.Lock()
 
     async def connect(self, ws: WebSocket):
         await ws.accept()
-        async with self.lock:
+        async with self._lock:
             self.active.add(ws)
 
     def disconnect(self, ws: WebSocket):
@@ -290,20 +321,79 @@ class WSManager:
     async def broadcast(self, event: dict):
         dead = []
         for ws in list(self.active):
-            try:
-                await ws.send_json(event)
-            except Exception:
-                dead.append(ws)
-        for d in dead:
-            self.active.discard(d)
+            try: await ws.send_json(event)
+            except: dead.append(ws)
+        for d in dead: self.active.discard(d)
 
-ws_manager = WSManager()
+ws_mgr = WSManager()
+def broadcast(event: dict): asyncio.create_task(ws_mgr.broadcast(event))
 
-def schedule_broadcast(event: dict):
-    asyncio.create_task(ws_manager.broadcast(event))
+# ── Queue counter ─────────────────────────────────────────────────────────────
+async def next_q() -> int:
+    key = f"queue-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}"
+    row = await database.fetch_one(counters_t.select().where(counters_t.c.key == key))
+    if row:
+        n = row["value"] + 1
+        await database.execute(counters_t.update().where(counters_t.c.key == key).values(value=n))
+        return n
+    await database.execute(counters_t.insert().values(key=key, value=1))
+    return 1
 
-# ─── Pydantic models ──────────────────────────────────────────────────────────
-Role = Literal["patient", "doctor", "admin", "pharmacist"]
+# ── DuitNow QR ────────────────────────────────────────────────────────────────
+def make_duitnow_qr(amount: float, ref: str) -> str:
+    try:
+        import qrcode
+        qr = qrcode.QRCode(version=2, box_size=6, border=2)
+        qr.add_data(f"DUITNOW|{CLINIC_NAME}|{ref}|MYR{amount:.2f}")
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = io.BytesIO(); img.save(buf, format="PNG")
+        return base64.b64encode(buf.getvalue()).decode()
+    except: return ""
+
+# ── Groq AI ───────────────────────────────────────────────────────────────────
+async def groq(system: str, messages: list, max_tokens: int = 600,
+               temperature: float = 0.2, response_format: str = "text") -> str:
+    if not GROQ_API_KEY:
+        raise HTTPException(503, "GROQ_API_KEY not configured")
+    try:
+        from groq import AsyncGroq
+        client = AsyncGroq(api_key=GROQ_API_KEY)
+        kwargs = dict(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "system", "content": system}, *messages],
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        if response_format == "json":
+            kwargs["response_format"] = {"type": "json_object"}
+        resp = await client.chat.completions.create(**kwargs)
+        return resp.choices[0].message.content
+    except HTTPException: raise
+    except Exception as e:
+        log.exception("Groq error")
+        raise HTTPException(502, f"AI service error: {e}")
+
+async def groq_stream(system: str, messages: list):
+    if not GROQ_API_KEY:
+        yield "data: [ERROR] AI not configured\n\n"; return
+    try:
+        from groq import AsyncGroq
+        client = AsyncGroq(api_key=GROQ_API_KEY)
+        stream = await client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "system", "content": system}, *messages],
+            max_tokens=512, temperature=0.4, stream=True,
+        )
+        async for chunk in stream:
+            delta = chunk.choices[0].delta.content
+            if delta: yield f"data: {json.dumps(delta)}\n\n"
+        yield "data: [DONE]\n\n"
+    except Exception as e:
+        yield f"data: [ERROR] {str(e)}\n\n"
+
+# ── Pydantic models ───────────────────────────────────────────────────────────
+Role = Literal["patient","doctor","admin","pharmacist","receptionist"]
 
 class RegisterIn(BaseModel):
     email: EmailStr
@@ -336,13 +426,13 @@ class AppointmentUpdate(BaseModel):
     scheduled_at: Optional[str] = None
     doctor_id: Optional[str] = None
     reason: Optional[str] = None
+    fee: Optional[float] = None
 
 class KioskRegisterIn(BaseModel):
     ic_number: str
     name: str
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
-    password: Optional[str] = None
 
 class KioskCheckinIn(BaseModel):
     ic_number: str
@@ -353,15 +443,16 @@ class KioskCheckinIn(BaseModel):
 class KioskPayIn(BaseModel):
     ic_number: str
     appointment_id: str
-    method: Literal["duitnow", "tng", "bank", "cash"] = "duitnow"
+    method: Literal["duitnow","tng","bank","cash"] = "duitnow"
 
 class VitalSigns(BaseModel):
-    bp: Optional[str] = None
-    hr: Optional[int] = None
-    temp: Optional[float] = None
-    weight: Optional[float] = None
-    height: Optional[float] = None
-    spo2: Optional[int] = None
+    bp: Optional[str] = None          # e.g. "120/80"
+    hr: Optional[int] = None          # bpm
+    temp: Optional[float] = None      # °C
+    weight: Optional[float] = None    # kg
+    height: Optional[float] = None    # cm
+    spo2: Optional[int] = None        # %
+    rr: Optional[int] = None          # respiratory rate
 
 class PrescriptionItem(BaseModel):
     medicine: str
@@ -369,6 +460,7 @@ class PrescriptionItem(BaseModel):
     frequency: str
     duration: str
     notes: Optional[str] = None
+    inventory_id: Optional[str] = None
 
 class MedicalRecordIn(BaseModel):
     patient_id: str
@@ -378,13 +470,23 @@ class MedicalRecordIn(BaseModel):
     notes: Optional[str] = None
     prescriptions: List[PrescriptionItem] = []
     allergies: Optional[str] = None
+    # Triage result can be saved with record
+    triage_category: Optional[str] = None
+    triage_colour: Optional[str] = None
+    triage_target_mins: Optional[int] = None
+    triage_red_flags: Optional[List[str]] = None
 
 class TriageIn(BaseModel):
     patient_id: str
     chief_complaint: str
     vitals: Optional[VitalSigns] = None
-    pain_score: Optional[int] = None    # 0-10
+    pain_score: Optional[int] = Field(None, ge=0, le=10)
+    duration: Optional[str] = None          # "2 hours", "3 days"
     history: Optional[str] = None
+    known_conditions: Optional[str] = None  # "diabetic, hypertensive"
+    allergies: Optional[str] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
 
 class AvailabilityIn(BaseModel):
     hours: Dict[str, str] = Field(default_factory=dict)
@@ -418,308 +520,264 @@ class InventoryUpdateIn(BaseModel):
 class DispenseIn(BaseModel):
     appointment_id: str
     patient_id: str
-    items: List[Dict[str, Any]]    # [{inventory_id, name, qty, unit_price}]
+    items: List[Dict[str, Any]]
 
 class AISymptomIn(BaseModel):
     message: str
     history: List[Dict[str, str]] = []
+    patient_context: Optional[str] = None  # age, known conditions
 
 class AISummaryIn(BaseModel):
     patient_id: str
 
 class AIDrugCheckIn(BaseModel):
     medicines: List[str]
+    patient_age: Optional[int] = None
+    known_conditions: Optional[str] = None
 
-DEFAULT_AVAILABILITY = {
-    "mon": "09:00-17:00", "tue": "09:00-17:00", "wed": "09:00-17:00",
-    "thu": "09:00-17:00", "fri": "09:00-17:00", "sat": "10:00-13:00", "sun": "",
+DEFAULT_AVAIL = {
+    "mon":"09:00-17:00","tue":"09:00-17:00","wed":"09:00-17:00",
+    "thu":"09:00-17:00","fri":"09:00-17:00","sat":"10:00-13:00","sun":"",
 }
 
-# ─── Queue counter ────────────────────────────────────────────────────────────
-async def next_queue_number() -> int:
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    key = f"queue-{today}"
-    existing = await database.fetch_one(
-        counters_t.select().where(counters_t.c.key == key)
-    )
-    if existing:
-        new_val = existing["value"] + 1
-        await database.execute(
-            counters_t.update().where(counters_t.c.key == key).values(value=new_val)
-        )
-        return new_val
-    else:
-        await database.execute(counters_t.insert().values(key=key, value=1))
-        return 1
-
-# ─── Groq AI helper ───────────────────────────────────────────────────────────
-async def groq_chat(system: str, messages: list, max_tokens: int = 512) -> str:
-    if not GROQ_API_KEY:
-        raise HTTPException(503, "AI service not configured (missing GROQ_API_KEY)")
-    try:
-        from groq import AsyncGroq
-        client = AsyncGroq(api_key=GROQ_API_KEY)
-        resp = await client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "system", "content": system}, *messages],
-            max_tokens=max_tokens,
-            temperature=0.3,
-        )
-        return resp.choices[0].message.content
-    except Exception as e:
-        log.exception("Groq error")
-        raise HTTPException(502, f"AI error: {e}")
-
-async def groq_stream(system: str, messages: list):
-    """Async generator yielding SSE chunks from Groq."""
-    if not GROQ_API_KEY:
-        yield "data: [ERROR] AI not configured\n\n"
-        return
-    try:
-        from groq import AsyncGroq
-        client = AsyncGroq(api_key=GROQ_API_KEY)
-        stream = await client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "system", "content": system}, *messages],
-            max_tokens=512,
-            temperature=0.4,
-            stream=True,
-        )
-        async for chunk in stream:
-            delta = chunk.choices[0].delta.content
-            if delta:
-                yield f"data: {delta}\n\n"
-        yield "data: [DONE]\n\n"
-    except Exception as e:
-        log.exception("Groq stream error")
-        yield f"data: [ERROR] {str(e)}\n\n"
-
-# ─── DuitNow QR generator (SVG placeholder — real impl uses PayNet SDK) ───────
-def generate_duitnow_qr(amount: float, ref: str, clinic_name: str) -> str:
-    """
-    Returns a base64-encoded PNG QR code image.
-    In production: call PayNet DuitNow Dynamic QR API.
-    For FYP demo: generates a QR with the payment payload string.
-    """
-    try:
-        import qrcode
-        payload = f"DUITNOW|{clinic_name}|{ref}|MYR{amount:.2f}"
-        qr = qrcode.QRCode(version=2, box_size=6, border=2)
-        qr.add_data(payload)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
-        buf = io.BytesIO()
-        img.save(buf, format="PNG")
-        return base64.b64encode(buf.getvalue()).decode()
-    except Exception:
-        return ""
-
-# ─── Patient helpers ──────────────────────────────────────────────────────────
+# ── Patient helpers ───────────────────────────────────────────────────────────
 async def patient_by_ic(ic: str):
+    parsed = parse_ic(ic)
+    search_ic = parsed["formatted"] if parsed["valid"] else ic.strip()
     return await database.fetch_one(
         users_t.select().where(
-            (users_t.c.ic_number == ic.strip()) & (users_t.c.role == "patient")
+            (users_t.c.ic_number == search_ic) & (users_t.c.role == "patient")
         )
     )
 
-async def todays_appts_for_patient(patient_id: str):
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    rows = await database.fetch_all(
-        appointments_t.select()
-        .where(
-            (appointments_t.c.patient_id == patient_id) &
-            (appointments_t.c.scheduled_at.like(f"{today}%"))
-        )
-        .order_by(appointments_t.c.queue_number)
-    )
+async def enrich_appointments(rows) -> list:
     result = []
     for r in rows:
         a = dict(r)
-        doc = await database.fetch_one(users_t.select().where(users_t.c.id == a["doctor_id"]))
-        a["doctor"] = clean(dict(doc)) if doc else None
+        p = await database.fetch_one(users_t.select().where(users_t.c.id == a["patient_id"])) if a.get("patient_id") else None
+        d = await database.fetch_one(users_t.select().where(users_t.c.id == a["doctor_id"])) if a.get("doctor_id") else None
+        a["patient"] = clean(dict(p)) if p else None
+        a["doctor"] = clean(dict(d)) if d else None
         result.append(a)
     return result
 
-# ─── IC parse endpoint (public — kiosk uses this) ────────────────────────────
+# ════════════════════════════════════════════════════════════════════════════
+# ROUTES
+# ════════════════════════════════════════════════════════════════════════════
+
+# ── Public ────────────────────────────────────────────────────────────────────
+@api.get("/")
+async def root():
+    return {"service": "MediLink EHR", "version": "3.0.0",
+            "facility": FACILITY_ID, "node": "cloud" if IS_CLOUD else "local", "status": "ok"}
+
 @api.get("/ic/parse/{ic_number}")
 async def ic_parse(ic_number: str):
     return parse_ic(ic_number)
 
-# ─── Auth routes ──────────────────────────────────────────────────────────────
-@api.post("/auth/register")
+@api.get("/health")
+async def health():
+    try:
+        await database.fetch_val(text("SELECT 1"))
+        db_ok = True
+    except: db_ok = False
+    return {"ok": db_ok, "ts": now_iso(), "node": "cloud" if IS_CLOUD else "local"}
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+@api.post("/auth/register", status_code=201)
 async def register(body: RegisterIn):
-    existing = await database.fetch_one(
-        users_t.select().where(users_t.c.email == body.email.lower())
-    )
-    if existing:
+    if await database.fetch_one(users_t.select().where(users_t.c.email == body.email.lower())):
         raise HTTPException(400, "Email already registered")
     ic = body.ic_number
-    dob = body.dob
-    gender = body.gender
+    dob, gender = body.dob, body.gender
     if body.role == "patient" and ic:
-        parsed = parse_ic(ic)
-        if parsed["valid"]:
-            ic = parsed["formatted"]
-            dob = dob or parsed.get("dob")
-            gender = gender or parsed.get("gender_hint")
-    user_id = uid()
+        p = parse_ic(ic)
+        if p["valid"]:
+            ic = p["formatted"]
+            dob = dob or p.get("dob")
+            gender = gender or p.get("gender_hint")
+    uid_ = uid()
+    now = now_iso()
     await database.execute(users_t.insert().values(
-        id=user_id, email=body.email.lower(),
-        password_hash=hash_password(body.password),
-        name=body.name, role=body.role,
-        ic_number=ic, phone=body.phone,
-        dob=dob, gender=gender,
-        specialty=body.specialty, license_no=body.license_no,
-        availability=DEFAULT_AVAILABILITY if body.role == "doctor" else None,
-        slot_minutes=30, facility_id="main",
-        source="web", created_at=now_iso(),
+        id=uid_, email=body.email.lower(), password_hash=hash_pw(body.password),
+        name=body.name, role=body.role, ic_number=ic, phone=body.phone,
+        dob=dob, gender=gender, specialty=body.specialty, license_no=body.license_no,
+        availability=DEFAULT_AVAIL if body.role == "doctor" else None,
+        slot_minutes=30, facility_id=FACILITY_ID, source="web",
+        created_at=now, updated_at=now, sync_status="local",
     ))
-    user = clean(dict(await database.fetch_one(
-        users_t.select().where(users_t.c.id == user_id)
-    )))
-    return {"token": create_token(user_id, body.role), "user": user}
+    user = clean(dict(await database.fetch_one(users_t.select().where(users_t.c.id == uid_))))
+    await enqueue_sync("users", uid_, "INSERT", user)
+    return {"token": make_token(uid_, body.role), "user": user}
 
 @api.post("/auth/login")
 async def login(body: LoginIn, request: Request):
-    row = await database.fetch_one(
-        users_t.select().where(users_t.c.email == body.email.lower())
-    )
-    if not row or not verify_password(body.password, row["password_hash"]):
+    row = await database.fetch_one(users_t.select().where(users_t.c.email == body.email.lower()))
+    if not row or not verify_pw(body.password, row["password_hash"]):
         raise HTTPException(401, "Invalid credentials")
-    await audit(row["id"], row["role"], "LOGIN", "auth", ip=request.client.host if request.client else "")
-    return {"token": create_token(row["id"], row["role"]), "user": clean(dict(row))}
+    await audit_log(row["id"], row["role"], "LOGIN", "auth",
+                    ip=request.client.host if request.client else "")
+    return {"token": make_token(row["id"], row["role"]), "user": clean(dict(row))}
 
 @api.get("/auth/me")
-async def me(user=Depends(get_current_user)):
-    return user
+async def me(u=Depends(current_user)):
+    return u
 
-# ─── Patients ─────────────────────────────────────────────────────────────────
+@api.patch("/auth/me/password")
+async def change_password(body: dict, u=Depends(current_user)):
+    old, new = body.get("old_password",""), body.get("new_password","")
+    row = await database.fetch_one(users_t.select().where(users_t.c.id == u["id"]))
+    if not verify_pw(old, row["password_hash"]):
+        raise HTTPException(400, "Current password incorrect")
+    if len(new) < 8:
+        raise HTTPException(400, "New password must be at least 8 characters")
+    await database.execute(users_t.update().where(users_t.c.id == u["id"])
+        .values(password_hash=hash_pw(new), updated_at=now_iso()))
+    return {"ok": True}
+
+# ── Users / Patients ──────────────────────────────────────────────────────────
 @api.get("/patients")
-async def list_patients(user=Depends(get_current_user)):
-    if user["role"] == "patient":
-        raise HTTPException(403, "Forbidden")
-    rows = await database.fetch_all(
-        users_t.select().where(users_t.c.role == "patient").order_by(users_t.c.name)
-    )
-    return [clean(dict(r)) for r in rows]
+async def list_patients(search: Optional[str] = None, u=Depends(current_user)):
+    if u["role"] == "patient": raise HTTPException(403, "Forbidden")
+    q = users_t.select().where(users_t.c.role == "patient").order_by(users_t.c.name)
+    rows = await database.fetch_all(q)
+    patients = [clean(dict(r)) for r in rows]
+    if search:
+        s = search.lower()
+        patients = [p for p in patients if
+                    s in p.get("name","").lower() or
+                    s in (p.get("ic_number") or "").lower() or
+                    s in (p.get("phone") or "").lower()]
+    return patients
 
 @api.get("/patients/{patient_id}")
-async def get_patient(patient_id: str, user=Depends(get_current_user)):
+async def get_patient(patient_id: str, u=Depends(current_user), request: Request = None):
     row = await database.fetch_one(
-        users_t.select().where(
-            (users_t.c.id == patient_id) & (users_t.c.role == "patient")
-        )
+        users_t.select().where((users_t.c.id == patient_id) & (users_t.c.role == "patient"))
     )
-    if not row:
-        raise HTTPException(404, "Patient not found")
-    await audit(user["id"], user["role"], "READ_PATIENT", "users", patient_id)
+    if not row: raise HTTPException(404, "Patient not found")
+    if u["role"] == "patient" and u["id"] != patient_id:
+        raise HTTPException(403, "Forbidden")
+    await audit_log(u["id"], u["role"], "READ_PATIENT", "users", patient_id,
+                    ip=request.client.host if request and request.client else "")
+    return clean(dict(row))
+
+@api.patch("/patients/{patient_id}")
+async def update_patient(patient_id: str, body: dict, u=Depends(current_user)):
+    if u["role"] == "patient" and u["id"] != patient_id:
+        raise HTTPException(403, "Forbidden")
+    allowed = {"name","phone","dob","gender","email"}
+    updates = {k: v for k, v in body.items() if k in allowed}
+    updates["updated_at"] = now_iso()
+    await database.execute(users_t.update().where(users_t.c.id == patient_id).values(**updates))
+    row = await database.fetch_one(users_t.select().where(users_t.c.id == patient_id))
     return clean(dict(row))
 
 @api.get("/doctors")
-async def list_doctors(user=Depends(get_current_user)):
-    rows = await database.fetch_all(
-        users_t.select().where(users_t.c.role == "doctor")
-    )
+async def list_doctors(u=Depends(current_user)):
+    rows = await database.fetch_all(users_t.select().where(users_t.c.role == "doctor"))
     return [clean(dict(r)) for r in rows]
 
-# ─── IC Kiosk lookup (public) ────────────────────────────────────────────────
+# ── Kiosk (public — no auth) ──────────────────────────────────────────────────
 @api.get("/kiosk/lookup/{ic_number}")
 async def kiosk_lookup(ic_number: str):
     p = await patient_by_ic(ic_number)
-    if not p:
-        raise HTTPException(404, "No patient registered with this IC")
-    appts = await todays_appts_for_patient(p["id"])
-    parsed = parse_ic(ic_number)
-    return {"patient": clean(dict(p)), "today_appointments": appts, "ic_info": parsed}
+    if not p: raise HTTPException(404, "No patient registered with this IC")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    appts_rows = await database.fetch_all(
+        appointments_t.select()
+        .where((appointments_t.c.patient_id == p["id"]) &
+               (appointments_t.c.scheduled_at.like(f"{today}%")))
+        .order_by(appointments_t.c.queue_number)
+    )
+    appts = await enrich_appointments(appts_rows)
+    return {"patient": clean(dict(p)), "today_appointments": appts, "ic_info": parse_ic(ic_number)}
 
-@api.post("/kiosk/register")
+@api.post("/kiosk/register", status_code=201)
 async def kiosk_register(body: KioskRegisterIn):
-    ic = body.ic_number.strip()
-    parsed = parse_ic(ic)
+    parsed = parse_ic(body.ic_number)
     if not parsed["valid"]:
-        raise HTTPException(400, f"Invalid IC format: {ic}. Expected YYMMDD-SS-NNNN")
-    existing = await patient_by_ic(ic)
-    if existing:
-        raise HTTPException(400, "Patient with this IC already registered")
-    email = (body.email or f"{ic.replace('-','').lower()}@kiosk.medilink.io").lower()
+        raise HTTPException(400, f"Invalid IC: {parsed.get('error','format must be YYMMDD-SS-NNNN')}")
+    if await patient_by_ic(body.ic_number):
+        raise HTTPException(400, "Patient with this IC already registered. Please check in instead.")
+    email = (body.email or f"{parsed['formatted'].replace('-','').lower()}@patient.medilink").lower()
     if await database.fetch_one(users_t.select().where(users_t.c.email == email)):
-        raise HTTPException(400, "Email already in use")
-    pwd = body.password or f"kiosk-{uuid.uuid4().hex[:10]}"
-    user_id = uid()
+        email = f"{parsed['formatted'].replace('-','').lower()}.{uid()[:6]}@patient.medilink"
+    uid_ = uid(); now = now_iso()
     await database.execute(users_t.insert().values(
-        id=user_id, email=email,
-        password_hash=hash_password(pwd),
+        id=uid_, email=email,
+        password_hash=hash_pw(f"IC{parsed['formatted'].replace('-','')[:8]}#"),
         name=body.name, role="patient",
-        ic_number=parsed["formatted"],
-        phone=body.phone,
+        ic_number=parsed["formatted"], phone=body.phone,
         dob=parsed.get("dob"), gender=parsed.get("gender_hint"),
-        facility_id="main", source="kiosk", created_at=now_iso(),
+        facility_id=FACILITY_ID, source="kiosk",
+        created_at=now, updated_at=now, sync_status="local",
     ))
-    user = clean(dict(await database.fetch_one(users_t.select().where(users_t.c.id == user_id))))
-    return {"patient": user, "ic_info": parsed}
+    user = clean(dict(await database.fetch_one(users_t.select().where(users_t.c.id == uid_))))
+    await enqueue_sync("users", uid_, "INSERT", user)
+    return {"patient": user, "ic_info": parsed,
+            "login_hint": f"Default password: IC{parsed['formatted'].replace('-','')[:8]}#"}
 
 @api.post("/kiosk/checkin")
 async def kiosk_checkin(body: KioskCheckinIn):
-    ic = body.ic_number.strip()
-    p = await patient_by_ic(ic)
-    if not p:
-        raise HTTPException(404, "No patient registered with this IC")
+    p = await patient_by_ic(body.ic_number)
+    if not p: raise HTTPException(404, "Patient not registered. Please register first.")
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # Check for existing today appointment
     existing = await database.fetch_one(
         appointments_t.select().where(
             (appointments_t.c.patient_id == p["id"]) &
             (appointments_t.c.scheduled_at.like(f"{today}%")) &
-            appointments_t.c.status.in_(["scheduled", "checked_in"])
+            appointments_t.c.status.in_(["scheduled","checked_in"])
         ).order_by(appointments_t.c.scheduled_at)
     )
     if existing:
         appt = dict(existing)
         if appt["status"] == "scheduled":
             await database.execute(
-                appointments_t.update()
-                .where(appointments_t.c.id == appt["id"])
-                .values(status="checked_in")
+                appointments_t.update().where(appointments_t.c.id == appt["id"])
+                .values(status="checked_in", updated_at=now_iso())
             )
             appt["status"] = "checked_in"
-            schedule_broadcast({"type": "appointment.updated", "appointment_id": appt["id"], "changes": {"status": "checked_in"}})
+            broadcast({"type":"appointment.updated","appointment_id":appt["id"],"changes":{"status":"checked_in"}})
     else:
-        doctor_row = None
+        # Walk-in — auto-assign doctor
+        doc_row = None
         if body.doctor_id:
-            doctor_row = await database.fetch_one(
+            doc_row = await database.fetch_one(
                 users_t.select().where((users_t.c.id == body.doctor_id) & (users_t.c.role == "doctor"))
             )
-        if not doctor_row:
-            doctor_row = await database.fetch_one(users_t.select().where(users_t.c.role == "doctor"))
-        if not doctor_row:
-            raise HTTPException(503, "No doctors configured")
-        q = await next_queue_number()
-        appt_id = uid()
-        appt = {
-            "id": appt_id, "patient_id": p["id"], "doctor_id": doctor_row["id"],
-            "scheduled_at": now_iso(), "reason": body.reason or "Walk-in consultation",
-            "fee": body.fee, "status": "checked_in", "queue_number": q,
-            "payment_status": "unpaid", "created_at": now_iso(),
-            "created_by": "kiosk", "source": "kiosk", "sync_status": "local",
-        }
+        if not doc_row:
+            doc_row = await database.fetch_one(users_t.select().where(users_t.c.role == "doctor"))
+        if not doc_row: raise HTTPException(503, "No doctors configured in system")
+        q = await next_q(); appt_id = uid(); now = now_iso()
+        appt = dict(
+            id=appt_id, patient_id=p["id"], doctor_id=doc_row["id"],
+            scheduled_at=now, reason=body.reason or "Walk-in consultation",
+            fee=body.fee, status="checked_in", queue_number=q,
+            payment_status="unpaid", created_at=now, updated_at=now,
+            created_by="kiosk", facility_id=FACILITY_ID,
+            source="kiosk", sync_status="local",
+        )
         await database.execute(appointments_t.insert().values(**appt))
-        schedule_broadcast({"type": "appointment.created", "appointment_id": appt_id})
+        await enqueue_sync("appointments", appt_id, "INSERT", appt)
+        broadcast({"type":"appointment.created","appointment_id":appt_id})
 
     doc_row = await database.fetch_one(users_t.select().where(users_t.c.id == appt["doctor_id"]))
-    d = clean(dict(doc_row)) if doc_row else {}
+    doc = clean(dict(doc_row)) if doc_row else {}
     chit = {
-        "type": "QUEUE", "clinic_name": CLINIC_NAME,
-        "patient_name": p["name"], "patient_ic": p["ic_number"],
-        "queue_number": appt["queue_number"],
-        "doctor_name": d.get("name", "-"), "doctor_specialty": d.get("specialty", "General"),
-        "reason": appt["reason"], "issued_at": now_iso(), "appointment_id": appt["id"],
+        "type":"QUEUE", "clinic_name":CLINIC_NAME,
+        "patient_name":p["name"], "patient_ic":p["ic_number"],
+        "queue_number":appt["queue_number"],
+        "doctor_name":doc.get("name","-"), "doctor_specialty":doc.get("specialty","General"),
+        "reason":appt["reason"], "issued_at":now_iso(), "appointment_id":appt["id"],
     }
-    return {"appointment": appt, "patient": clean(dict(p)), "doctor": d, "chit": chit}
+    return {"appointment":appt, "patient":clean(dict(p)), "doctor":doc, "chit":chit}
 
 @api.post("/kiosk/pay")
 async def kiosk_pay(body: KioskPayIn):
-    p = await patient_by_ic(body.ic_number.strip())
-    if not p:
-        raise HTTPException(404, "Patient not found")
+    p = await patient_by_ic(body.ic_number)
+    if not p: raise HTTPException(404, "Patient not found")
     appt_row = await database.fetch_one(
         appointments_t.select().where(appointments_t.c.id == body.appointment_id)
     )
@@ -728,55 +786,38 @@ async def kiosk_pay(body: KioskPayIn):
     appt = dict(appt_row)
     if appt.get("payment_status") == "paid":
         raise HTTPException(400, "Already paid")
-
     amount = float(appt.get("fee") or 50.0)
     txn_ref = f"MLK-{uuid.uuid4().hex[:10].upper()}"
-
-    # Generate payment artefacts based on method
-    qr_base64 = ""
-    payment_info = {}
+    # Build payment info
     if body.method == "duitnow":
-        qr_base64 = generate_duitnow_qr(amount, txn_ref, CLINIC_NAME)
-        payment_info = {"type": "DuitNow QR", "ref": txn_ref, "qr": qr_base64}
+        payment_info = {"type":"DuitNow QR","ref":txn_ref,"qr":make_duitnow_qr(amount,txn_ref)}
     elif body.method == "tng":
-        payment_info = {
-            "type": "Touch 'n Go eWallet",
-            "deeplink": f"tngd://pay?amount={amount:.2f}&ref={txn_ref}",
-            "ref": txn_ref,
-        }
+        payment_info = {"type":"Touch 'n Go","deeplink":f"tngd://pay?amount={amount:.2f}&ref={txn_ref}","ref":txn_ref}
     elif body.method == "bank":
-        payment_info = {
-            "type": "Bank Transfer",
-            "account_name": CLINIC_NAME,
-            "account_no": os.environ.get("BANK_ACCOUNT_NO", "1234567890"),
-            "bank": os.environ.get("BANK_NAME", "Maybank"),
-            "ref": txn_ref,
-            "amount": amount,
-        }
+        payment_info = {"type":"Bank Transfer","account_name":CLINIC_NAME,
+                        "account_no":os.environ.get("BANK_ACCOUNT_NO","1234567890"),
+                        "bank":os.environ.get("BANK_NAME","Maybank"),"ref":txn_ref,"amount":amount}
     else:
-        payment_info = {"type": "Cash", "ref": txn_ref, "amount": amount}
+        payment_info = {"type":"Cash","ref":txn_ref,"amount":amount}
 
-    pay_id = uid()
+    pay_id = uid(); now = now_iso()
+    is_instant = body.method == "cash"
     await database.execute(payments_t.insert().values(
-        id=pay_id, appointment_id=appt["id"],
-        amount=amount, method=body.method,
-        status="pending" if body.method in ("duitnow", "tng", "bank") else "succeeded",
-        txn_ref=txn_ref, paid_by="kiosk", paid_at=now_iso(),
-        receipt_data=payment_info, source="kiosk",
+        id=pay_id, appointment_id=appt["id"], amount=amount, method=body.method,
+        status="succeeded" if is_instant else "pending",
+        txn_ref=txn_ref, paid_by="kiosk", paid_at=now,
+        receipt_data=payment_info, facility_id=FACILITY_ID,
+        source="kiosk", sync_status="local",
     ))
+    new_appt_status = "ready_for_pharmacy" if is_instant else appt["status"]
     await database.execute(
-        appointments_t.update()
-        .where(appointments_t.c.id == appt["id"])
-        .values(
-            payment_status="paid" if body.method == "cash" else "pending",
-            payment_method=body.method,
-            payment_ref=txn_ref,
-            paid_amount=amount,
-            status="ready_for_pharmacy" if body.method == "cash" else appt["status"],
+        appointments_t.update().where(appointments_t.c.id == appt["id"]).values(
+            payment_status="paid" if is_instant else "pending",
+            payment_method=body.method, payment_ref=txn_ref,
+            paid_amount=amount, status=new_appt_status, updated_at=now,
         )
     )
-    schedule_broadcast({"type": "appointment.updated", "appointment_id": appt["id"]})
-
+    broadcast({"type":"appointment.updated","appointment_id":appt["id"]})
     # Fetch prescriptions for medicine chit
     rec = await database.fetch_one(
         records_t.select()
@@ -785,173 +826,160 @@ async def kiosk_pay(body: KioskPayIn):
     )
     prescriptions = (dict(rec).get("prescriptions") or []) if rec else []
     doc_row = await database.fetch_one(users_t.select().where(users_t.c.id == appt["doctor_id"]))
-
     receipt = {
-        "type": "RECEIPT", "clinic_name": CLINIC_NAME,
-        "clinic_address": CLINIC_ADDR, "clinic_phone": CLINIC_PHONE,
-        "patient_name": p["name"], "patient_ic": p["ic_number"],
-        "amount": amount, "method": body.method,
-        "txn_ref": txn_ref, "paid_at": now_iso(),
-        "appointment_id": appt["id"],
+        "type":"RECEIPT","clinic_name":CLINIC_NAME,"clinic_address":CLINIC_ADDR,
+        "clinic_phone":CLINIC_PHONE,"patient_name":p["name"],"patient_ic":p["ic_number"],
+        "amount":amount,"method":body.method,"txn_ref":txn_ref,"paid_at":now,"appointment_id":appt["id"],
     }
     medicine_chit = {
-        "type": "MEDICINE", "clinic_name": f"{CLINIC_NAME} — Pharmacy",
-        "patient_name": p["name"], "patient_ic": p["ic_number"],
-        "queue_number": appt["queue_number"],
-        "doctor_name": doc_row["name"] if doc_row else "-",
-        "prescriptions": prescriptions, "appointment_id": appt["id"],
-        "issued_at": now_iso(),
+        "type":"MEDICINE","clinic_name":f"{CLINIC_NAME} — Pharmacy",
+        "patient_name":p["name"],"patient_ic":p["ic_number"],
+        "queue_number":appt["queue_number"],
+        "doctor_name":doc_row["name"] if doc_row else "-",
+        "prescriptions":prescriptions,"appointment_id":appt["id"],"issued_at":now,
     }
-    return {
-        "appointment": appt, "payment": payment_info,
-        "receipt": receipt, "medicine_chit": medicine_chit,
-    }
+    return {"appointment":appt,"payment":payment_info,"receipt":receipt,"medicine_chit":medicine_chit}
 
 @api.post("/kiosk/payment-confirm/{txn_ref}")
 async def confirm_payment(txn_ref: str):
-    """Called by payment gateway webhook / staff to mark payment complete."""
-    pay_row = await database.fetch_one(
-        payments_t.select().where(payments_t.c.txn_ref == txn_ref)
-    )
-    if not pay_row:
-        raise HTTPException(404, "Transaction not found")
+    pay_row = await database.fetch_one(payments_t.select().where(payments_t.c.txn_ref == txn_ref))
+    if not pay_row: raise HTTPException(404, "Transaction not found")
+    now = now_iso()
+    await database.execute(payments_t.update().where(payments_t.c.txn_ref == txn_ref)
+        .values(status="succeeded"))
     await database.execute(
-        payments_t.update().where(payments_t.c.txn_ref == txn_ref).values(status="succeeded")
+        appointments_t.update().where(appointments_t.c.id == pay_row["appointment_id"])
+        .values(payment_status="paid", status="ready_for_pharmacy", updated_at=now)
     )
-    await database.execute(
-        appointments_t.update()
-        .where(appointments_t.c.id == pay_row["appointment_id"])
-        .values(payment_status="paid", status="ready_for_pharmacy")
-    )
-    schedule_broadcast({"type": "appointment.updated", "appointment_id": pay_row["appointment_id"]})
-    return {"ok": True, "txn_ref": txn_ref}
+    broadcast({"type":"appointment.updated","appointment_id":pay_row["appointment_id"]})
+    return {"ok":True,"txn_ref":txn_ref}
 
-# ─── Appointments ─────────────────────────────────────────────────────────────
-@api.post("/appointments")
-async def create_appointment(body: AppointmentIn, user=Depends(get_current_user)):
-    q = await next_queue_number()
-    appt_id = uid()
-    await database.execute(appointments_t.insert().values(
+# ── Appointments ──────────────────────────────────────────────────────────────
+@api.post("/appointments", status_code=201)
+async def create_appointment(body: AppointmentIn, u=Depends(current_user)):
+    q = await next_q(); appt_id = uid(); now = now_iso()
+    appt = dict(
         id=appt_id, patient_id=body.patient_id, doctor_id=body.doctor_id,
         scheduled_at=body.scheduled_at, reason=body.reason, fee=body.fee,
         status="scheduled", queue_number=q, payment_status="unpaid",
-        created_at=now_iso(), created_by=user["id"], source="web", sync_status="local",
-    ))
-    schedule_broadcast({"type": "appointment.created", "appointment_id": appt_id})
-    row = await database.fetch_one(appointments_t.select().where(appointments_t.c.id == appt_id))
-    return dict(row)
+        created_at=now, updated_at=now, created_by=u["id"],
+        facility_id=FACILITY_ID, source="web", sync_status="local",
+    )
+    await database.execute(appointments_t.insert().values(**appt))
+    await enqueue_sync("appointments", appt_id, "INSERT", appt)
+    broadcast({"type":"appointment.created","appointment_id":appt_id})
+    return appt
 
 @api.get("/appointments")
-async def list_appointments(user=Depends(get_current_user)):
+async def list_appointments(date: Optional[str] = None, u=Depends(current_user)):
     q = appointments_t.select()
-    if user["role"] == "patient":
-        q = q.where(appointments_t.c.patient_id == user["id"])
-    elif user["role"] == "doctor":
-        q = q.where(appointments_t.c.doctor_id == user["id"])
+    if u["role"] == "patient":
+        q = q.where(appointments_t.c.patient_id == u["id"])
+    elif u["role"] == "doctor":
+        q = q.where(appointments_t.c.doctor_id == u["id"])
+    if date:
+        q = q.where(appointments_t.c.scheduled_at.like(f"{date}%"))
     rows = await database.fetch_all(q.order_by(appointments_t.c.scheduled_at.desc()))
-    result = []
-    for r in rows:
-        a = dict(r)
-        p = await database.fetch_one(users_t.select().where(users_t.c.id == a["patient_id"]))
-        d = await database.fetch_one(users_t.select().where(users_t.c.id == a["doctor_id"]))
-        a["patient"] = clean(dict(p)) if p else None
-        a["doctor"] = clean(dict(d)) if d else None
-        result.append(a)
-    return result
-
-@api.patch("/appointments/{appt_id}")
-async def update_appointment(appt_id: str, body: AppointmentUpdate, user=Depends(get_current_user)):
-    updates = {k: v for k, v in body.model_dump().items() if v is not None}
-    if not updates:
-        raise HTTPException(400, "Nothing to update")
-    await database.execute(
-        appointments_t.update().where(appointments_t.c.id == appt_id).values(**updates)
-    )
-    schedule_broadcast({"type": "appointment.updated", "appointment_id": appt_id, "changes": updates})
-    row = await database.fetch_one(appointments_t.select().where(appointments_t.c.id == appt_id))
-    if not row:
-        raise HTTPException(404, "Appointment not found")
-    return dict(row)
-
-@api.delete("/appointments/{appt_id}")
-async def delete_appointment(appt_id: str, user=Depends(get_current_user)):
-    row = await database.fetch_one(appointments_t.select().where(appointments_t.c.id == appt_id))
-    if not row:
-        raise HTTPException(404, "Appointment not found")
-    appt = dict(row)
-    if user["role"] == "doctor":
-        if appt.get("doctor_id") != user["id"] or not appt.get("is_block"):
-            raise HTTPException(403, "Doctors can only delete their own time blocks")
-    elif user["role"] not in ("admin",):
-        raise HTTPException(403, "Forbidden")
-    await database.execute(appointments_t.delete().where(appointments_t.c.id == appt_id))
-    schedule_broadcast({"type": "appointment.deleted", "appointment_id": appt_id})
-    return {"ok": True}
-
-@api.post("/appointments/block")
-async def block_time(body: BlockTimeIn, user=Depends(require_role("doctor"))):
-    q = await next_queue_number()
-    doc_id = uid()
-    await database.execute(appointments_t.insert().values(
-        id=doc_id, patient_id=None, doctor_id=user["id"],
-        scheduled_at=body.scheduled_at, reason=body.reason or "Blocked",
-        fee=0, status="cancelled", queue_number=q,
-        payment_status="n/a", is_block=True,
-        duration_minutes=body.duration_minutes,
-        created_at=now_iso(), created_by=user["id"], source="web", sync_status="local",
-    ))
-    schedule_broadcast({"type": "appointment.created", "appointment_id": doc_id})
-    row = await database.fetch_one(appointments_t.select().where(appointments_t.c.id == doc_id))
-    return dict(row)
+    return await enrich_appointments(rows)
 
 @api.get("/queue/today")
-async def todays_queue(user=Depends(get_current_user)):
+async def todays_queue(u=Depends(current_user)):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     rows = await database.fetch_all(
         appointments_t.select()
         .where(appointments_t.c.scheduled_at.like(f"{today}%"))
+        .where(~appointments_t.c.is_block)
         .order_by(appointments_t.c.queue_number)
     )
-    result = []
-    for r in rows:
-        a = dict(r)
-        p = await database.fetch_one(users_t.select().where(users_t.c.id == a["patient_id"]))
-        d = await database.fetch_one(users_t.select().where(users_t.c.id == a["doctor_id"]))
-        a["patient"] = clean(dict(p)) if p else None
-        a["doctor"] = clean(dict(d)) if d else None
-        result.append(a)
-    return result
+    return await enrich_appointments(rows)
 
-# ─── Medical records ──────────────────────────────────────────────────────────
-@api.post("/records")
-async def create_record(body: MedicalRecordIn, user=Depends(require_role("doctor")), request: Request = None):
-    rec_id = uid()
-    await database.execute(records_t.insert().values(
-        id=rec_id, patient_id=body.patient_id,
-        doctor_id=user["id"], appointment_id=body.appointment_id,
-        facility_id="main",
-        vitals=body.vitals.model_dump() if body.vitals else None,
-        diagnosis=body.diagnosis, notes=body.notes,
-        prescriptions=[p.model_dump() for p in body.prescriptions],
-        allergies=body.allergies, attachment_ids=[],
-        created_at=now_iso(), sync_status="local",
-    ))
-    await audit(user["id"], user["role"], "WRITE_RECORD", "medical_records", rec_id,
-                ip=request.client.host if request and request.client else "")
-    row = await database.fetch_one(records_t.select().where(records_t.c.id == rec_id))
+@api.patch("/appointments/{appt_id}")
+async def update_appointment(appt_id: str, body: AppointmentUpdate, u=Depends(current_user)):
+    updates = {k:v for k,v in body.model_dump().items() if v is not None}
+    if not updates: raise HTTPException(400, "Nothing to update")
+    updates["updated_at"] = now_iso()
+    await database.execute(appointments_t.update()
+        .where(appointments_t.c.id == appt_id).values(**updates))
+    row = await database.fetch_one(appointments_t.select().where(appointments_t.c.id == appt_id))
+    if not row: raise HTTPException(404, "Appointment not found")
+    await enqueue_sync("appointments", appt_id, "UPDATE", dict(row))
+    broadcast({"type":"appointment.updated","appointment_id":appt_id,"changes":updates})
     return dict(row)
 
+@api.delete("/appointments/{appt_id}")
+async def delete_appointment(appt_id: str, u=Depends(current_user)):
+    row = await database.fetch_one(appointments_t.select().where(appointments_t.c.id == appt_id))
+    if not row: raise HTTPException(404, "Not found")
+    appt = dict(row)
+    if u["role"] == "doctor" and (appt.get("doctor_id") != u["id"] or not appt.get("is_block")):
+        raise HTTPException(403, "Doctors can only delete their own time blocks")
+    elif u["role"] not in ("admin","doctor"):
+        raise HTTPException(403, "Forbidden")
+    await database.execute(appointments_t.delete().where(appointments_t.c.id == appt_id))
+    broadcast({"type":"appointment.deleted","appointment_id":appt_id})
+    return {"ok":True}
+
+@api.post("/appointments/block")
+async def block_time(body: BlockTimeIn, u=Depends(role_required("doctor","admin"))):
+    bid = uid(); q = await next_q(); now = now_iso()
+    await database.execute(appointments_t.insert().values(
+        id=bid, patient_id=None, doctor_id=u["id"],
+        scheduled_at=body.scheduled_at, reason=body.reason,
+        fee=0, status="cancelled", queue_number=q,
+        payment_status="n/a", is_block=True,
+        duration_minutes=body.duration_minutes,
+        created_at=now, updated_at=now, created_by=u["id"],
+        facility_id=FACILITY_ID, source="web", sync_status="local",
+    ))
+    broadcast({"type":"appointment.created","appointment_id":bid})
+    return dict(await database.fetch_one(appointments_t.select().where(appointments_t.c.id == bid)))
+
+# ── Medical records ───────────────────────────────────────────────────────────
+@api.post("/records", status_code=201)
+async def create_record(body: MedicalRecordIn, u=Depends(role_required("doctor","admin")),
+                        request: Request = None):
+    rec_id = uid(); now = now_iso()
+    vitals = body.vitals.model_dump() if body.vitals else None
+    await database.execute(records_t.insert().values(
+        id=rec_id, patient_id=body.patient_id, doctor_id=u["id"],
+        appointment_id=body.appointment_id, facility_id=FACILITY_ID,
+        vitals=vitals, diagnosis=body.diagnosis, notes=body.notes,
+        prescriptions=[p.model_dump() for p in body.prescriptions],
+        allergies=body.allergies,
+        triage_category=body.triage_category,
+        triage_colour=body.triage_colour,
+        triage_target_mins=body.triage_target_mins,
+        triage_red_flags=body.triage_red_flags or [],
+        attachment_ids=[], created_at=now, updated_at=now, sync_status="local",
+    ))
+    # Auto-advance appointment to ready_for_pharmacy if it was in_progress
+    if body.appointment_id:
+        appt_row = await database.fetch_one(
+            appointments_t.select().where(appointments_t.c.id == body.appointment_id)
+        )
+        if appt_row and dict(appt_row)["status"] == "in_progress":
+            await database.execute(
+                appointments_t.update().where(appointments_t.c.id == body.appointment_id)
+                .values(status="completed", updated_at=now)
+            )
+            broadcast({"type":"appointment.updated","appointment_id":body.appointment_id,
+                       "changes":{"status":"completed"}})
+    await audit_log(u["id"], u["role"], "WRITE_RECORD", "medical_records", rec_id,
+                    ip=request.client.host if request and request.client else "")
+    rec = dict(await database.fetch_one(records_t.select().where(records_t.c.id == rec_id)))
+    await enqueue_sync("medical_records", rec_id, "INSERT", rec)
+    return rec
+
 @api.get("/records/patient/{patient_id}")
-async def patient_records(patient_id: str, user=Depends(get_current_user), request: Request = None):
-    if user["role"] == "patient" and user["id"] != patient_id:
+async def patient_records(patient_id: str, u=Depends(current_user), request: Request = None):
+    if u["role"] == "patient" and u["id"] != patient_id:
         raise HTTPException(403, "Forbidden")
     rows = await database.fetch_all(
-        records_t.select()
-        .where(records_t.c.patient_id == patient_id)
+        records_t.select().where(records_t.c.patient_id == patient_id)
         .order_by(records_t.c.created_at.desc())
     )
-    await audit(user["id"], user["role"], "READ_RECORD", "medical_records", patient_id,
-                ip=request.client.host if request and request.client else "")
+    await audit_log(u["id"], u["role"], "READ_RECORD", "medical_records", patient_id,
+                    ip=request.client.host if request and request.client else "")
     result = []
     for r in rows:
         rec = dict(r)
@@ -960,156 +988,173 @@ async def patient_records(patient_id: str, user=Depends(get_current_user), reque
         result.append(rec)
     return result
 
-# ─── AI Triage (Manchester Triage System) ────────────────────────────────────
-MTS_SYSTEM = """You are MediLink's clinical triage AI using the Manchester Triage System (MTS).
-Given a patient's chief complaint, vital signs, and pain score, output ONLY valid JSON:
+# ── AI Triage — Manchester Triage System (MTS) ────────────────────────────────
+MTS_SYSTEM = """You are MediLink's clinical AI running the Manchester Triage System (MTS) used in Malaysian hospitals.
+
+Assess the patient and output ONLY a JSON object with exactly these fields:
 {
-  "category": "Immediate|Very Urgent|Urgent|Standard|Non-Urgent",
-  "colour": "Red|Orange|Yellow|Green|Blue",
-  "target_wait_minutes": <integer>,
-  "reasoning": "<1-2 sentence clinical rationale>",
-  "red_flags": ["<flag1>", ...],
-  "recommended_action": "<what staff should do now>"
+  "category": "Immediate" | "Very Urgent" | "Urgent" | "Standard" | "Non-Urgent",
+  "colour": "Red" | "Orange" | "Yellow" | "Green" | "Blue",
+  "target_wait_minutes": <integer: 0, 10, 60, 120, or 240>,
+  "clinical_score": <integer 1-5, where 5=most critical>,
+  "reasoning": "<2-3 sentences explaining the clinical rationale>",
+  "red_flags": ["<flag>", ...],
+  "recommended_action": "<specific immediate action for staff>",
+  "vital_concerns": ["<concern>", ...],
+  "reassess_in_minutes": <integer, when to reassess if condition unchanged>
 }
 
-MTS Reference:
-- Immediate (Red): Life-threatening. Target: 0 min
-- Very Urgent (Orange): Very serious. Target: 10 min
-- Urgent (Yellow): Urgent. Target: 60 min
-- Standard (Green): Standard. Target: 120 min
-- Non-Urgent (Blue): Non-urgent. Target: 240 min
+MTS Categories (use strict clinical criteria):
+- Immediate (Red, 0 min): Airway compromise, absent/inadequate breathing, shock, unconscious, uncontrolled major haemorrhage, ongoing seizure, acute MI signs
+- Very Urgent (Orange, 10 min): Severe pain (7-10/10), abnormal vitals (HR<40 or >140, SpO2<90%, temp>41°C or <35°C, BP<80 systolic), hot or cold periphery, acute confusion, vomiting blood, severe respiratory distress, stroke signs (FAST+)
+- Urgent (Yellow, 60 min): Moderate pain (4-7/10), moderate distress, moderate abnormal vitals, pleuritic chest pain, moderate respiratory difficulty, head injury without LOC
+- Standard (Green, 120 min): Mild pain (1-3/10), minor injury, chronic complaint, non-urgent presentation, normal vitals
+- Non-Urgent (Blue, 240 min): No pain or pain 0/10, administrative, repeat prescription, minor chronic issue
 
-Always base on clinical indicators. Err on the side of caution."""
+Always err toward higher urgency when uncertain. Missing vitals does not lower urgency."""
 
 @api.post("/ai/triage")
-async def ai_triage(body: TriageIn, user=Depends(require_role("doctor", "admin"))):
-    vitals_str = ""
+async def ai_triage(body: TriageIn, u=Depends(role_required("doctor","admin","receptionist"))):
+    # Build comprehensive clinical prompt
+    vitals_parts = []
     if body.vitals:
         v = body.vitals
-        parts = []
-        if v.bp: parts.append(f"BP: {v.bp}")
-        if v.hr: parts.append(f"HR: {v.hr} bpm")
-        if v.temp: parts.append(f"Temp: {v.temp}°C")
-        if v.spo2: parts.append(f"SpO2: {v.spo2}%")
-        vitals_str = " | ".join(parts)
-    prompt = (
-        f"Chief complaint: {body.chief_complaint}\n"
-        f"Vitals: {vitals_str or 'Not recorded'}\n"
-        f"Pain score: {body.pain_score}/10\n"
-        f"History: {body.history or 'None provided'}"
-    )
-    raw = await groq_chat(MTS_SYSTEM, [{"role": "user", "content": prompt}], max_tokens=400)
+        if v.bp: vitals_parts.append(f"BP: {v.bp} mmHg")
+        if v.hr: vitals_parts.append(f"HR: {v.hr} bpm {'⚠️ TACHYCARDIA' if v.hr > 100 else '⚠️ BRADYCARDIA' if v.hr < 60 else ''}")
+        if v.temp: vitals_parts.append(f"Temp: {v.temp}°C {'⚠️ FEVER' if v.temp > 37.5 else '⚠️ HYPOTHERMIA' if v.temp < 36 else ''}")
+        if v.spo2: vitals_parts.append(f"SpO2: {v.spo2}% {'⚠️ HYPOXIA' if v.spo2 < 94 else ''}")
+        if v.rr: vitals_parts.append(f"RR: {v.rr} breaths/min {'⚠️ TACHYPNOEA' if v.rr > 20 else ''}")
+        if v.weight: vitals_parts.append(f"Weight: {v.weight} kg")
+
+    # Fetch patient context if available
+    patient_context = ""
+    if body.patient_id:
+        p = await database.fetch_one(users_t.select().where(users_t.c.id == body.patient_id))
+        if p:
+            pd = dict(p)
+            patient_context = f"Age: {body.age or pd.get('dob', 'Unknown')}, Gender: {body.gender or pd.get('gender','Unknown')}"
+
+    prompt = f"""PATIENT: {patient_context or f'Age: {body.age or "Unknown"}, Gender: {body.gender or "Unknown"}'}
+CHIEF COMPLAINT: {body.chief_complaint}
+PAIN SCORE: {body.pain_score if body.pain_score is not None else "Not assessed"}/10
+DURATION: {body.duration or "Not specified"}
+VITAL SIGNS: {" | ".join(vitals_parts) if vitals_parts else "Not recorded"}
+KNOWN CONDITIONS: {body.known_conditions or "None stated"}
+ALLERGIES: {body.allergies or "None stated"}
+HISTORY: {body.history or "None provided"}
+
+Apply MTS strictly. Output JSON only."""
+
+    raw = await groq(MTS_SYSTEM, [{"role":"user","content":prompt}],
+                     max_tokens=600, temperature=0.1, response_format="json")
     try:
-        clean_raw = raw.strip().lstrip("```json").rstrip("```").strip()
-        result = json.loads(clean_raw)
+        result = json.loads(raw.strip().lstrip("```json").rstrip("```").strip())
     except Exception:
-        result = {"raw": raw, "parse_error": True}
+        result = {"raw":raw,"parse_error":True,"category":"Urgent","colour":"Yellow",
+                  "target_wait_minutes":60,"reasoning":"Parse error — review manually"}
     return result
 
 @api.post("/ai/symptom-check")
-async def ai_symptom_check(body: AISymptomIn, user=Depends(get_current_user)):
+async def ai_symptom_check(body: AISymptomIn, u=Depends(current_user)):
     system = (
-        "You are MediLink AI, a friendly medical triage assistant for a Malaysian clinic. "
-        "Ask clarifying questions, identify possible causes (non-diagnostic), "
-        "rate urgency (Low/Moderate/High/Emergency), and advise whether to self-care, "
-        "see a doctor, or go to ER. End every response with: "
-        "'⚠️ This is not medical advice. Please consult a doctor.' "
-        "Keep responses under 150 words. Plain text only."
+        "You are MediLink's patient-facing health assistant for a Malaysian clinic. "
+        "You help patients understand symptoms and urgency. "
+        f"{'Patient context: ' + body.patient_context if body.patient_context else ''} "
+        "Ask ONE clarifying question at a time. Identify possible causes (non-diagnostic). "
+        "Rate urgency: Self-care / See doctor within a week / See doctor today / Go to ER now. "
+        "Be warm, clear, and multilingual-friendly (patient may mix English and Bahasa Malaysia). "
+        "End every response with: '⚠️ Ini bukan nasihat perubatan. Sila berjumpa doktor.' "
+        "Max 120 words. Plain text only."
     )
-    messages = body.history + [{"role": "user", "content": body.message}]
+    messages = body.history + [{"role":"user","content":body.message}]
     return StreamingResponse(
         groq_stream(system, messages),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        headers={"Cache-Control":"no-cache","X-Accel-Buffering":"no"},
     )
 
 @api.post("/ai/summary")
-async def ai_summary(body: AISummaryIn, user=Depends(require_role("doctor", "admin"))):
+async def ai_summary(body: AISummaryIn, u=Depends(role_required("doctor","admin"))):
     p = await database.fetch_one(users_t.select().where(users_t.c.id == body.patient_id))
-    if not p:
-        raise HTTPException(404, "Patient not found")
+    if not p: raise HTTPException(404, "Patient not found")
     rows = await database.fetch_all(
-        records_t.select()
-        .where(records_t.c.patient_id == body.patient_id)
+        records_t.select().where(records_t.c.patient_id == body.patient_id)
         .order_by(records_t.c.created_at.desc()).limit(20)
     )
-    if not rows:
-        return {"summary": "No prior medical records found."}
+    if not rows: return {"summary":"No prior medical records found for this patient."}
     history_text = "\n\n".join([
-        f"Visit {i+1} ({dict(r).get('created_at','')[:10]}):\n"
+        f"Visit {i+1} | {dict(r).get('created_at','')[:10]} | Facility: {dict(r).get('facility_id','-')}\n"
+        f"  Triage: {dict(r).get('triage_category','-')} ({dict(r).get('triage_colour','-')})\n"
         f"  Diagnosis: {dict(r).get('diagnosis','-')}\n"
         f"  Notes: {dict(r).get('notes','-')}\n"
-        f"  Meds: {', '.join([m['medicine'] for m in (dict(r).get('prescriptions') or [])]) or '-'}"
+        f"  Allergies: {dict(r).get('allergies','-')}\n"
+        f"  Prescriptions: {', '.join([m['medicine'] for m in (dict(r).get('prescriptions') or [])]) or '-'}"
         for i, r in enumerate(rows)
     ])
+    pd = dict(p)
+    prompt = f"Patient: {pd['name']} | DOB: {pd.get('dob','-')} | Gender: {pd.get('gender','-')} | IC: {pd.get('ic_number','-')}\n\n{history_text}"
     system = (
-        "You are a clinical summarization assistant. Produce a concise doctor-facing summary. "
-        "Highlight chronic conditions, recurring symptoms, key allergies, active medications, "
-        "and red-flag patterns. Use short bullets. Max 150 words."
+        "You are a clinical summarization AI for a doctor. Produce a concise structured summary. "
+        "Use these exact headings: CHRONIC CONDITIONS | RECURRING SYMPTOMS | ACTIVE MEDICATIONS | "
+        "ALLERGIES | RED FLAGS | RECENT VISITS. Bullet points only. Max 200 words. "
+        "Flag any dangerous patterns. Be precise and clinical."
     )
-    patient = dict(p)
-    prompt = f"Patient: {patient['name']} | DOB: {patient.get('dob','-')} | Gender: {patient.get('gender','-')}\n\nHISTORY:\n{history_text}"
-    summary = await groq_chat(system, [{"role": "user", "content": prompt}])
-    return {"summary": summary}
+    summary = await groq(system, [{"role":"user","content":prompt}], max_tokens=300)
+    return {"summary":summary,"patient":clean(pd),"record_count":len(rows)}
 
 @api.post("/ai/drug-check")
-async def ai_drug_check(body: AIDrugCheckIn, user=Depends(require_role("doctor", "admin"))):
-    if not body.medicines:
-        raise HTTPException(400, "Provide at least 1 medicine")
+async def ai_drug_check(body: AIDrugCheckIn, u=Depends(role_required("doctor","admin"))):
+    if not body.medicines: raise HTTPException(400, "Provide at least 1 medicine")
+    context = ""
+    if body.patient_age: context += f" Patient age: {body.patient_age}."
+    if body.known_conditions: context += f" Known conditions: {body.known_conditions}."
     system = (
-        "You are a pharmacology safety assistant. Given medicines, identify: "
-        "1) Drug-drug interactions (severity: minor/moderate/major). "
-        "2) Common contraindications. Short bullets. Max 130 words. End with disclaimer."
-    )
-    result = await groq_chat(system, [{"role": "user", "content": "Medicines: " + ", ".join(body.medicines)}])
-    return {"analysis": result, "medicines": body.medicines}
+        "You are a clinical pharmacology safety AI.{context} "
+        "Analyse the given medicines and output: "
+        "1. DRUG INTERACTIONS (list each pair, severity: Minor/Moderate/Major/Contraindicated, clinical effect) "
+        "2. CONTRAINDICATIONS (if patient context given) "
+        "3. MONITORING REQUIREMENTS "
+        "4. SAFE TO PRESCRIBE TOGETHER? (Yes/No/With caution) "
+        "Be concise. End with: '⚠️ Clinical judgement required. This is a screening tool only.'"
+    ).replace("{context}", context)
+    result = await groq(system, [{"role":"user","content":"Medicines: " + ", ".join(body.medicines)}],
+                        max_tokens=400)
+    return {"analysis":result,"medicines":body.medicines}
 
-# ─── Availability & Slots ──────────────────────────────────────────────────────
+# ── Availability & slots ──────────────────────────────────────────────────────
 @api.get("/availability/{doctor_id}")
 async def get_availability(doctor_id: str):
     d = await database.fetch_one(
         users_t.select().where((users_t.c.id == doctor_id) & (users_t.c.role == "doctor"))
     )
-    if not d:
-        raise HTTPException(404, "Doctor not found")
-    return {
-        "doctor_id": doctor_id,
-        "hours": dict(d)["availability"] or DEFAULT_AVAILABILITY,
-        "slot_minutes": dict(d).get("slot_minutes", 30),
-    }
+    if not d: raise HTTPException(404, "Doctor not found")
+    return {"doctor_id":doctor_id,"hours":dict(d)["availability"] or DEFAULT_AVAIL,
+            "slot_minutes":dict(d).get("slot_minutes",30)}
 
 @api.patch("/availability/me")
-async def update_availability(body: AvailabilityIn, user=Depends(require_role("doctor"))):
-    await database.execute(
-        users_t.update().where(users_t.c.id == user["id"])
-        .values(availability=body.hours, slot_minutes=body.slot_minutes)
-    )
-    return {"hours": body.hours, "slot_minutes": body.slot_minutes}
+async def update_availability(body: AvailabilityIn, u=Depends(role_required("doctor"))):
+    await database.execute(users_t.update().where(users_t.c.id == u["id"])
+        .values(availability=body.hours, slot_minutes=body.slot_minutes, updated_at=now_iso()))
+    return {"hours":body.hours,"slot_minutes":body.slot_minutes}
 
 @api.get("/availability/{doctor_id}/slots")
 async def get_slots(doctor_id: str, date: str = Query(...)):
     d = await database.fetch_one(
         users_t.select().where((users_t.c.id == doctor_id) & (users_t.c.role == "doctor"))
     )
-    if not d:
-        raise HTTPException(404, "Doctor not found")
+    if not d: raise HTTPException(404, "Doctor not found")
     doc = dict(d)
-    try:
-        the_date = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-    except ValueError:
-        raise HTTPException(400, "date must be YYYY-MM-DD")
+    try: the_date = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError: raise HTTPException(400, "date must be YYYY-MM-DD")
     dow = ["mon","tue","wed","thu","fri","sat","sun"][the_date.weekday()]
-    hours_map = doc.get("availability") or DEFAULT_AVAILABILITY
-    window = hours_map.get(dow, "")
+    window = (doc.get("availability") or DEFAULT_AVAIL).get(dow, "")
     if not window or "-" not in window:
-        return {"date": date, "doctor_id": doctor_id, "slots": [], "off": True}
+        return {"date":date,"doctor_id":doctor_id,"slots":[],"off":True}
     try:
         a, b = window.split("-")
-        sh, sm = map(int, a.split(":"))
-        eh, em = map(int, b.split(":"))
+        sh, sm = map(int, a.split(":")); eh, em = map(int, b.split(":"))
         start_min, end_min = sh*60+sm, eh*60+em
-    except Exception:
-        return {"date": date, "doctor_id": doctor_id, "slots": [], "off": True}
+    except: return {"date":date,"doctor_id":doctor_id,"slots":[],"off":True}
     slot_min = int(doc.get("slot_minutes") or 30)
     booked_rows = await database.fetch_all(
         appointments_t.select().where(
@@ -1118,76 +1163,72 @@ async def get_slots(doctor_id: str, date: str = Query(...)):
             (appointments_t.c.status != "cancelled")
         )
     )
-    booked_set = set()
+    booked = set()
     for r in booked_rows:
         try:
-            t = datetime.fromisoformat(dict(r)["scheduled_at"].replace("Z", "+00:00"))
-            booked_set.add(t.hour*60+t.minute)
-        except Exception:
-            pass
+            t = datetime.fromisoformat(dict(r)["scheduled_at"].replace("Z","+00:00"))
+            booked.add(t.hour*60+t.minute)
+        except: pass
     slots = []
     cur = start_min
     while cur + slot_min <= end_min:
         hh, mm = divmod(cur, 60)
-        slot_iso = the_date.replace(hour=hh, minute=mm).isoformat()
-        slots.append({"time": f"{hh:02d}:{mm:02d}", "iso": slot_iso, "booked": cur in booked_set})
+        slots.append({"time":f"{hh:02d}:{mm:02d}",
+                      "iso":the_date.replace(hour=hh,minute=mm).isoformat(),
+                      "booked":cur in booked})
         cur += slot_min
-    return {"date": date, "doctor_id": doctor_id, "slots": slots, "off": False}
+    return {"date":date,"doctor_id":doctor_id,"slots":slots,"off":False}
 
-# ─── Pharmacy inventory ───────────────────────────────────────────────────────
+# ── Pharmacy inventory ────────────────────────────────────────────────────────
 @api.get("/inventory")
-async def list_inventory(user=Depends(require_role("pharmacist", "admin", "doctor"))):
+async def list_inventory(u=Depends(role_required("pharmacist","admin","doctor"))):
     rows = await database.fetch_all(
-        inventory_t.select().where(inventory_t.c.active == True).order_by(inventory_t.c.name)
+        inventory_t.select().where(inventory_t.c.active == True)
+        .order_by(inventory_t.c.name)
     )
     return [dict(r) for r in rows]
 
-@api.post("/inventory")
-async def add_inventory(body: InventoryItemIn, user=Depends(require_role("pharmacist", "admin"))):
-    item_id = uid()
+@api.post("/inventory", status_code=201)
+async def add_inventory(body: InventoryItemIn, u=Depends(role_required("pharmacist","admin"))):
+    item_id = uid(); now = now_iso()
     await database.execute(inventory_t.insert().values(
         id=item_id, name=body.name, generic_name=body.generic_name,
-        category=body.category, unit=body.unit,
-        stock_qty=body.stock_qty, reorder_level=body.reorder_level,
-        unit_price=body.unit_price, expiry_date=body.expiry_date,
-        batch_no=body.batch_no, supplier=body.supplier,
-        active=True, created_at=now_iso(), updated_at=now_iso(),
+        category=body.category, unit=body.unit, stock_qty=body.stock_qty,
+        reorder_level=body.reorder_level, unit_price=body.unit_price,
+        expiry_date=body.expiry_date, batch_no=body.batch_no, supplier=body.supplier,
+        active=True, facility_id=FACILITY_ID,
+        created_at=now, updated_at=now, sync_status="local",
     ))
-    row = await database.fetch_one(inventory_t.select().where(inventory_t.c.id == item_id))
-    return dict(row)
+    return dict(await database.fetch_one(inventory_t.select().where(inventory_t.c.id == item_id)))
 
 @api.patch("/inventory/{item_id}")
-async def update_inventory(item_id: str, body: InventoryUpdateIn, user=Depends(require_role("pharmacist", "admin"))):
-    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+async def update_inventory(item_id: str, body: InventoryUpdateIn,
+                           u=Depends(role_required("pharmacist","admin"))):
+    updates = {k:v for k,v in body.model_dump().items() if v is not None}
     updates["updated_at"] = now_iso()
-    await database.execute(
-        inventory_t.update().where(inventory_t.c.id == item_id).values(**updates)
-    )
+    await database.execute(inventory_t.update().where(inventory_t.c.id == item_id).values(**updates))
     row = await database.fetch_one(inventory_t.select().where(inventory_t.c.id == item_id))
-    if not row:
-        raise HTTPException(404, "Item not found")
+    if not row: raise HTTPException(404, "Item not found")
     return dict(row)
 
 @api.get("/inventory/low-stock")
-async def low_stock_alerts(user=Depends(require_role("pharmacist", "admin"))):
+async def low_stock_alerts(u=Depends(role_required("pharmacist","admin"))):
     rows = await database.fetch_all(inventory_t.select().where(inventory_t.c.active == True))
     alerts = []
     for r in rows:
         item = dict(r)
         if item["stock_qty"] <= item["reorder_level"]:
-            alerts.append({**item, "alert": "low_stock"})
+            alerts.append({**item,"alert_type":"low_stock"})
         if item.get("expiry_date"):
             try:
-                exp = datetime.strptime(item["expiry_date"], "%Y-%m-%d")
-                days_left = (exp - datetime.now()).days
-                if days_left <= 30:
-                    alerts.append({**item, "alert": "expiring_soon", "days_left": days_left})
-            except Exception:
-                pass
-    return alerts
+                days = (datetime.strptime(item["expiry_date"],"%Y-%m-%d") - datetime.now()).days
+                if days <= 30:
+                    alerts.append({**item,"alert_type":"expiring_soon","days_left":days})
+            except: pass
+    return sorted(alerts, key=lambda x: x.get("days_left",9999))
 
 @api.get("/pharmacy/queue")
-async def pharmacy_queue(user=Depends(require_role("pharmacist", "admin"))):
+async def pharmacy_queue(u=Depends(role_required("pharmacist","admin"))):
     rows = await database.fetch_all(
         appointments_t.select()
         .where(appointments_t.c.status == "ready_for_pharmacy")
@@ -1210,88 +1251,112 @@ async def pharmacy_queue(user=Depends(require_role("pharmacist", "admin"))):
     return result
 
 @api.post("/pharmacy/dispense")
-async def dispense(body: DispenseIn, user=Depends(require_role("pharmacist", "admin"))):
+async def dispense(body: DispenseIn, u=Depends(role_required("pharmacist","admin"))):
     appt = await database.fetch_one(
         appointments_t.select().where(appointments_t.c.id == body.appointment_id)
     )
     if not appt or dict(appt)["status"] != "ready_for_pharmacy":
         raise HTTPException(400, "Appointment not ready for pharmacy")
-
-    # Deduct stock for each item
-    total_cost = 0.0
+    total = 0.0
     for item in body.items:
         inv_id = item.get("inventory_id")
-        qty = int(item.get("qty", 1))
+        qty = int(item.get("qty",1))
         if inv_id:
-            inv_row = await database.fetch_one(
-                inventory_t.select().where(inventory_t.c.id == inv_id)
-            )
+            inv_row = await database.fetch_one(inventory_t.select().where(inventory_t.c.id == inv_id))
             if inv_row:
                 inv = dict(inv_row)
-                new_stock = max(0, inv["stock_qty"] - qty)
                 await database.execute(
                     inventory_t.update().where(inventory_t.c.id == inv_id)
-                    .values(stock_qty=new_stock, updated_at=now_iso())
+                    .values(stock_qty=max(0, inv["stock_qty"] - qty), updated_at=now_iso())
                 )
-                total_cost += inv["unit_price"] * qty
-
-    disp_id = uid()
+                total += inv["unit_price"] * qty
+    disp_id = uid(); now = now_iso()
     await database.execute(dispense_t.insert().values(
         id=disp_id, appointment_id=body.appointment_id,
-        patient_id=body.patient_id, pharmacist_id=user["id"],
-        items=body.items, total_cost=total_cost, dispensed_at=now_iso(),
+        patient_id=body.patient_id, pharmacist_id=u["id"],
+        items=body.items, total_cost=total,
+        dispensed_at=now, facility_id=FACILITY_ID, sync_status="local",
     ))
     await database.execute(
         appointments_t.update().where(appointments_t.c.id == body.appointment_id)
-        .values(status="dispensed", dispensed_at=now_iso(), dispensed_by=user["id"])
+        .values(status="dispensed", dispensed_at=now, dispensed_by=u["id"], updated_at=now)
     )
-    schedule_broadcast({"type": "appointment.updated", "appointment_id": body.appointment_id, "changes": {"status": "dispensed"}})
-    return {"ok": True, "dispense_id": disp_id, "total_cost": total_cost}
+    broadcast({"type":"appointment.updated","appointment_id":body.appointment_id,
+               "changes":{"status":"dispensed"}})
+    return {"ok":True,"dispense_id":disp_id,"total_cost":total}
 
-# ─── Sync status ──────────────────────────────────────────────────────────────
+# ── Hybrid sync ────────────────────────────────────────────────────────────────
 @api.get("/sync/status")
-async def sync_status(user=Depends(get_current_user)):
-    total = await database.fetch_val(
-        text("SELECT COUNT(*) FROM medical_records")
-    )
-    local = await database.fetch_val(
-        text("SELECT COUNT(*) FROM medical_records WHERE sync_status='local'")
-    )
-    synced = await database.fetch_val(
-        text("SELECT COUNT(*) FROM medical_records WHERE sync_status='cloud'")
-    )
+async def sync_status(u=Depends(current_user)):
+    total   = await database.fetch_val(text("SELECT COUNT(*) FROM medical_records")) or 0
+    local   = await database.fetch_val(text("SELECT COUNT(*) FROM medical_records WHERE sync_status='local'")) or 0
+    synced  = await database.fetch_val(text("SELECT COUNT(*) FROM medical_records WHERE sync_status='cloud'")) or 0
+    pending = await database.fetch_val(text("SELECT COUNT(*) FROM sync_queue WHERE synced=false")) or 0
+    errors  = await database.fetch_val(text("SELECT COUNT(*) FROM sync_queue WHERE synced=false AND attempts>=3")) or 0
     last_row = await database.fetch_one(
         records_t.select().where(records_t.c.sync_status == "cloud")
         .order_by(records_t.c.synced_at.desc())
     )
     return {
-        "total_records": total or 0,
-        "local_ssd": (total or 0) - (synced or 0),
-        "cloud": synced or 0,
+        "node": "cloud" if IS_CLOUD else "local",
+        "facility_id": FACILITY_ID,
+        "total_records": total,
+        "synced_to_cloud": synced,
+        "local_only": local,
+        "pending_sync": pending,
+        "sync_errors": errors,
         "last_synced": dict(last_row).get("synced_at") if last_row else None,
-        "ssd_label": "Local NVMe SSD",
-        "cloud_label": "AWS RDS",
-        "online": True,
+        "cloud_connected": cloud_db is not None,
+        "hardware": "HP Folio 9470m (local)" if not IS_CLOUD else "Cloud Node",
     }
 
-# ─── Audit log viewer (admin only) ───────────────────────────────────────────
+@api.post("/sync/trigger")
+async def trigger_sync(bg: BackgroundTasks, u=Depends(role_required("admin"))):
+    bg.add_task(run_sync_job)
+    return {"ok":True,"message":"Sync job triggered"}
+
+@api.get("/sync/queue")
+async def view_sync_queue(limit: int = Query(50, le=200), u=Depends(role_required("admin"))):
+    rows = await database.fetch_all(
+        sync_queue_t.select()
+        .where(sync_queue_t.c.synced == False)
+        .order_by(sync_queue_t.c.created_at.desc())
+        .limit(limit)
+    )
+    return [dict(r) for r in rows]
+
+# ── Audit logs ────────────────────────────────────────────────────────────────
 @api.get("/audit/logs")
-async def view_audit_logs(
-    limit: int = Query(100, le=500),
-    user=Depends(require_role("admin"))
-):
+async def audit_logs(limit: int = Query(100, le=500), u=Depends(role_required("admin"))):
     rows = await database.fetch_all(
         audit_t.select().order_by(audit_t.c.timestamp.desc()).limit(limit)
     )
     return [dict(r) for r in rows]
 
-# ─── Seed (idempotent) ────────────────────────────────────────────────────────
+# ── Admin stats ───────────────────────────────────────────────────────────────
+@api.get("/admin/stats")
+async def admin_stats(u=Depends(role_required("admin"))):
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return {
+        "patients": await database.fetch_val(text("SELECT COUNT(*) FROM users WHERE role='patient'")) or 0,
+        "doctors":  await database.fetch_val(text("SELECT COUNT(*) FROM users WHERE role='doctor'")) or 0,
+        "today_appointments": await database.fetch_val(
+            text(f"SELECT COUNT(*) FROM appointments WHERE scheduled_at LIKE '{today}%'")) or 0,
+        "today_completed": await database.fetch_val(
+            text(f"SELECT COUNT(*) FROM appointments WHERE scheduled_at LIKE '{today}%' AND status='dispensed'")) or 0,
+        "inventory_alerts": await database.fetch_val(
+            text("SELECT COUNT(*) FROM pharmacy_inventory WHERE stock_qty <= reorder_level AND active=true")) or 0,
+        "pending_sync": await database.fetch_val(text("SELECT COUNT(*) FROM sync_queue WHERE synced=false")) or 0,
+    }
+
+# ── Seed ──────────────────────────────────────────────────────────────────────
 @api.post("/seed")
 async def seed():
     seeded, skipped = [], []
     demo_users = [
-        {"email":"admin@medilink.io","password":"Admin@123","name":"Aria Admin","role":"admin"},
+        {"email":"admin@medilink.io","password":"Admin@123","name":"Admin MediLink","role":"admin"},
         {"email":"pharmacy@medilink.io","password":"Pharm@123","name":"Pn. Lily Lim","role":"pharmacist"},
+        {"email":"reception@medilink.io","password":"Recep@123","name":"Sarah Ang","role":"receptionist"},
         {"email":"dr.tan@medilink.io","password":"Doctor@123","name":"Dr. Wei Tan","role":"doctor","specialty":"General Physician","license_no":"MMC-44219"},
         {"email":"dr.kaur@medilink.io","password":"Doctor@123","name":"Dr. Simran Kaur","role":"doctor","specialty":"Cardiology","license_no":"MMC-55781"},
         {"email":"patient1@medilink.io","password":"Patient@123","name":"Arjun Rao","role":"patient","ic_number":"880421-14-5567","dob":"1988-04-21","gender":"Male","phone":"+60 12-345 6788"},
@@ -1299,24 +1364,20 @@ async def seed():
         {"email":"patient3@medilink.io","password":"Patient@123","name":"Hafiz Rahman","role":"patient","ic_number":"720915-10-7733","dob":"1972-09-15","gender":"Male","phone":"+60 19-554 8821"},
     ]
     for u in demo_users:
-        existing = await database.fetch_one(users_t.select().where(users_t.c.email == u["email"]))
-        if existing:
-            skipped.append(u["email"])
-            continue
-        user_id = uid()
+        if await database.fetch_one(users_t.select().where(users_t.c.email == u["email"])):
+            skipped.append(u["email"]); continue
+        uid_ = uid(); now = now_iso()
         await database.execute(users_t.insert().values(
-            id=user_id, email=u["email"],
-            password_hash=hash_password(u["password"]),
+            id=uid_, email=u["email"], password_hash=hash_pw(u["password"]),
             name=u["name"], role=u["role"],
             ic_number=u.get("ic_number"), phone=u.get("phone"),
             dob=u.get("dob"), gender=u.get("gender"),
             specialty=u.get("specialty"), license_no=u.get("license_no"),
-            availability=DEFAULT_AVAILABILITY if u["role"]=="doctor" else None,
-            slot_minutes=30, facility_id="main", source="seed", created_at=now_iso(),
+            availability=DEFAULT_AVAIL if u["role"]=="doctor" else None,
+            slot_minutes=30, facility_id=FACILITY_ID, source="seed",
+            created_at=now, updated_at=now, sync_status="local",
         ))
         seeded.append(u["email"])
-
-    # Seed demo inventory
     demo_meds = [
         {"name":"Paracetamol 500mg","generic_name":"Acetaminophen","category":"Analgesic","unit":"tablet","stock_qty":500,"reorder_level":100,"unit_price":0.20},
         {"name":"Amoxicillin 250mg","generic_name":"Amoxicillin","category":"Antibiotic","unit":"capsule","stock_qty":200,"reorder_level":50,"unit_price":0.80},
@@ -1326,50 +1387,106 @@ async def seed():
         {"name":"Omeprazole 20mg","generic_name":"Omeprazole","category":"PPI","unit":"capsule","stock_qty":250,"reorder_level":50,"unit_price":0.60},
         {"name":"Salbutamol Inhaler","generic_name":"Salbutamol","category":"Bronchodilator","unit":"unit","stock_qty":40,"reorder_level":10,"unit_price":12.50},
         {"name":"ORS Sachet","generic_name":"Oral Rehydration Salts","category":"Rehydration","unit":"sachet","stock_qty":150,"reorder_level":30,"unit_price":0.80},
-        {"name":"Ibuprofen 400mg","generic_name":"Ibuprofen","category":"NSAID","unit":"tablet","stock_qty":8,"reorder_level":80,"unit_price":0.30},  # low stock for demo
+        {"name":"Ibuprofen 400mg","generic_name":"Ibuprofen","category":"NSAID","unit":"tablet","stock_qty":8,"reorder_level":80,"unit_price":0.30},
         {"name":"Azithromycin 250mg","generic_name":"Azithromycin","category":"Antibiotic","unit":"tablet","stock_qty":100,"reorder_level":40,"unit_price":2.20},
+        {"name":"Dexamethasone 0.5mg","generic_name":"Dexamethasone","category":"Corticosteroid","unit":"tablet","stock_qty":180,"reorder_level":40,"unit_price":0.15},
+        {"name":"Atorvastatin 20mg","generic_name":"Atorvastatin","category":"Lipid-lowering","unit":"tablet","stock_qty":320,"reorder_level":60,"unit_price":0.90},
     ]
     for med in demo_meds:
-        exists = await database.fetch_one(inventory_t.select().where(inventory_t.c.name == med["name"]))
-        if not exists:
+        if not await database.fetch_one(inventory_t.select().where(inventory_t.c.name == med["name"])):
+            now = now_iso()
             await database.execute(inventory_t.insert().values(
-                id=uid(), active=True, created_at=now_iso(), updated_at=now_iso(), **med
+                id=uid(), active=True, facility_id=FACILITY_ID,
+                created_at=now, updated_at=now, sync_status="local", **med
             ))
-    return {"seeded": seeded, "skipped": skipped}
+    return {"seeded":seeded,"skipped":skipped}
 
-# ─── WebSocket ────────────────────────────────────────────────────────────────
+# ── WebSocket ─────────────────────────────────────────────────────────────────
 @app.websocket("/api/ws/queue")
 async def ws_queue(ws: WebSocket, token: str = Query(...)):
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
     except jwt.PyJWTError:
-        await ws.close(code=1008)
-        return
+        await ws.close(code=1008); return
     user = await database.fetch_one(users_t.select().where(users_t.c.id == payload["sub"]))
     if not user:
-        await ws.close(code=1008)
-        return
-    await ws_manager.connect(ws)
+        await ws.close(code=1008); return
+    await ws_mgr.connect(ws)
     try:
-        await ws.send_json({"type": "hello", "role": dict(user)["role"]})
+        await ws.send_json({"type":"hello","role":dict(user)["role"],"facility":FACILITY_ID})
         while True:
             msg = await ws.receive_text()
-            if msg == "ping":
-                await ws.send_json({"type": "pong"})
-    except WebSocketDisconnect:
-        ws_manager.disconnect(ws)
-    except Exception:
-        ws_manager.disconnect(ws)
+            if msg == "ping": await ws.send_json({"type":"pong","ts":now_iso()})
+    except WebSocketDisconnect: ws_mgr.disconnect(ws)
+    except Exception: ws_mgr.disconnect(ws)
 
-@api.get("/")
-async def root():
-    return {"service": "MediLink EHR", "version": "2.0.0", "status": "ok"}
+# ── Background sync engine ────────────────────────────────────────────────────
+async def run_sync_job():
+    """Push local-only records to cloud DB."""
+    if not cloud_db or IS_CLOUD:
+        return
+    try:
+        pending = await database.fetch_all(
+            sync_queue_t.select()
+            .where((sync_queue_t.c.synced == False) & (sync_queue_t.c.attempts < 3))
+            .order_by(sync_queue_t.c.created_at)
+            .limit(50)
+        )
+        if not pending:
+            return
+        log.info(f"Sync: processing {len(pending)} pending records")
+        for item in pending:
+            item_d = dict(item)
+            try:
+                tbl_map = {
+                    "users": users_t, "appointments": appointments_t,
+                    "medical_records": records_t, "payments": payments_t,
+                    "dispense_records": dispense_t,
+                }
+                tbl = tbl_map.get(item_d["table_name"])
+                if tbl is None:
+                    await database.execute(
+                        sync_queue_t.update().where(sync_queue_t.c.id == item_d["id"])
+                        .values(synced=True, error="Unknown table")
+                    )
+                    continue
+                payload = item_d["payload"]
+                now = now_iso()
+                # Upsert to cloud
+                existing = await cloud_db.fetch_one(
+                    tbl.select().where(tbl.c.id == item_d["record_id"])
+                )
+                if existing:
+                    await cloud_db.execute(
+                        tbl.update().where(tbl.c.id == item_d["record_id"])
+                        .values(**{k: v for k, v in payload.items() if k != "id"})
+                    )
+                else:
+                    await cloud_db.execute(tbl.insert().values(**payload))
+                # Mark synced locally
+                await database.execute(
+                    tbl.update().where(tbl.c.id == item_d["record_id"])
+                    .values(sync_status="cloud", synced_at=now)
+                )
+                await database.execute(
+                    sync_queue_t.update().where(sync_queue_t.c.id == item_d["id"])
+                    .values(synced=True, attempted_at=now)
+                )
+                log.info(f"Synced {item_d['table_name']}:{item_d['record_id']}")
+            except Exception as e:
+                await database.execute(
+                    sync_queue_t.update().where(sync_queue_t.c.id == item_d["id"])
+                    .values(attempts=item_d["attempts"]+1, attempted_at=now_iso(), error=str(e)[:500])
+                )
+                log.warning(f"Sync failed for {item_d['record_id']}: {e}")
+    except Exception as e:
+        log.exception(f"Sync job error: {e}")
 
-# ─── Startup / Shutdown ───────────────────────────────────────────────────────
+# ── Startup / shutdown ────────────────────────────────────────────────────────
 app.include_router(api)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_origins=os.environ.get("CORS_ORIGINS","*").split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1378,17 +1495,36 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     await database.connect()
-    # Create all tables
-    engine = create_engine(DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://") if "postgresql://" in DATABASE_URL else DATABASE_URL)
-    metadata.create_all(engine)
-    engine.dispose()
-    log.info("Database tables ready")
-    # Auto-seed if empty
+    if cloud_db:
+        try:
+            await cloud_db.connect()
+            log.info("Cloud DB connected")
+        except Exception as e:
+            log.warning(f"Cloud DB connection failed (offline mode): {e}")
+    # Create tables
+    sync_db_url = DATABASE_URL
+    if "postgresql://" in sync_db_url:
+        sync_db_url = sync_db_url.replace("postgresql://","postgresql+psycopg2://")
+    engine = create_engine(sync_db_url)
+    metadata.create_all(engine); engine.dispose()
+    log.info(f"Tables ready | Facility: {FACILITY_ID} | Node: {'cloud' if IS_CLOUD else 'local'}")
+    # Auto seed
     count = await database.fetch_val(text("SELECT COUNT(*) FROM users"))
     if not count:
-        await seed()
-        log.info("Demo data seeded")
+        await seed(); log.info("Demo data seeded")
+    # Start background sync loop
+    if not IS_CLOUD and cloud_db:
+        asyncio.create_task(sync_loop())
 
 @app.on_event("shutdown")
 async def shutdown():
     await database.disconnect()
+    if cloud_db:
+        try: await cloud_db.disconnect()
+        except: pass
+
+async def sync_loop():
+    """Background loop — syncs every SYNC_INTERVAL seconds."""
+    while True:
+        await asyncio.sleep(SYNC_INTERVAL)
+        await run_sync_job()

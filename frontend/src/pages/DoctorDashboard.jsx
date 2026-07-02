@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
+import ICScanner from "@/components/ICScanner";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -9,8 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import SyncIndicator from "@/components/SyncIndicator";
-import NFCScanner from "@/components/NFCScanner";
-import BluetoothVitals from "@/components/BluetoothVitals";
 import { AttachmentUploader, AttachmentList } from "@/components/Attachments";
 import AvailabilityCard from "@/components/AvailabilityCard";
 import DoctorScheduler from "@/components/DoctorScheduler";
@@ -47,7 +46,7 @@ export default function DoctorDashboard() {
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [aiDrug, setAiDrug] = useState("");
   const [aiDrugLoading, setAiDrugLoading] = useState(false);
-  const [nfcOpen, setNfcOpen] = useState(false);
+  const [icScanOpen, setIcScanOpen] = useState(false);
   const [recOpen, setRecOpen] = useState(false);
 
   const [form, setForm] = useState({
@@ -202,7 +201,7 @@ export default function DoctorDashboard() {
             <Button
               data-testid="nfc-open-btn"
               size="sm"
-              onClick={() => setNfcOpen(true)}
+              onClick={() => setIcScanOpen(true)}
               className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full h-8"
             >
               <WaveTriangle size={14} weight="duotone" className="mr-1.5" /> Scan NFC
@@ -331,7 +330,7 @@ export default function DoctorDashboard() {
         </div>
       </div>
 
-      <NFCScanner open={nfcOpen} onOpenChange={setNfcOpen} onMatch={onNFCMatch} />
+      <ICScanner open={icScanOpen} onOpenChange={setNfcOpen} onMatch={onNFCMatch} />
 
       {/* Record dialog */}
       <Dialog open={recOpen} onOpenChange={setRecOpen}>
