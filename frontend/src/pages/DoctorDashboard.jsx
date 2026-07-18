@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import ICScanner from "@/components/ICScanner";
+import BluetoothVitals from "@/components/BluetoothVitals";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
