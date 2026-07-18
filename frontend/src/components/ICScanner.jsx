@@ -10,7 +10,12 @@ import { toast } from "sonner";
 import axios from "axios";
 import { API } from "@/lib/api";
 
-const kioskAxios = axios.create({ baseURL: API });
+const kioskAxios = axios.create({
+  baseURL: API,
+  headers: process.env.REACT_APP_KIOSK_TOKEN
+    ? { "X-Kiosk-Token": process.env.REACT_APP_KIOSK_TOKEN }
+    : {},
+});
 
 /**
  * ICScanner — replaces NFCScanner.
