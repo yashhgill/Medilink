@@ -1,6 +1,12 @@
 import axios from "axios";
 
-export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+// Use the same host the page was served from (works on phone/kiosk/laptop).
+// An explicit non-localhost REACT_APP_BACKEND_URL still wins (e.g. cloud deploys).
+const envUrl = process.env.REACT_APP_BACKEND_URL;
+export const BACKEND_URL =
+  envUrl && !envUrl.includes("localhost")
+    ? envUrl
+    : `${window.location.protocol}//${window.location.hostname}:8000`;
 export const API = `${BACKEND_URL}/api`;
 
 const api = axios.create({ baseURL: API });

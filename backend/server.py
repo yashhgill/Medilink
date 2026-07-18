@@ -1533,6 +1533,8 @@ _cors = [o.strip() for o in os.environ.get(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors,
+    # Local-first clinic server: also accept devices on the private LAN
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
