@@ -4,9 +4,15 @@ import { CloudCheck, HardDrives, ArrowsClockwise } from "@phosphor-icons/react";
 import api from "@/lib/api";
 import { motion } from "framer-motion";
 
-export default function SyncIndicator({ compact = false }) {
+// Admin-only gate: hooks-safe wrapper — the inner component's hooks
+// only mount when the user is an admin, so hook order never changes.
+export default function SyncIndicator(props) {
   const { user } = useAuth();
   if (!user || user.role !== "admin") return null;
+  return <SyncIndicatorInner {...props} />;
+}
+
+function SyncIndicatorInner({ compact = false }) {
   const [data, setData] = useState(null);
 
   const load = async () => {
