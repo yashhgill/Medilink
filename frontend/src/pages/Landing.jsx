@@ -79,7 +79,7 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="relative z-10 max-w-[1400px] mx-auto px-6 md:px-8 pt-16 pb-20 grid lg:grid-cols-12 gap-10 items-center">
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-12 max-w-3xl">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#E2DDD7] bg-white text-xs font-mono text-[#5C6661] mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-[#2D6A4F] breathe" />
             Clinic operating system · Local-first · Secure
@@ -136,50 +136,6 @@ export default function Landing() {
           </div>
         </div>
 
-        {/* Hero card */}
-        <div className="lg:col-span-5">
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-            className="relative rounded-3xl border border-[#E2DDD7] bg-white p-6 shadow-[0_30px_80px_-40px_rgba(28,63,57,0.35)]"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="overline">Reception · Live</div>
-              <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#2D6A4F]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#2D6A4F] breathe" />
-                Online
-              </div>
-            </div>
-
-            <div className="inset-card flex flex-col items-center justify-center py-10">
-              <motion.div
-                initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                className="relative w-28 h-28 rounded-full bg-white border-2 border-[#1C3F39] flex items-center justify-center nfc-pulse"
-              >
-                <WaveTriangle size={48} weight="duotone" color="#1C3F39" />
-              </motion.div>
-              <div className="overline mt-5">Tap IC to check-in</div>
-              <div className="font-display text-3xl mt-1 text-[#1C3F39]">Walk-in ready</div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              <div className="rounded-xl p-3 bg-[#F3EFE9] border border-[#E2DDD7]">
-                <div className="flex items-center gap-1.5 text-xs text-[#1C3F39]">
-                  <HardDrives size={14} weight="duotone" /> NVMe SSD
-                </div>
-                <div className="font-mono text-lg mt-1">Instant writes</div>
-              </div>
-              <div className="rounded-xl p-3 bg-white border border-[#E2DDD7]">
-                <div className="flex items-center gap-1.5 text-xs text-[#1C3F39]">
-                  <CloudCheck size={14} weight="duotone" /> Cloud
-                </div>
-                <div className="font-mono text-lg mt-1">Auto-mirrored</div>
-              </div>
-            </div>
-          </motion.div>
-        </div>
       </section>
 
       {/* Features */}
