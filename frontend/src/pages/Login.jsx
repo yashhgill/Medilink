@@ -143,9 +143,11 @@ export default function Login() {
             </Button>
           </form>
 
+          {!IS_PUBLIC && (
           <div className="flex items-center gap-3 my-8 text-[10px] uppercase tracking-[0.2em] text-[#5C6661]">
             <div className="h-px flex-1 bg-[#E2DDD7]" /> Demo accounts <div className="h-px flex-1 bg-[#E2DDD7]" />
           </div>
+          )}
 
           <div className="grid gap-2">
             {!IS_PUBLIC && demoAccounts.map((d) => (
