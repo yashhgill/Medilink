@@ -97,7 +97,7 @@ export default function Kiosk() {
       <div className="kiosk-orb w-[420px] h-[420px] bg-[#2D6A4F] -top-24 -left-24" />
       <div className="kiosk-orb w-[360px] h-[360px] bg-[#D4A373] top-1/3 -right-28" style={{ animationDelay: "-6s" }} />
 
-      <main className="relative z-10 max-w-5xl mx-auto px-6 pt-10 pb-16">
+      <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pt-4 landscape:pt-3 pb-8">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -106,14 +106,14 @@ export default function Kiosk() {
         >
           Welcome
         </motion.div>
-        <h1 className="font-display text-5xl sm:text-6xl text-[#F9F9F6] tracking-tight font-semibold leading-[1.02]">
+        <h1 className="font-display text-3xl sm:text-4xl landscape:text-3xl text-[#F9F9F6] tracking-tight font-semibold leading-[1.05]">
           <motion.span
             initial={{ opacity: 0, y: 26 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className="inline-block"
           >
-            Tap your IC to
+            Welcome, enter
           </motion.span>{" "}
           <br />
           <motion.span
@@ -122,7 +122,7 @@ export default function Kiosk() {
             transition={{ duration: 0.6, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
             className="text-[#D4A373] inline-block"
           >
-            begin.
+            your IC to begin.
           </motion.span>
         </h1>
 
@@ -130,7 +130,7 @@ export default function Kiosk() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.65, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
-          className="mt-10 rounded-3xl bg-[#F9F9F6] p-2"
+          className="mt-5 landscape:mt-4 rounded-3xl bg-[#F9F9F6] p-2"
         >
           <Tabs value={mode} onValueChange={setMode}>
             <TabsList className="grid grid-cols-3 w-full bg-[#F3EFE9] border border-[#E2DDD7] rounded-full p-1 h-12">
@@ -145,17 +145,13 @@ export default function Kiosk() {
               </TabsTrigger>
             </TabsList>
 
-            <div className="p-6 md:p-8">
+            <div className="p-4 md:p-6">
               <TabsContent value="checkin"><CheckinFlow onPrint={(c) => showChits(c)} /></TabsContent>
               <TabsContent value="pay"><PayFlow onPrint={(r, m) => showChits(r, m)} /></TabsContent>
               <TabsContent value="status"><StatusFlow /></TabsContent>
             </div>
           </Tabs>
         </motion.div>
-
-        <div className="mt-6 text-center text-[11px] text-white/50 font-mono">
-          Demo ICs: 880421-14-5567 · 950311-08-2210 · 720915-10-7733
-        </div>
       </main>
 
       <PrintChit
@@ -507,25 +503,25 @@ function CheckinFlow({ onPrint }) {
     <div>
       <div className="overline">Step 1</div>
       <h2 className="font-display text-2xl mt-1">Identify yourself</h2>
-      <p className="text-sm text-[#5C6661] mt-1 mb-6">Tap your IC card on the reader, scan the QR code, or type your IC number.</p>
+      <p className="text-sm text-[#5C6661] mt-1 mb-6">Type your IC number, or scan the QR code on your appointment slip with the camera.</p>
 
       <div className="grid md:grid-cols-2 gap-4">
         {/* NFC tap zone */}
-        <div className="inset-card p-8 flex flex-col items-center text-center">
+        <div className="inset-card p-5 flex flex-col items-center text-center">
           <motion.div
             whileTap={{ scale: 0.94 }}
             onClick={() => ic && lookup(ic)}
             data-testid="kiosk-tap-zone"
-            className={`relative w-28 h-28 rounded-full flex items-center justify-center cursor-pointer bg-white border-2 ${
+            className={`relative w-20 h-20 rounded-full flex items-center justify-center cursor-pointer bg-white border-2 ${
               tapping ? "nfc-pulse border-[#B55B49]" : "border-[#1C3F39]"
             }`}
           >
-            <WaveTriangle size={44} weight="duotone" color="#1C3F39" />
+            <WaveTriangle size={32} weight="duotone" color="#1C3F39" />
           </motion.div>
-          <div className="overline mt-5">Tap IC on reader</div>
+          <div className="overline mt-5">MediLink check-in</div>
 
           <div className="w-full mt-6 space-y-2">
-            <Label className="text-xs">Or enter IC manually</Label>
+            <Label className="text-xs">Enter your IC number</Label>
             <Input
               data-testid="kiosk-ic-input"
               value={ic}
@@ -551,7 +547,7 @@ function CheckinFlow({ onPrint }) {
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             {!scanning && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/55 text-white text-sm">
-                Camera idle
+                Camera ready — tap Start
               </div>
             )}
             {scanning && (

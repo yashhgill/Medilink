@@ -19,7 +19,10 @@ export default function useQueueSocket(onEvent) {
       const token = localStorage.getItem("ml_token");
       if (!token) return;
       const wsUrl =
-        BACKEND_URL.replace(/^http/, "ws") + `/api/ws/queue?token=${encodeURIComponent(token)}`;
+        (BACKEND_URL
+          ? BACKEND_URL.replace(/^http/, "ws")
+          : (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host
+        ) + `/api/ws/queue?token=${encodeURIComponent(token)}`;
       let ws;
       try {
         ws = new WebSocket(wsUrl);

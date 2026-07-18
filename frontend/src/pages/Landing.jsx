@@ -17,8 +17,8 @@ import {
 const features = [
   {
     icon: WaveTriangle,
-    title: "NFC IC Tap",
-    body: "Walk in, tap the chip on your IC — your full health record opens instantly at reception.",
+    title: "Kiosk IC Check-in",
+    body: "Walk in, type your IC number at the kiosk — registered, triaged and queued in under a minute.",
   },
   {
     icon: Stethoscope,
@@ -91,7 +91,7 @@ export default function Landing() {
           </h1>
 
           <p className="mt-6 text-lg text-[#5C6661] max-w-xl leading-relaxed">
-            MediLink unifies the patient&apos;s journey — from an NFC tap at the door
+            MediLink unifies the patient&apos;s journey — from a 30-second kiosk check-in
             to an AI-assisted prescription — and keeps every record safe across
             your <span className="text-[#0A0F0D] font-medium">local NVMe SSD</span>{" "}
             and the <span className="text-[#0A0F0D] font-medium">cloud</span>.
