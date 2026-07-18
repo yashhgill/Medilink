@@ -94,16 +94,44 @@ export default function Kiosk() {
         </Button>
       </header>
 
+      <div className="kiosk-orb w-[420px] h-[420px] bg-[#2D6A4F] -top-24 -left-24" />
+      <div className="kiosk-orb w-[360px] h-[360px] bg-[#D4A373] top-1/3 -right-28" style={{ animationDelay: "-6s" }} />
+
       <main className="relative z-10 max-w-5xl mx-auto px-6 pt-10 pb-16">
-        <div className="text-[10px] uppercase tracking-[0.25em] text-white/60 mb-3">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="text-[10px] uppercase tracking-[0.25em] text-white/60 mb-3"
+        >
           Welcome
-        </div>
+        </motion.div>
         <h1 className="font-display text-5xl sm:text-6xl text-[#F9F9F6] tracking-tight font-semibold leading-[1.02]">
-          Tap your IC to <br />
-          <span className="text-[#D4A373]">begin.</span>
+          <motion.span
+            initial={{ opacity: 0, y: 26 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="inline-block"
+          >
+            Tap your IC to
+          </motion.span>{" "}
+          <br />
+          <motion.span
+            initial={{ opacity: 0, y: 26 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+            className="text-[#D4A373] inline-block"
+          >
+            begin.
+          </motion.span>
         </h1>
 
-        <div className="mt-10 rounded-3xl bg-[#F9F9F6] p-2">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.65, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+          className="mt-10 rounded-3xl bg-[#F9F9F6] p-2"
+        >
           <Tabs value={mode} onValueChange={setMode}>
             <TabsList className="grid grid-cols-3 w-full bg-[#F3EFE9] border border-[#E2DDD7] rounded-full p-1 h-12">
               <TabsTrigger value="checkin" data-testid="kiosk-tab-checkin" className="data-[state=active]:bg-[#1C3F39] data-[state=active]:text-[#F9F9F6] rounded-full">
@@ -123,7 +151,7 @@ export default function Kiosk() {
               <TabsContent value="status"><StatusFlow /></TabsContent>
             </div>
           </Tabs>
-        </div>
+        </motion.div>
 
         <div className="mt-6 text-center text-[11px] text-white/50 font-mono">
           Demo ICs: 880421-14-5567 · 950311-08-2210 · 720915-10-7733
@@ -251,7 +279,7 @@ function CheckinFlow({ onPrint }) {
 
   if (step === "register") {
     return (
-      <div data-testid="kiosk-register-screen">
+      <motion.div initial={{ opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }} data-testid="kiosk-register-screen">
         <div className="overline">First time here</div>
         <h2 className="font-display text-3xl mt-1">Quick register</h2>
         <p className="text-sm text-[#5C6661] mt-1 mb-6">
@@ -319,12 +347,12 @@ function CheckinFlow({ onPrint }) {
             data-testid="kiosk-reg-submit"
             onClick={registerAndCheckin}
             disabled={!regForm.name || registering}
-            className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full flex-1"
+            className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full flex-1 btn-shimmer"
           >
             <Ticket size={14} className="mr-1.5" /> {registering ? "Setting up…" : "Register & get my ticket"}
           </Button>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
@@ -333,7 +361,7 @@ function CheckinFlow({ onPrint }) {
       (a) => ["scheduled", "checked_in"].includes(a.status)
     );
     return (
-      <div data-testid="kiosk-found-screen">
+      <motion.div initial={{ opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }} data-testid="kiosk-found-screen">
         <div className="overline">Identified</div>
         <h2 className="font-display text-3xl mt-1">{data.patient.name}</h2>
         <div className="text-sm text-[#5C6661] font-mono mt-1">{data.patient.ic_number} · {data.patient.gender || "—"}</div>
@@ -365,9 +393,11 @@ function CheckinFlow({ onPrint }) {
           <div className="mt-3 flex items-center gap-2 flex-wrap">
             <span className="text-xs text-[#5C6661] font-mono mr-1">Pain level:</span>
             {[0,1,2,3,4,5,6,7,8,9,10].map((n) => (
-              <button
+              <motion.button
                 key={n}
                 type="button"
+                whileHover={{ scale: 1.15 }}
+                whileTap={{ scale: 0.85 }}
                 onClick={() => setPainScore(painScore === n ? null : n)}
                 className={`w-8 h-8 rounded-full text-xs font-mono border transition-colors ${
                   painScore === n
@@ -376,7 +406,7 @@ function CheckinFlow({ onPrint }) {
                 }`}
               >
                 {n}
-              </button>
+              </motion.button>
             ))}
           </div>
           <div className="text-[11px] text-[#5C6661] mt-2">
@@ -397,12 +427,12 @@ function CheckinFlow({ onPrint }) {
             data-testid="kiosk-confirm-checkin"
             onClick={confirmCheckin}
             disabled={tapping}
-            className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full flex-1"
+            className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full flex-1 btn-shimmer"
           >
             <Ticket size={14} className="mr-1.5" /> {existing ? "Check in" : "Walk-in & get ticket"}
           </Button>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
@@ -410,17 +440,45 @@ function CheckinFlow({ onPrint }) {
     return (
       <div className="text-center" data-testid="kiosk-booked-screen">
         <motion.div
-          initial={{ scale: 0.6, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="w-16 h-16 rounded-full bg-[#2D6A4F]/20 flex items-center justify-center mx-auto"
+          initial={{ scale: 0.4, opacity: 0, rotate: -12 }}
+          animate={{ scale: 1, opacity: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 260, damping: 16 }}
+          className="relative w-16 h-16 rounded-full bg-[#2D6A4F]/20 flex items-center justify-center mx-auto ring-ripple"
         >
           <CheckCircle size={32} weight="duotone" color="#2D6A4F" />
         </motion.div>
         <div className="overline mt-4">Ticket issued</div>
         <h2 className="font-display text-2xl mt-1">Your queue number</h2>
-        <div className="font-display text-7xl text-[#1C3F39] font-mono tabular-nums leading-none mt-3" data-testid="kiosk-queue-number">
+        <motion.div
+          initial={{ scale: 0.3, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 200, damping: 14, delay: 0.15 }}
+          className="font-display text-7xl text-[#1C3F39] font-mono tabular-nums leading-none mt-3"
+          data-testid="kiosk-queue-number"
+        >
           #{String(data.chit.queue_number).padStart(3, "0")}
-        </div>
+        </motion.div>
+        {data.chit.triage_colour && (
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45, duration: 0.4 }}
+            className={`inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-full text-sm font-medium ${
+              data.chit.triage_colour === "Red"
+                ? "bg-red-50 text-red-700 border border-red-200 triage-red-glow"
+                : data.chit.triage_colour === "Yellow"
+                ? "bg-amber-50 text-amber-700 border border-amber-200"
+                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${
+              data.chit.triage_colour === "Red" ? "bg-red-500"
+              : data.chit.triage_colour === "Yellow" ? "bg-amber-500" : "bg-emerald-500"}`} />
+            {data.chit.triage_colour === "Red" ? "Priority — you'll be seen urgently"
+              : data.chit.triage_colour === "Yellow" ? "Semi-urgent — shortened wait"
+              : "Standard queue"}
+          </motion.div>
+        )}
         <div className="text-sm text-[#5C6661] mt-3">
           See {data.doctor?.name || "the doctor"} when called.
         </div>

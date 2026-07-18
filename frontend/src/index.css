@@ -214,3 +214,39 @@ h1, h2, h3, h4, h5 {
     border: none !important;
   }
 }
+
+
+/* ── Kiosk motion pack ─────────────────────────────────────── */
+@keyframes orb-float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(40px, -30px) scale(1.08); }
+  66% { transform: translate(-25px, 20px) scale(0.95); }
+}
+.kiosk-orb {
+  position: absolute; border-radius: 9999px; filter: blur(70px);
+  opacity: 0.35; pointer-events: none;
+  animation: orb-float 14s ease-in-out infinite;
+}
+@keyframes ring-ripple {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.1); opacity: 0; }
+}
+.ring-ripple::after {
+  content: ""; position: absolute; inset: 0; border-radius: 9999px;
+  border: 2px solid #2D6A4F; animation: ring-ripple 1.6s ease-out infinite;
+}
+@keyframes shimmer-sweep {
+  0% { transform: translateX(-150%) skewX(-15deg); }
+  100% { transform: translateX(250%) skewX(-15deg); }
+}
+.btn-shimmer { position: relative; overflow: hidden; }
+.btn-shimmer::before {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  animation: shimmer-sweep 2.8s ease-in-out infinite;
+}
+@keyframes triage-red-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.35); }
+  50% { box-shadow: 0 0 0 12px rgba(220,38,38,0); }
+}
+.triage-red-glow { animation: triage-red-glow 1.4s ease-in-out infinite; }
