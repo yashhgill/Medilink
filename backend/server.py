@@ -1501,7 +1501,7 @@ async def patient_bills(u=Depends(role_required("patient", "admin"))):
         appointments_t.select()
         .where((appointments_t.c.patient_id == u["id"]) &
                (appointments_t.c.payment_status.in_(["unpaid", "pending"])) &
-               (~appointments_t.c.is_block))
+               (appointments_t.c.is_block.isnot(True)))
         .order_by(appointments_t.c.scheduled_at.desc())
     )
     return await enrich_appointments(rows)
