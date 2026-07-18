@@ -44,6 +44,7 @@ services:
     restart: unless-stopped
     environment:
       HTTPS: "true"
+      DANGEROUSLY_DISABLE_HOST_CHECK: "true"   # allow medilink.harnova.my via tunnel
     ports:
       - "3000:3000"
     depends_on:
