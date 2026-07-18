@@ -76,15 +76,14 @@ export default function Login() {
           </Link>
           <div>
             <div className="text-xs uppercase tracking-[0.25em] text-white/60 mb-3">
-              Final-year project
+              MediLink Health Systems
             </div>
             <div className="font-display text-4xl lg:text-5xl leading-tight max-w-md">
-              Tap. Triage. Treat. <br />Zero downtime.
+              Check in. Triage. Treat. <br />Zero downtime.
             </div>
             <div className="text-white/70 mt-4 max-w-md">
-              An NFC-enabled PHR system that mirrors every record between your local
-              NVMe SSD and the cloud — so your clinic keeps running even when the
-              internet doesn&apos;t.
+              A local-first clinic system — every record lives in the clinic and
+              mirrors to the cloud, so care never stops when the internet does.
             </div>
           </div>
         </div>
