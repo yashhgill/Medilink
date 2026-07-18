@@ -575,9 +575,7 @@ async def patient_by_ic(ic: str):
     parsed = parse_ic(ic)
     search_ic = parsed["formatted"] if parsed["valid"] else ic.strip()
     return await database.fetch_one(
-        users_t.select().where(
-            (users_t.c.ic_number == search_ic) & (users_t.c.role == "patient")
-        )
+        users_t.select().where(users_t.c.ic_number == search_ic)
     )
 
 async def enrich_appointments(rows) -> list:
@@ -1396,15 +1394,22 @@ async def seed():
         raise HTTPException(403, "Seeding disabled. Set ALLOW_SEED=true (dev/demo only).")
     seeded, skipped = [], []
     demo_users = [
-        {"email":"admin@medilink.io","password":"Admin@123","name":"Admin MediLink","role":"admin"},
+        {"email":"dr.tan@medilink.io","password":"Doctor@123","name":"Dr. Wei Tan","role":"doctor","specialty":"General Physician","license_no":"MMC-44219"},
         {"email":"pharmacy@medilink.io","password":"Pharm@123","name":"Pn. Lily Lim","role":"pharmacist"},
         {"email":"reception@medilink.io","password":"Recep@123","name":"Sarah Ang","role":"receptionist"},
-        {"email":"dr.tan@medilink.io","password":"Doctor@123","name":"Dr. Wei Tan","role":"doctor","specialty":"General Physician","license_no":"MMC-44219"},
-        {"email":"dr.kaur@medilink.io","password":"Doctor@123","name":"Dr. Simran Kaur","role":"doctor","specialty":"Cardiology","license_no":"MMC-55781"},
-        {"email":"patient1@medilink.io","password":"Patient@123","name":"Arjun Rao","role":"patient","ic_number":"880421-14-5567","dob":"1988-04-21","gender":"Male","phone":"+60 12-345 6788"},
-        {"email":"patient2@medilink.io","password":"Patient@123","name":"Mei Lin Chong","role":"patient","ic_number":"950311-08-2210","dob":"1995-03-11","gender":"Female","phone":"+60 16-998 4422"},
-        {"email":"patient3@medilink.io","password":"Patient@123","name":"Hafiz Rahman","role":"patient","ic_number":"720915-10-7733","dob":"1972-09-15","gender":"Male","phone":"+60 19-554 8821"},
     ]
+    # System administrator comes from env — never hardcoded credentials
+    if os.environ.get("ADMIN_EMAIL") and os.environ.get("ADMIN_PASSWORD"):
+        demo_users.insert(0, {
+            "email": os.environ["ADMIN_EMAIL"],
+            "password": os.environ["ADMIN_PASSWORD"],
+            "name": os.environ.get("ADMIN_NAME", "System Administrator"),
+            "role": "admin",
+            "ic_number": os.environ.get("ADMIN_IC") or None,
+            "phone": os.environ.get("ADMIN_PHONE") or None,
+            "dob": os.environ.get("ADMIN_DOB") or None,
+            "gender": os.environ.get("ADMIN_GENDER") or None,
+        })
     for u in demo_users:
         if await database.fetch_one(users_t.select().where(users_t.c.email == u["email"])):
             skipped.append(u["email"]); continue

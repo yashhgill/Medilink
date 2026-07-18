@@ -1,9 +1,12 @@
+import { useAuth } from "@/contexts/AuthContext";
 import React, { useEffect, useState } from "react";
 import { CloudCheck, HardDrives, ArrowsClockwise } from "@phosphor-icons/react";
 import api from "@/lib/api";
 import { motion } from "framer-motion";
 
 export default function SyncIndicator({ compact = false }) {
+  const { user } = useAuth();
+  if (!user || user.role !== "admin") return null;
   const [data, setData] = useState(null);
 
   const load = async () => {

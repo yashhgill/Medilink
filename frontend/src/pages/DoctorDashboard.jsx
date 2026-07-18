@@ -275,7 +275,7 @@ export default function DoctorDashboard() {
               {aiSummary && (
                 <div data-testid="ai-summary-output" className="rounded-2xl border border-[#1C3F39]/20 bg-[#F3EFE9] p-5 mb-5">
                   <div className="overline flex items-center gap-1.5">
-                    <Sparkle size={12} weight="fill" /> AI Summary · Gemini
+                    <Sparkle size={12} weight="fill" /> AI Summary
                   </div>
                   <div className="text-sm mt-2 whitespace-pre-wrap leading-relaxed">{aiSummary}</div>
                 </div>
@@ -330,7 +330,7 @@ export default function DoctorDashboard() {
         </div>
       </div>
 
-      <ICScanner open={icScanOpen} onOpenChange={setNfcOpen} onMatch={onNFCMatch} />
+      <ICScanner open={icScanOpen} onOpenChange={setIcScanOpen} onMatch={onNFCMatch} />
 
       {/* Record dialog */}
       <Dialog open={recOpen} onOpenChange={setRecOpen}>

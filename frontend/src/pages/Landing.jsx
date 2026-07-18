@@ -22,7 +22,7 @@ const features = [
   },
   {
     icon: Stethoscope,
-    title: "AI Triage (Gemini)",
+    title: "AI Triage",
     body: "Symptom checker, history summarizer, and drug-interaction safety net for every clinician.",
   },
   {
@@ -82,7 +82,7 @@ export default function Landing() {
         <div className="lg:col-span-7">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#E2DDD7] bg-white text-xs font-mono text-[#5C6661] mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-[#2D6A4F] breathe" />
-            Final-year project · Cloud + AI + IoT
+            Clinic operating system · Local-first · Secure
           </div>
 
           <h1 className="font-display font-semibold tracking-tight text-5xl sm:text-6xl lg:text-7xl leading-[0.95] text-[#0A0F0D]">
@@ -131,7 +131,7 @@ export default function Landing() {
               <CloudCheck size={14} /> SSD-first sync
             </div>
             <div className="flex items-center gap-1.5">
-              <Sparkle size={14} /> Gemini 3 Flash
+              <Sparkle size={14} /> AI-assisted care
             </div>
           </div>
         </div>
@@ -161,7 +161,7 @@ export default function Landing() {
                 <WaveTriangle size={48} weight="duotone" color="#1C3F39" />
               </motion.div>
               <div className="overline mt-5">Tap IC to check-in</div>
-              <div className="font-display text-3xl mt-1 text-[#1C3F39]">Patient #042</div>
+              <div className="font-display text-3xl mt-1 text-[#1C3F39]">Walk-in ready</div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 mt-4">
@@ -169,13 +169,13 @@ export default function Landing() {
                 <div className="flex items-center gap-1.5 text-xs text-[#1C3F39]">
                   <HardDrives size={14} weight="duotone" /> NVMe SSD
                 </div>
-                <div className="font-mono text-lg mt-1">12 local</div>
+                <div className="font-mono text-lg mt-1">Instant writes</div>
               </div>
               <div className="rounded-xl p-3 bg-white border border-[#E2DDD7]">
                 <div className="flex items-center gap-1.5 text-xs text-[#1C3F39]">
                   <CloudCheck size={14} weight="duotone" /> Cloud
                 </div>
-                <div className="font-mono text-lg mt-1">8,402 mirrored</div>
+                <div className="font-mono text-lg mt-1">Auto-mirrored</div>
               </div>
             </div>
           </motion.div>
@@ -186,7 +186,7 @@ export default function Landing() {
       <section className="relative z-10 max-w-[1400px] mx-auto px-6 md:px-8 pb-24">
         <div className="overline mb-3">What&apos;s inside</div>
         <h2 className="font-display text-3xl sm:text-4xl mb-10 max-w-2xl tracking-tight">
-          A clinic-grade workflow, packed into a final-year project.
+          Everything a modern clinic needs, in one system.
         </h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {features.map((f, i) => (
@@ -210,8 +210,8 @@ export default function Landing() {
 
       <footer className="relative z-10 border-t border-[#E2DDD7]">
         <div className="max-w-[1400px] mx-auto px-6 md:px-8 py-6 flex items-center justify-between text-xs text-[#5C6661] font-mono">
-          <div>© 2026 MediLink · Final-Year Project</div>
-          <div>Built with FastAPI · MongoDB · Gemini 3 · React</div>
+          <div>© 2026 MediLink Health Systems</div>
+          <div>Local-first · Encrypted · Built for Malaysian clinics</div>
         </div>
       </footer>
     </div>
