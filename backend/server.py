@@ -549,6 +549,7 @@ class MedicalRecordIn(BaseModel):
     notes: Optional[str] = None
     prescriptions: List[PrescriptionItem] = []
     allergies: Optional[str] = None
+    attachment_ids: Optional[List[str]] = []
     # Triage result can be saved with record
     triage_category: Optional[str] = None
     triage_colour: Optional[str] = None
@@ -891,7 +892,7 @@ async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
         "reason":appt["reason"], "issued_at":now_iso(), "appointment_id":appt["id"],
         "triage_colour":appt.get("triage_colour"), "triage_category":appt.get("triage_category"),
         "app_url": PUBLIC_APP_URL,
-        "app_qr": make_duitnow_qr and _app_qr(),
+        "app_qr": _app_qr(),
     }
     return {"appointment":appt, "patient":clean(dict(p)), "doctor":doc, "chit":chit}
 
@@ -1077,8 +1078,13 @@ async def create_record(body: MedicalRecordIn, u=Depends(role_required("doctor",
         triage_colour=body.triage_colour,
         triage_target_mins=body.triage_target_mins,
         triage_red_flags=body.triage_red_flags or [],
-        attachment_ids=[], created_at=now, updated_at=now, sync_status="local",
+        attachment_ids=body.attachment_ids or [], created_at=now, updated_at=now, sync_status="local",
     ))
+    if body.attachment_ids:
+        await database.execute(
+            attachments_t.update()
+            .where(attachments_t.c.id.in_(body.attachment_ids))
+            .values(record_id=rec_id, patient_id=body.patient_id))
     # Auto-advance appointment to ready_for_pharmacy if it was in_progress
     if body.appointment_id:
         appt_row = await database.fetch_one(
@@ -1112,6 +1118,15 @@ async def patient_records(patient_id: str, u=Depends(current_user), request: Req
         rec = dict(r)
         doc = await database.fetch_one(users_t.select().where(users_t.c.id == rec["doctor_id"]))
         rec["doctor"] = clean(dict(doc)) if doc else None
+        att_ids = rec.get("attachment_ids") or []
+        rec["attachments"] = []
+        if att_ids:
+            att_rows = await database.fetch_all(
+                attachments_t.select().where(attachments_t.c.id.in_(att_ids)))
+            for a in att_rows:
+                ad = {k: v for k, v in dict(a).items() if k != "path"}
+                ad["original_filename"] = ad["filename"]
+                rec["attachments"].append(ad)
         result.append(rec)
     return result
 
@@ -1618,6 +1633,33 @@ async def download_attachment(att_id: str, u=Depends(current_user), request: Req
     if not os.path.exists(d["path"]):
         raise HTTPException(410, "File no longer on this node")
     return FileResponse(d["path"], media_type=d["content_type"], filename=d["filename"])
+
+# ── Generic file upload (frontend contract: /files/*) ───────────────────────
+@api.post("/files/upload", status_code=201)
+async def files_upload(file: UploadFile = File(...),
+                       u=Depends(role_required("doctor", "admin"))):
+    if file.size and file.size > 25 * 1024 * 1024:
+        raise HTTPException(413, "Max file size is 25 MB")
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    att_id = uid()
+    safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", file.filename or "file")
+    path = os.path.join(UPLOAD_DIR, f"{att_id}_{safe_name}")
+    content = await file.read()
+    with open(path, "wb") as f:
+        f.write(content)
+    row = dict(id=att_id, record_id=None, patient_id=None, filename=safe_name,
+               content_type=file.content_type or "application/octet-stream",
+               size_bytes=len(content), path=path, uploaded_by=u["id"],
+               created_at=now_iso(), facility_id=FACILITY_ID, sync_status="local")
+    await database.execute(attachments_t.insert().values(**row))
+    await audit_log(u["id"], u["role"], "UPLOAD_FILE", "attachments", att_id)
+    row.pop("path")
+    row["original_filename"] = safe_name
+    return row
+
+@api.get("/files/{att_id}/download")
+async def files_download(att_id: str, u=Depends(current_user), request: Request = None):
+    return await download_attachment(att_id, u, request)
 
 # ── Pharmacy: expiry alerts ──────────────────────────────────────────────────
 @api.get("/pharmacy/expiry-alerts")
