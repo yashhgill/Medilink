@@ -90,6 +90,13 @@ function ChitContent({ chit }) {
           {chit.triage_colour && (
             <Row label="Triage" value={`${chit.triage_colour}${chit.triage_category ? " — " + chit.triage_category : ""}`} />
           )}
+          {chit.activation_code && (
+            <div className="mt-3 pt-3 border-t border-dashed border-[#E2DDD7] text-center">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C6661]">App activation code</div>
+              <div className="font-mono text-2xl tracking-[0.35em] font-semibold">{chit.activation_code}</div>
+              <div className="text-[10px] text-[#5C6661]">Set your password at {chit.app_url || "the app"} · valid 72h</div>
+            </div>
+          )}
           {chit.app_qr && (
             <div className="mt-3 pt-3 border-t border-dashed border-[#E2DDD7] text-center">
               <img src={chit.app_qr} alt="MediLink app QR" className="w-24 h-24 mx-auto" />

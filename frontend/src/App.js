@@ -6,6 +6,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { IS_PUBLIC } from "@/lib/api";
 import Landing from "@/pages/Landing";
 import Login, { redirectFor } from "@/pages/Login";
+import Activate from "@/pages/Activate";
 import Register from "@/pages/Register";
 import PatientDashboard from "@/pages/PatientDashboard";
 import DoctorDashboard from "@/pages/DoctorDashboard";
@@ -31,6 +32,7 @@ function App() {
             <Route path="/kiosk" element={IS_PUBLIC ? <Navigate to="/" replace /> : <Kiosk />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={IS_PUBLIC ? <Navigate to="/login" replace /> : <Register />} />
+            <Route path="/activate" element={<Activate />} />
             <Route
               path="/patient"
               element={

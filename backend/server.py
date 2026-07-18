@@ -16,7 +16,7 @@ from sqlalchemy import (
 )
 from dotenv import load_dotenv
 from pathlib import Path
-import os, logging, asyncio, uuid, json, re, io, base64, httpx, hmac, time
+import os, logging, asyncio, uuid, json, re, io, base64, httpx, hmac, time, secrets
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any, Literal, Set
 from pydantic import BaseModel, Field, EmailStr
@@ -71,6 +71,8 @@ users_t = Table("users", metadata,
     Column("slot_minutes", Integer, default=30),
     Column("facility_id", String, default="main"),
     Column("source", String, default="web"),
+    Column("activation_code", String),      # one-time app activation (kiosk slip)
+    Column("activation_expires", String),
     Column("created_at", String),
     Column("updated_at", String),
     Column("sync_status", String, default="local"),
@@ -246,7 +248,10 @@ def make_token(uid_: str, role: str) -> str:
 
 def clean(d: dict) -> dict:
     if not d: return d
-    r = dict(d); r.pop("password_hash", None); return r
+    r = dict(d)
+    for k in ("password_hash", "activation_code", "activation_expires"):
+        r.pop(k, None)
+    return r
 
 # ── NRIC parser ───────────────────────────────────────────────────────────────
 NRIC_RE = re.compile(r"^(\d{2})(\d{2})(\d{2})-?(\d{2})-?(\d{4})$")
@@ -707,6 +712,32 @@ async def login(body: LoginIn, request: Request):
     await audit_log(row["id"], row["role"], "LOGIN", "auth", ip=ip)
     return {"token": make_token(row["id"], row["role"]), "user": clean(dict(row))}
 
+class ActivateIn(BaseModel):
+    ic_number: str
+    code: str
+    password: str
+
+@api.post("/auth/activate")
+async def activate_account(body: ActivateIn, request: Request):
+    ip = request.client.host if request.client else ""
+    guard_key = f"activate|{body.ic_number}|{ip}"
+    login_guard(guard_key)
+    parsed = parse_ic(body.ic_number)
+    search_ic = parsed["formatted"] if parsed["valid"] else body.ic_number.strip()
+    row = await database.fetch_one(users_t.select().where(users_t.c.ic_number == search_ic))
+    d = dict(row) if row else {}
+    if (not row or not d.get("activation_code") or d["activation_code"] != body.code.strip()
+            or (d.get("activation_expires") and d["activation_expires"] < now_iso())):
+        login_fail(guard_key)
+        raise HTTPException(400, "Invalid or expired activation code — get a fresh one at the clinic kiosk")
+    if len(body.password) < 8:
+        raise HTTPException(400, "Password must be at least 8 characters")
+    await database.execute(users_t.update().where(users_t.c.id == d["id"]).values(
+        password_hash=hash_pw(body.password), activation_code=None,
+        activation_expires=None, updated_at=now_iso()))
+    await audit_log(d["id"], d["role"], "ACCOUNT_ACTIVATED", "auth", ip=ip)
+    return {"token": make_token(d["id"], d["role"]), "user": clean(d)}
+
 @api.get("/auth/me")
 async def me(u=Depends(current_user)):
     return u
@@ -792,9 +823,12 @@ async def kiosk_register(body: KioskRegisterIn, _=Depends(kiosk_auth)):
     if await database.fetch_one(users_t.select().where(users_t.c.email == email)):
         email = f"{parsed['formatted'].replace('-','').lower()}.{uid()[:6]}@patient.medilink"
     uid_ = uid(); now = now_iso()
+    code = f"{secrets.randbelow(1000000):06d}"
+    expires = (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()
     await database.execute(users_t.insert().values(
         id=uid_, email=email,
-        password_hash=hash_pw(f"IC{parsed['formatted'].replace('-','')[:8]}#"),
+        password_hash=hash_pw(secrets.token_urlsafe(32)),  # unusable until activated
+        activation_code=code, activation_expires=expires,
         name=body.name, role="patient",
         ic_number=parsed["formatted"], phone=body.phone,
         dob=parsed.get("dob"), gender=parsed.get("gender_hint"),
@@ -802,9 +836,9 @@ async def kiosk_register(body: KioskRegisterIn, _=Depends(kiosk_auth)):
         created_at=now, updated_at=now, sync_status="local",
     ))
     user = clean(dict(await database.fetch_one(users_t.select().where(users_t.c.id == uid_))))
+    user.pop("activation_code", None); user.pop("activation_expires", None)
     await enqueue_sync("users", uid_, "INSERT", user)
-    return {"patient": user, "ic_info": parsed,
-            "login_hint": f"Default password: IC{parsed['formatted'].replace('-','')[:8]}#"}
+    return {"patient": user, "ic_info": parsed, "activation_code": code}
 
 async def kiosk_triage(symptoms: str, pain_score, patient: dict) -> dict:
     """Run MTS triage on kiosk-reported symptoms. Fail-safe: Green on any error."""
@@ -882,6 +916,12 @@ async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
         await enqueue_sync("appointments", appt_id, "INSERT", appt)
         broadcast({"type":"appointment.created","appointment_id":appt_id})
 
+    activation_code = None
+    if dict(p).get("activation_code") is not None:
+        activation_code = f"{secrets.randbelow(1000000):06d}"
+        await database.execute(users_t.update().where(users_t.c.id == p["id"]).values(
+            activation_code=activation_code,
+            activation_expires=(datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()))
     doc_row = await database.fetch_one(users_t.select().where(users_t.c.id == appt["doctor_id"]))
     doc = clean(dict(doc_row)) if doc_row else {}
     chit = {
@@ -893,6 +933,7 @@ async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
         "triage_colour":appt.get("triage_colour"), "triage_category":appt.get("triage_category"),
         "app_url": PUBLIC_APP_URL,
         "app_qr": _app_qr(),
+        "activation_code": activation_code,
     }
     return {"appointment":appt, "patient":clean(dict(p)), "doctor":doc, "chit":chit}
 
@@ -1865,7 +1906,16 @@ async def startup():
     if "postgresql://" in sync_db_url:
         sync_db_url = sync_db_url.replace("postgresql://","postgresql+psycopg2://")
     engine = create_engine(sync_db_url)
-    metadata.create_all(engine); engine.dispose()
+    metadata.create_all(engine)
+    if "sqlite" not in sync_db_url:
+        with engine.connect() as conn:
+            for ddl in ("ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_code VARCHAR",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_expires VARCHAR"):
+                try:
+                    conn.execute(text(ddl)); conn.commit()
+                except Exception:
+                    pass
+    engine.dispose()
     log.info(f"Tables ready | Facility: {FACILITY_ID} | Node: {'cloud' if IS_CLOUD else 'local'}")
     # Self-provision the cloud mirror: create tables there too on first connect
     if CLOUD_DB_URL and not IS_CLOUD:
@@ -1874,7 +1924,15 @@ async def startup():
             if "postgresql://" in cloud_sync_url:
                 cloud_sync_url = cloud_sync_url.replace("postgresql://", "postgresql+psycopg2://")
             cengine = create_engine(cloud_sync_url)
-            metadata.create_all(cengine); cengine.dispose()
+            metadata.create_all(cengine)
+            with cengine.connect() as conn:
+                for ddl in ("ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_code VARCHAR",
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_expires VARCHAR"):
+                    try:
+                        conn.execute(text(ddl)); conn.commit()
+                    except Exception:
+                        pass
+            cengine.dispose()
             log.info("Cloud mirror tables ready")
         except Exception as e:
             log.warning(f"Cloud mirror not provisioned yet (will keep queueing): {e}")
