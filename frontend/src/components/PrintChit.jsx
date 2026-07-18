@@ -90,6 +90,15 @@ function ChitContent({ chit }) {
           {chit.triage_colour && (
             <Row label="Triage" value={`${chit.triage_colour}${chit.triage_category ? " — " + chit.triage_category : ""}`} />
           )}
+          {chit.app_qr && (
+            <div className="mt-3 pt-3 border-t border-dashed border-[#E2DDD7] text-center">
+              <img src={chit.app_qr} alt="MediLink app QR" className="w-24 h-24 mx-auto" />
+              <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C6661] mt-1">
+                Scan to view your records &amp; pay bills
+              </div>
+              <div className="text-[10px] font-mono text-[#5C6661]">{chit.app_url}</div>
+            </div>
+          )}
           <Row label="Issued" value={new Date(chit.issued_at).toLocaleString()} mono />
         </>
       )}

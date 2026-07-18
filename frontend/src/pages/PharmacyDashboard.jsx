@@ -19,10 +19,14 @@ export default function PharmacyDashboard() {
   const [busy, setBusy] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(null);
 
+  const [expiry, setExpiry] = useState({ expired: [], expiring_soon: [] });
+
   const load = async () => {
     try {
       const r = await api.get("/pharmacy/queue");
       setQueue(r.data);
+      const ex = await api.get("/pharmacy/expiry-alerts").catch(() => null);
+      if (ex) setExpiry(ex.data);
     } catch (e) {
       toast.error("Failed to load pharmacy queue");
     }
@@ -50,6 +54,31 @@ export default function PharmacyDashboard() {
 
   return (
     <AppShell title="Pharmacy · Dispense Queue" subtitle={`${user.name}`} navItems={[]}>
+      {(expiry.expired.length > 0 || expiry.expiring_soon.length > 0) && (
+        <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5" data-testid="expiry-alerts">
+          <div className="overline text-amber-700">Stock expiry alerts</div>
+          <div className="mt-2 grid sm:grid-cols-2 gap-2">
+            {expiry.expired.map((m) => (
+              <div key={m.id} className="flex items-center justify-between p-3 rounded-xl bg-white border border-red-200">
+                <div>
+                  <div className="text-sm font-medium">{m.name}</div>
+                  <div className="text-[11px] text-[#5C6661] font-mono">batch {m.batch_no || "—"} · {m.stock_qty} {m.unit || "units"}</div>
+                </div>
+                <span className="text-xs font-semibold text-red-600">EXPIRED {m.expiry_date?.slice(0,10)}</span>
+              </div>
+            ))}
+            {expiry.expiring_soon.map((m) => (
+              <div key={m.id} className="flex items-center justify-between p-3 rounded-xl bg-white border border-amber-200">
+                <div>
+                  <div className="text-sm font-medium">{m.name}</div>
+                  <div className="text-[11px] text-[#5C6661] font-mono">batch {m.batch_no || "—"} · {m.stock_qty} {m.unit || "units"}</div>
+                </div>
+                <span className="text-xs font-semibold text-amber-700">{m.days_to_expiry}d left</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="grid lg:grid-cols-3 gap-5">
         <div className="rounded-2xl border border-[#E2DDD7] bg-[#1C3F39] text-[#F9F9F6] p-6">
           <div className="overline text-white/60">Waiting</div>

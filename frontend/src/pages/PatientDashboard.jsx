@@ -33,18 +33,23 @@ export default function PatientDashboard() {
   const [records, setRecords] = useState([]);
   const [openBook, setOpenBook] = useState(false);
   const [openPay, setOpenPay] = useState(null);
+  const [qrPay, setQrPay] = useState(null);      // active DuitNow payment {qr, ref, amount}
+  const [receipts, setReceipts] = useState([]);
+  const [confirming, setConfirming] = useState(false);
   const [booking, setBooking] = useState({ doctor_id: "", scheduled_at: "", reason: "" });
   const [loading, setLoading] = useState(false);
 
   const load = async () => {
-    const [a, d, r] = await Promise.all([
+    const [a, d, r, rc] = await Promise.all([
       api.get("/appointments"),
       api.get("/doctors"),
       api.get(`/records/patient/${user.id}`),
+      api.get("/patient/receipts").catch(() => ({ data: [] })),
     ]);
     setAppts(a.data);
     setDoctors(d.data);
     setRecords(r.data);
+    setReceipts(rc.data);
   };
 
   useEffect(() => {
@@ -78,16 +83,26 @@ export default function PatientDashboard() {
 
   const pay = async (appt) => {
     try {
-      await api.post("/payments/mock", {
-        appointment_id: appt.id,
-        amount: appt.fee || 50,
-        method: "card",
-      });
-      toast.success("Payment successful");
+      const r = await api.post(`/patient/bills/${appt.id}/pay`);
+      setQrPay(r.data.payment);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not start payment");
+    }
+  };
+
+  const confirmPay = async () => {
+    if (!qrPay) return;
+    setConfirming(true);
+    try {
+      await api.post(`/patient/payments/${qrPay.ref}/confirm`);
+      toast.success("Payment received — thank you");
+      setQrPay(null);
       setOpenPay(null);
       load();
     } catch (e) {
-      toast.error("Payment failed");
+      toast.error(e?.response?.data?.detail || "Confirmation failed");
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -180,6 +195,27 @@ export default function PatientDashboard() {
                     </Button>
                   )}
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Receipts */}
+        <div className="rounded-2xl border border-[#E2DDD7] bg-white p-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="overline">Receipts</div>
+            <CreditCard size={18} weight="duotone" color="#1C3F39" />
+          </div>
+          {receipts.length === 0 && <div className="text-sm text-[#5C6661]">No payments yet.</div>}
+          <div className="space-y-2 max-h-[300px] overflow-y-auto">
+            {receipts.map((r) => (
+              <div key={r.txn_ref} data-testid="receipt-row" className="flex items-center justify-between p-3 rounded-xl border border-[#E2DDD7]">
+                <div>
+                  <div className="text-sm font-medium">RM {Number(r.amount).toFixed(2)} · {r.method}</div>
+                  <div className="text-[11px] font-mono text-[#5C6661]">{r.txn_ref}</div>
+                  <div className="text-[11px] text-[#5C6661]">{new Date(r.paid_at).toLocaleString()} · {r.reason}</div>
+                </div>
+                <Badge className="bg-[#2D6A4F]/20 text-[#2D6A4F]">paid</Badge>
               </div>
             ))}
           </div>
@@ -279,10 +315,10 @@ export default function PatientDashboard() {
       <Dialog open={!!openPay} onOpenChange={(o) => !o && setOpenPay(null)}>
         <DialogContent data-testid="pay-dialog" className="bg-[#F9F9F6] border-[#E2DDD7]">
           <DialogHeader>
-            <DialogTitle className="font-display text-2xl">Mock payment</DialogTitle>
-            <DialogDescription>Simulated card payment — no real charge.</DialogDescription>
+            <DialogTitle className="font-display text-2xl">Pay your bill</DialogTitle>
+            <DialogDescription>Scan the DuitNow QR with your banking app.</DialogDescription>
           </DialogHeader>
-          {openPay && (
+          {openPay && !qrPay && (
             <div className="rounded-2xl border border-[#E2DDD7] bg-white p-5">
               <div className="overline">Amount</div>
               <div className="font-display text-4xl mt-1">RM {(openPay.fee || 50).toFixed(2)}</div>
@@ -291,14 +327,32 @@ export default function PatientDashboard() {
               </div>
             </div>
           )}
+          {qrPay && (
+            <div className="rounded-2xl border border-[#E2DDD7] bg-white p-5 text-center">
+              <img src={qrPay.qr} alt="DuitNow QR" className="w-52 h-52 mx-auto rounded-xl border border-[#E2DDD7]" />
+              <div className="font-mono text-xs text-[#5C6661] mt-2">{qrPay.ref}</div>
+              <div className="font-display text-2xl mt-1">RM {Number(qrPay.amount).toFixed(2)}</div>
+            </div>
+          )}
           <DialogFooter>
-            <Button
-              data-testid="pay-confirm-btn"
-              onClick={() => pay(openPay)}
-              className="bg-[#B55B49] hover:bg-[#9b4a3b] text-[#F9F9F6]"
-            >
-              <CreditCard size={16} className="mr-1.5" /> Pay now
-            </Button>
+            {!qrPay ? (
+              <Button
+                data-testid="pay-confirm-btn"
+                onClick={() => pay(openPay)}
+                className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6]"
+              >
+                <CreditCard size={16} className="mr-1.5" /> Show DuitNow QR
+              </Button>
+            ) : (
+              <Button
+                data-testid="pay-done-btn"
+                onClick={confirmPay}
+                disabled={confirming}
+                className="bg-[#2D6A4F] hover:bg-[#255c43] text-[#F9F9F6]"
+              >
+                {confirming ? "Checking…" : "I've paid"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
