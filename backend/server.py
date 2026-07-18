@@ -16,7 +16,7 @@ from sqlalchemy import (
 )
 from dotenv import load_dotenv
 from pathlib import Path
-import os, logging, asyncio, uuid, json, re, io, base64, httpx
+import os, logging, asyncio, uuid, json, re, io, base64, httpx, hmac, time
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any, Literal, Set
 from pydantic import BaseModel, Field, EmailStr
@@ -37,6 +37,9 @@ CLINIC_ADDR     = os.environ.get("CLINIC_ADDRESS", "")
 CLINIC_PHONE    = os.environ.get("CLINIC_PHONE", "")
 FACILITY_ID     = os.environ.get("FACILITY_ID", "main")
 IS_CLOUD        = os.environ.get("IS_CLOUD_NODE", "false").lower() == "true"
+KIOSK_TOKEN     = os.environ.get("KIOSK_TOKEN", "")          # shared secret for kiosk devices
+ALLOW_SEED      = os.environ.get("ALLOW_SEED", "false").lower() == "true"
+STAFF_JWT_EXP_HOURS = int(os.environ.get("STAFF_JWT_EXP_HOURS", "12"))
 SYNC_INTERVAL   = int(os.environ.get("SYNC_INTERVAL_SECONDS", "30"))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s | %(message)s")
@@ -215,8 +218,10 @@ def verify_pw(pw: str, hashed: str) -> bool:
     except: return False
 
 def make_token(uid_: str, role: str) -> str:
+    # Staff sessions expire quickly (default 12h); patient app sessions last longer.
+    hours = JWT_EXP_HOURS if role == "patient" else STAFF_JWT_EXP_HOURS
     return jwt.encode(
-        {"sub": uid_, "role": role, "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXP_HOURS)},
+        {"sub": uid_, "role": role, "exp": datetime.now(timezone.utc) + timedelta(hours=hours)},
         JWT_SECRET, algorithm=JWT_ALG,
     )
 
@@ -279,6 +284,31 @@ def role_required(*roles: str):
             raise HTTPException(403, f"Requires: {roles}")
         return u
     return dep
+
+# ── Kiosk device auth ────────────────────────────────────────────────────────
+# Kiosk endpoints are unauthenticated for patients but must come from a trusted
+# device. Each kiosk sends X-Kiosk-Token (shared secret from env). If KIOSK_TOKEN
+# is unset we allow requests but log loudly — dev mode only, never production.
+async def kiosk_auth(x_kiosk_token: Optional[str] = Header(None)):
+    if KIOSK_TOKEN:
+        if not x_kiosk_token or not hmac.compare_digest(x_kiosk_token, KIOSK_TOKEN):
+            raise HTTPException(401, "Kiosk device not authorised")
+    else:
+        log.warning("KIOSK_TOKEN not set — kiosk endpoints are UNPROTECTED (dev mode only)")
+
+# ── Login brute-force guard (per email+IP, in-memory sliding window) ─────────
+_login_fails: dict = {}
+LOGIN_MAX_FAILS, LOGIN_WINDOW_S = 5, 900
+
+def login_guard(key: str):
+    now_ts = time.time()
+    _login_fails[key] = [t for t in _login_fails.get(key, []) if now_ts - t < LOGIN_WINDOW_S]
+    if len(_login_fails[key]) >= LOGIN_MAX_FAILS:
+        raise HTTPException(429, "Too many failed attempts. Try again in 15 minutes.")
+
+def login_fail(key: str):
+    _login_fails.setdefault(key, []).append(time.time())
+
 
 # ── Audit ─────────────────────────────────────────────────────────────────────
 async def audit_log(user_id: str, role: str, action: str, resource: str,
@@ -612,8 +642,14 @@ async def register(body: RegisterIn):
 
 @api.post("/auth/login")
 async def login(body: LoginIn, request: Request):
+    ip = request.client.host if request.client else ""
+    guard_key = f"{body.email.lower()}|{ip}"
+    login_guard(guard_key)
     row = await database.fetch_one(users_t.select().where(users_t.c.email == body.email.lower()))
     if not row or not verify_pw(body.password, row["password_hash"]):
+        login_fail(guard_key)
+        await audit_log(row["id"] if row else "unknown", row["role"] if row else "unknown",
+                        "LOGIN_FAILED", "auth", ip=ip)
         raise HTTPException(401, "Invalid credentials")
     await audit_log(row["id"], row["role"], "LOGIN", "auth",
                     ip=request.client.host if request.client else "")
@@ -680,7 +716,7 @@ async def list_doctors(u=Depends(current_user)):
 
 # ── Kiosk (public — no auth) ──────────────────────────────────────────────────
 @api.get("/kiosk/lookup/{ic_number}")
-async def kiosk_lookup(ic_number: str):
+async def kiosk_lookup(ic_number: str, _=Depends(kiosk_auth)):
     p = await patient_by_ic(ic_number)
     if not p: raise HTTPException(404, "No patient registered with this IC")
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -694,7 +730,7 @@ async def kiosk_lookup(ic_number: str):
     return {"patient": clean(dict(p)), "today_appointments": appts, "ic_info": parse_ic(ic_number)}
 
 @api.post("/kiosk/register", status_code=201)
-async def kiosk_register(body: KioskRegisterIn):
+async def kiosk_register(body: KioskRegisterIn, _=Depends(kiosk_auth)):
     parsed = parse_ic(body.ic_number)
     if not parsed["valid"]:
         raise HTTPException(400, f"Invalid IC: {parsed.get('error','format must be YYMMDD-SS-NNNN')}")
@@ -719,7 +755,7 @@ async def kiosk_register(body: KioskRegisterIn):
             "login_hint": f"Default password: IC{parsed['formatted'].replace('-','')[:8]}#"}
 
 @api.post("/kiosk/checkin")
-async def kiosk_checkin(body: KioskCheckinIn):
+async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
     p = await patient_by_ic(body.ic_number)
     if not p: raise HTTPException(404, "Patient not registered. Please register first.")
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -775,7 +811,7 @@ async def kiosk_checkin(body: KioskCheckinIn):
     return {"appointment":appt, "patient":clean(dict(p)), "doctor":doc, "chit":chit}
 
 @api.post("/kiosk/pay")
-async def kiosk_pay(body: KioskPayIn):
+async def kiosk_pay(body: KioskPayIn, _=Depends(kiosk_auth)):
     p = await patient_by_ic(body.ic_number)
     if not p: raise HTTPException(404, "Patient not found")
     appt_row = await database.fetch_one(
@@ -841,9 +877,13 @@ async def kiosk_pay(body: KioskPayIn):
     return {"appointment":appt,"payment":payment_info,"receipt":receipt,"medicine_chit":medicine_chit}
 
 @api.post("/kiosk/payment-confirm/{txn_ref}")
-async def confirm_payment(txn_ref: str):
+async def confirm_payment(txn_ref: str, _=Depends(kiosk_auth)):
     pay_row = await database.fetch_one(payments_t.select().where(payments_t.c.txn_ref == txn_ref))
     if not pay_row: raise HTTPException(404, "Transaction not found")
+    if pay_row["status"] == "succeeded":          # idempotent — already confirmed
+        return {"ok": True, "txn_ref": txn_ref, "already_confirmed": True}
+    if pay_row["status"] not in ("pending", "initiated"):
+        raise HTTPException(409, f"Cannot confirm payment in status {pay_row['status']}")
     now = now_iso()
     await database.execute(payments_t.update().where(payments_t.c.txn_ref == txn_ref)
         .values(status="succeeded"))
@@ -1352,6 +1392,8 @@ async def admin_stats(u=Depends(role_required("admin"))):
 # ── Seed ──────────────────────────────────────────────────────────────────────
 @api.post("/seed")
 async def seed():
+    if not ALLOW_SEED:
+        raise HTTPException(403, "Seeding disabled. Set ALLOW_SEED=true (dev/demo only).")
     seeded, skipped = [], []
     demo_users = [
         {"email":"admin@medilink.io","password":"Admin@123","name":"Admin MediLink","role":"admin"},
@@ -1428,7 +1470,7 @@ async def run_sync_job():
     try:
         pending = await database.fetch_all(
             sync_queue_t.select()
-            .where((sync_queue_t.c.synced == False) & (sync_queue_t.c.attempts < 3))
+            .where((sync_queue_t.c.synced == False) & (sync_queue_t.c.attempts < 5))
             .order_by(sync_queue_t.c.created_at)
             .limit(50)
         )
@@ -1445,9 +1487,11 @@ async def run_sync_job():
                 }
                 tbl = tbl_map.get(item_d["table_name"])
                 if tbl is None:
+                    # Dead-letter: never mark fake-synced; park it out of the retry
+                    # window so it stays visible in /sync/queue as an error.
                     await database.execute(
                         sync_queue_t.update().where(sync_queue_t.c.id == item_d["id"])
-                        .values(synced=True, error="Unknown table")
+                        .values(attempts=999, error="Unknown table — dead-lettered")
                     )
                     continue
                 payload = item_d["payload"]
@@ -1484,13 +1528,23 @@ async def run_sync_job():
 
 # ── Startup / shutdown ────────────────────────────────────────────────────────
 app.include_router(api)
+_cors = [o.strip() for o in os.environ.get(
+    "CORS_ORIGINS", "http://localhost:3000,http://localhost:8000").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("CORS_ORIGINS","*").split(","),
+    allow_origins=_cors,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    resp = await call_next(request)
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    return resp
 
 @app.on_event("startup")
 async def startup():

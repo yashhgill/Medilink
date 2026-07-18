@@ -24,7 +24,12 @@ import { Toaster } from "@/components/ui/sonner";
 import PrintChit from "@/components/PrintChit";
 import { API } from "@/lib/api";
 
-const kioskAxios = axios.create({ baseURL: API });
+const kioskAxios = axios.create({
+  baseURL: API,
+  headers: process.env.REACT_APP_KIOSK_TOKEN
+    ? { "X-Kiosk-Token": process.env.REACT_APP_KIOSK_TOKEN }
+    : {},
+});
 
 const statusBadge = {
   scheduled: "bg-[#F3EFE9] text-[#1C3F39]",
