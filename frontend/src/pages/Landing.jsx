@@ -1,4 +1,5 @@
 import React from "react";
+import { IS_PUBLIC } from "@/lib/api";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -69,7 +70,7 @@ export default function Landing() {
           </Button>
           <Button
             data-testid="cta-register-nav"
-            onClick={() => nav("/register")}
+            onClick={() => nav(IS_PUBLIC ? "/login" : "/register")}
             className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full px-5"
           >
             Get Started
@@ -100,7 +101,7 @@ export default function Landing() {
           <div className="mt-9 flex flex-wrap gap-3">
             <Button
               data-testid="cta-get-started"
-              onClick={() => nav("/register")}
+              onClick={() => nav(IS_PUBLIC ? "/login" : "/register")}
               className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full px-6 h-12 lift-on-hover"
             >
               Get Started <ArrowRight size={16} className="ml-1.5" />
@@ -113,6 +114,7 @@ export default function Landing() {
             >
               <Cardholder size={16} className="mr-1.5" weight="duotone" /> Try a demo login
             </Button>
+            {!IS_PUBLIC && (
             <Button
               data-testid="cta-kiosk"
               variant="outline"
@@ -121,6 +123,7 @@ export default function Landing() {
             >
               Open Kiosk <ArrowRight size={16} className="ml-1.5" />
             </Button>
+            )}
           </div>
 
           <div className="mt-10 flex items-center gap-6 text-xs text-[#5C6661] font-mono">

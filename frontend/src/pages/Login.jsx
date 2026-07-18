@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { IS_PUBLIC } from "@/lib/api";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -104,7 +105,7 @@ export default function Login() {
             Welcome back
           </h2>
           <p className="text-sm text-[#5C6661] mb-8">
-            Use a demo account or your own credentials.
+            Sign in to view your records and bills.
           </p>
 
           <form onSubmit={submit} className="space-y-4">
@@ -147,7 +148,7 @@ export default function Login() {
           </div>
 
           <div className="grid gap-2">
-            {demoAccounts.map((d) => (
+            {!IS_PUBLIC && demoAccounts.map((d) => (
               <button
                 key={d.email}
                 data-testid={`demo-login-${d.role.toLowerCase()}`}
@@ -164,12 +165,14 @@ export default function Login() {
             ))}
           </div>
 
+          {!IS_PUBLIC && (
           <p className="text-sm text-[#5C6661] mt-8 text-center">
             New here?{" "}
             <Link to="/register" className="text-[#1C3F39] font-medium underline-offset-2 hover:underline" data-testid="goto-register">
               Create an account
             </Link>
           </p>
+          )}
         </div>
       </div>
     </div>

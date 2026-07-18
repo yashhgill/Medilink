@@ -292,12 +292,19 @@ def role_required(*roles: str):
 # Kiosk endpoints are unauthenticated for patients but must come from a trusted
 # device. Each kiosk sends X-Kiosk-Token (shared secret from env). If KIOSK_TOKEN
 # is unset we allow requests but log loudly — dev mode only, never production.
-async def kiosk_auth(x_kiosk_token: Optional[str] = Header(None)):
+async def kiosk_auth(request: Request, x_kiosk_token: Optional[str] = Header(None)):
+    if is_public_request(request):
+        raise HTTPException(403, "The kiosk is available in-clinic only")
     if KIOSK_TOKEN:
         if not x_kiosk_token or not hmac.compare_digest(x_kiosk_token, KIOSK_TOKEN):
             raise HTTPException(401, "Kiosk device not authorised")
     else:
         log.warning("KIOSK_TOKEN not set — kiosk endpoints are UNPROTECTED (dev mode only)")
+
+def is_public_request(request: Request) -> bool:
+    """Requests via the Cloudflare tunnel carry CF headers; LAN requests never do.
+    Public visitors are patients only — staff/kiosk surfaces are clinic-LAN only."""
+    return bool(request.headers.get("cf-ray"))
 
 # ── Login brute-force guard (per email+IP, in-memory sliding window) ─────────
 _login_fails: dict = {}
@@ -618,7 +625,9 @@ async def health():
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 @api.post("/auth/register", status_code=201)
-async def register(body: RegisterIn):
+async def register(body: RegisterIn, request: Request):
+    if is_public_request(request):
+        raise HTTPException(403, "Account registration is done at the clinic")
     if await database.fetch_one(users_t.select().where(users_t.c.email == body.email.lower())):
         raise HTTPException(400, "Email already registered")
     ic = body.ic_number
@@ -654,8 +663,10 @@ async def login(body: LoginIn, request: Request):
         await audit_log(row["id"] if row else "unknown", row["role"] if row else "unknown",
                         "LOGIN_FAILED", "auth", ip=ip)
         raise HTTPException(401, "Invalid credentials")
-    await audit_log(row["id"], row["role"], "LOGIN", "auth",
-                    ip=request.client.host if request.client else "")
+    if row["role"] != "patient" and is_public_request(request):
+        await audit_log(row["id"], row["role"], "LOGIN_BLOCKED_PUBLIC", "auth", ip=ip)
+        raise HTTPException(403, "Staff sign-in is only available inside the clinic")
+    await audit_log(row["id"], row["role"], "LOGIN", "auth", ip=ip)
     return {"token": make_token(row["id"], row["role"]), "user": clean(dict(row))}
 
 @api.get("/auth/me")
