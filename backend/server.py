@@ -89,6 +89,9 @@ appointments_t = Table("appointments", metadata,
     Column("payment_ref", String),
     Column("paid_amount", Float),
     Column("is_block", Boolean, default=False),
+    Column("triage_colour", String),        # Red | Yellow | Green (MTS zones)
+    Column("triage_category", String),
+    Column("triage_target_mins", Integer),
     Column("duration_minutes", Integer, default=30),
     Column("created_at", String),
     Column("updated_at", String),
@@ -469,6 +472,8 @@ class KioskCheckinIn(BaseModel):
     doctor_id: Optional[str] = None
     reason: Optional[str] = "Walk-in consultation"
     fee: float = 50.0
+    symptoms: Optional[str] = None      # "how are you feeling" free text
+    pain_score: Optional[int] = None    # 0-10
 
 class KioskPayIn(BaseModel):
     ic_number: str
@@ -752,6 +757,28 @@ async def kiosk_register(body: KioskRegisterIn, _=Depends(kiosk_auth)):
     return {"patient": user, "ic_info": parsed,
             "login_hint": f"Default password: IC{parsed['formatted'].replace('-','')[:8]}#"}
 
+async def kiosk_triage(symptoms: str, pain_score, patient: dict) -> dict:
+    """Run MTS triage on kiosk-reported symptoms. Fail-safe: Green on any error."""
+    fallback = {"colour": "Green", "category": "Non-critical", "target_wait_minutes": 120}
+    if not symptoms or not GROQ_API_KEY:
+        return fallback
+    try:
+        prompt = f"""PATIENT: DOB {patient.get('dob','Unknown')}, Gender: {patient.get('gender','Unknown')}
+CHIEF COMPLAINT (self-reported at kiosk): {symptoms}
+PAIN SCORE: {pain_score if pain_score is not None else 'Not assessed'}/10
+VITAL SIGNS: Not recorded (kiosk self check-in)
+
+Apply MTS strictly. This is self-reported — if red-flag symptoms are described (chest pain, breathlessness, severe bleeding, stroke signs, unconsciousness), escalate. Output JSON only."""
+        raw = await groq(MTS_SYSTEM, [{"role": "user", "content": prompt}],
+                         max_tokens=400, temperature=0.1, response_format="json")
+        r = json.loads(raw.strip().lstrip("```json").rstrip("```").strip())
+        if r.get("colour") in ("Red", "Yellow", "Green"):
+            return r
+        return fallback
+    except Exception as e:
+        log.warning(f"Kiosk triage failed, defaulting Green: {e}")
+        return fallback
+
 @api.post("/kiosk/checkin")
 async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
     p = await patient_by_ic(body.ic_number)
@@ -768,11 +795,16 @@ async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
     if existing:
         appt = dict(existing)
         if appt["status"] == "scheduled":
+            upd = {"status": "checked_in", "updated_at": now_iso()}
+            if body.symptoms:
+                triage = await kiosk_triage(body.symptoms, body.pain_score, dict(p))
+                upd.update(reason=body.symptoms.strip(), triage_colour=triage.get("colour"),
+                           triage_category=triage.get("category"),
+                           triage_target_mins=triage.get("target_wait_minutes"))
             await database.execute(
-                appointments_t.update().where(appointments_t.c.id == appt["id"])
-                .values(status="checked_in", updated_at=now_iso())
+                appointments_t.update().where(appointments_t.c.id == appt["id"]).values(**upd)
             )
-            appt["status"] = "checked_in"
+            appt.update(upd)
             broadcast({"type":"appointment.updated","appointment_id":appt["id"],"changes":{"status":"checked_in"}})
     else:
         # Walk-in — auto-assign doctor
@@ -785,9 +817,13 @@ async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
             doc_row = await database.fetch_one(users_t.select().where(users_t.c.role == "doctor"))
         if not doc_row: raise HTTPException(503, "No doctors configured in system")
         q = await next_q(); appt_id = uid(); now = now_iso()
+        triage = await kiosk_triage(body.symptoms, body.pain_score, dict(p))
+        reason_txt = body.symptoms.strip() if body.symptoms else (body.reason or "Walk-in consultation")
         appt = dict(
             id=appt_id, patient_id=p["id"], doctor_id=doc_row["id"],
-            scheduled_at=now, reason=body.reason or "Walk-in consultation",
+            scheduled_at=now, reason=reason_txt,
+            triage_colour=triage.get("colour"), triage_category=triage.get("category"),
+            triage_target_mins=triage.get("target_wait_minutes"),
             fee=body.fee, status="checked_in", queue_number=q,
             payment_status="unpaid", created_at=now, updated_at=now,
             created_by="kiosk", facility_id=FACILITY_ID,
@@ -805,6 +841,7 @@ async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
         "queue_number":appt["queue_number"],
         "doctor_name":doc.get("name","-"), "doctor_specialty":doc.get("specialty","General"),
         "reason":appt["reason"], "issued_at":now_iso(), "appointment_id":appt["id"],
+        "triage_colour":appt.get("triage_colour"), "triage_category":appt.get("triage_category"),
     }
     return {"appointment":appt, "patient":clean(dict(p)), "doctor":doc, "chit":chit}
 
@@ -927,8 +964,10 @@ async def todays_queue(u=Depends(current_user)):
         appointments_t.select()
         .where(appointments_t.c.scheduled_at.like(f"{today}%"))
         .where(~appointments_t.c.is_block)
-        .order_by(appointments_t.c.queue_number)
     )
+    # Malaysian triage ordering: Red first, then Yellow, Green, untriaged; FIFO within zone
+    prio = {"Red": 0, "Yellow": 1, "Green": 2}
+    rows = sorted(rows, key=lambda r: (prio.get(r["triage_colour"], 3), r["queue_number"] or 0))
     return await enrich_appointments(rows)
 
 @api.patch("/appointments/{appt_id}")

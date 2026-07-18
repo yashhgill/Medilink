@@ -87,6 +87,9 @@ function ChitContent({ chit }) {
           <Row label="IC" value={chit.patient_ic} mono />
           <Row label="Doctor" value={`${chit.doctor_name} (${chit.doctor_specialty})`} />
           <Row label="Reason" value={chit.reason} />
+          {chit.triage_colour && (
+            <Row label="Triage" value={`${chit.triage_colour}${chit.triage_category ? " — " + chit.triage_category : ""}`} />
+          )}
           <Row label="Issued" value={new Date(chit.issued_at).toLocaleString()} mono />
         </>
       )}

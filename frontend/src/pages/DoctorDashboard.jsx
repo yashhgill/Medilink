@@ -223,7 +223,17 @@ export default function DoctorDashboard() {
                 </div>
                 <div className="flex-1">
                   <div className="text-sm font-medium">{a.patient?.name}</div>
-                  <div className="text-xs text-[#5C6661]">{a.reason}</div>
+                  <div className="text-xs text-[#5C6661] flex items-center gap-2">
+                    {a.triage_colour && (
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold ${
+                        a.triage_colour === "Red" ? "bg-red-100 text-red-700"
+                        : a.triage_colour === "Yellow" ? "bg-amber-100 text-amber-700"
+                        : "bg-emerald-100 text-emerald-700"}`}>
+                        {a.triage_colour.toUpperCase()}
+                      </span>
+                    )}
+                    <span>{a.reason}</span>
+                  </div>
                 </div>
                 <Badge className={statusColors[a.status]}>{a.status.replaceAll("_", " ")}</Badge>
               </button>

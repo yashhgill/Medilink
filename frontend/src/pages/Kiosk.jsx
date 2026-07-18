@@ -152,6 +152,8 @@ function CheckinFlow({ onPrint }) {
   const [scanning, setScanning] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [regForm, setRegForm] = useState({ name: "", phone: "", gender: "", dob: "" });
+  const [symptoms, setSymptoms] = useState("");
+  const [painScore, setPainScore] = useState(null);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
@@ -190,7 +192,7 @@ function CheckinFlow({ onPrint }) {
       });
       toast.success("Registered · proceeding to check-in");
       // immediately lookup + checkin
-      const r = await kioskAxios.post("/kiosk/checkin", { ic_number: ic });
+      const r = await kioskAxios.post("/kiosk/checkin", { ic_number: ic, symptoms: symptoms || null, pain_score: painScore });
       setData(r.data);
       setStep("booked");
       onPrint(r.data.chit);
@@ -204,7 +206,7 @@ function CheckinFlow({ onPrint }) {
   const confirmCheckin = async () => {
     setTapping(true);
     try {
-      const r = await kioskAxios.post("/kiosk/checkin", { ic_number: ic });
+      const r = await kioskAxios.post("/kiosk/checkin", { ic_number: ic, symptoms: symptoms || null, pain_score: painScore });
       setData((d) => ({ ...d, ...r.data }));
       setStep("booked");
       onPrint(r.data.chit);
@@ -349,6 +351,38 @@ function CheckinFlow({ onPrint }) {
             No appointment today. You can check in as a walk-in — we&apos;ll assign the first available doctor.
           </div>
         )}
+
+        <div className="mt-5 rounded-2xl border border-[#E2DDD7] bg-white p-5">
+          <div className="overline">How are you feeling?</div>
+          <textarea
+            data-testid="kiosk-symptoms"
+            value={symptoms}
+            onChange={(e) => setSymptoms(e.target.value)}
+            placeholder="Describe your symptoms — e.g. fever and sore throat since yesterday…"
+            rows={3}
+            className="mt-3 w-full rounded-xl border border-[#E2DDD7] bg-[#F9F9F6] p-3 text-sm outline-none focus:border-[#1C3F39] resize-none"
+          />
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-[#5C6661] font-mono mr-1">Pain level:</span>
+            {[0,1,2,3,4,5,6,7,8,9,10].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setPainScore(painScore === n ? null : n)}
+                className={`w-8 h-8 rounded-full text-xs font-mono border transition-colors ${
+                  painScore === n
+                    ? "bg-[#1C3F39] text-white border-[#1C3F39]"
+                    : "bg-white text-[#5C6661] border-[#E2DDD7] hover:border-[#1C3F39]"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <div className="text-[11px] text-[#5C6661] mt-2">
+            Optional — helps our doctors see urgent cases first.
+          </div>
+        </div>
 
         <div className="flex gap-2 mt-6">
           <Button
