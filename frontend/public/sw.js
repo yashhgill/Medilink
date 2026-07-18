@@ -1,4 +1,4 @@
-const SHELL = "medilink-shell-v1";
+const SHELL = "medilink-shell-v2";
 self.addEventListener("install", (e) => { self.skipWaiting(); });
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then(ks => Promise.all(

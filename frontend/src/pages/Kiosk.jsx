@@ -503,40 +503,37 @@ function CheckinFlow({ onPrint }) {
     <div>
       <div className="overline">Step 1</div>
       <h2 className="font-display text-2xl mt-1">Identify yourself</h2>
-      <p className="text-sm text-[#5C6661] mt-1 mb-6">Type your IC number, or scan the QR code on your appointment slip with the camera.</p>
+      <p className="text-sm text-[#5C6661] mt-1 mb-6">Key in your IC number — or use the camera to scan the QR code on your appointment slip.</p>
 
       <div className="grid md:grid-cols-2 gap-4">
-        {/* NFC tap zone */}
-        <div className="inset-card p-5 flex flex-col items-center text-center">
-          <motion.div
-            whileTap={{ scale: 0.94 }}
+        {/* Manual IC entry — primary */}
+        <div className="inset-card p-6 md:p-8 flex flex-col justify-center">
+          <div className="overline">Enter your IC number</div>
+          <Input
+            data-testid="kiosk-ic-input"
+            value={ic}
+            onChange={(e) => {
+              const digits = e.target.value.replace(/[^0-9]/g, "").slice(0, 12);
+              let out = digits;
+              if (digits.length > 8) out = `${digits.slice(0,6)}-${digits.slice(6,8)}-${digits.slice(8)}`;
+              else if (digits.length > 6) out = `${digits.slice(0,6)}-${digits.slice(6)}`;
+              setIc(out);
+            }}
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="000000-00-0000"
+            className="mt-3 h-16 text-2xl tracking-widest text-center font-mono border-[#E2DDD7] bg-white rounded-2xl"
+          />
+          <Button
+            data-testid="kiosk-lookup-btn"
             onClick={() => ic && lookup(ic)}
-            data-testid="kiosk-tap-zone"
-            className={`relative w-20 h-20 rounded-full flex items-center justify-center cursor-pointer bg-white border-2 ${
-              tapping ? "nfc-pulse border-[#B55B49]" : "border-[#1C3F39]"
-            }`}
+            disabled={ic.replace(/[^0-9]/g, "").length !== 12 || tapping}
+            className="w-full mt-4 h-12 text-base bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-2xl btn-shimmer"
           >
-            <WaveTriangle size={32} weight="duotone" color="#1C3F39" />
-          </motion.div>
-          <div className="overline mt-5">MediLink check-in</div>
-
-          <div className="w-full mt-6 space-y-2">
-            <Label className="text-xs">Enter your IC number</Label>
-            <Input
-              data-testid="kiosk-ic-input"
-              value={ic}
-              onChange={(e) => setIc(e.target.value)}
-              placeholder="880421-14-5567"
-              className="border-[#E2DDD7] font-mono"
-            />
-            <Button
-              data-testid="kiosk-lookup-btn"
-              onClick={() => ic && lookup(ic)}
-              disabled={!ic || tapping}
-              className="w-full bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6]"
-            >
-              {tapping ? "Reading…" : "Identify"}
-            </Button>
+            {tapping ? "Checking…" : "Continue"}
+          </Button>
+          <div className="text-[11px] text-[#5C6661] mt-3 text-center">
+            12 digits, as printed on your MyKad
           </div>
         </div>
 
