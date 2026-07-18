@@ -1619,6 +1619,17 @@ async def startup():
     engine = create_engine(sync_db_url)
     metadata.create_all(engine); engine.dispose()
     log.info(f"Tables ready | Facility: {FACILITY_ID} | Node: {'cloud' if IS_CLOUD else 'local'}")
+    # Self-provision the cloud mirror: create tables there too on first connect
+    if CLOUD_DB_URL and not IS_CLOUD:
+        try:
+            cloud_sync_url = CLOUD_DB_URL
+            if "postgresql://" in cloud_sync_url:
+                cloud_sync_url = cloud_sync_url.replace("postgresql://", "postgresql+psycopg2://")
+            cengine = create_engine(cloud_sync_url)
+            metadata.create_all(cengine); cengine.dispose()
+            log.info("Cloud mirror tables ready")
+        except Exception as e:
+            log.warning(f"Cloud mirror not provisioned yet (will keep queueing): {e}")
     # Auto seed
     count = await database.fetch_val(text("SELECT COUNT(*) FROM users"))
     if not count:
