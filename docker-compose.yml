@@ -49,6 +49,18 @@ services:
     depends_on:
       - backend
 
+  # ── Cloudflare Tunnel — public access (medilink.harnova.my) ────────────────
+  # Outbound-only: no ports opened, clinic keeps working offline if this dies.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: medilink_tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - frontend
+
 volumes:
   pgdata:
 
