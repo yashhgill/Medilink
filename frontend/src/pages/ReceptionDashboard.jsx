@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import api from "@/lib/api";
 import SyncIndicator from "@/components/SyncIndicator";
-import NFCScanner from "@/components/NFCScanner";
+import NFCScanner from "@/components/ICScanner";
 import SlotPicker from "@/components/SlotPicker";
 import useQueueSocket from "@/hooks/useQueueSocket";
 import { Button } from "@/components/ui/button";
