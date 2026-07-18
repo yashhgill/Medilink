@@ -1565,7 +1565,10 @@ async def startup():
     # Auto seed
     count = await database.fetch_val(text("SELECT COUNT(*) FROM users"))
     if not count:
-        await seed(); log.info("Demo data seeded")
+        if ALLOW_SEED:
+            await seed(); log.info("Demo data seeded")
+        else:
+            log.warning("users table empty and ALLOW_SEED=false — create an admin via /api/auth/register or enable ALLOW_SEED once")
     # Start background sync loop
     if not IS_CLOUD and cloud_db:
         asyncio.create_task(sync_loop())
