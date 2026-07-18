@@ -5,9 +5,9 @@ HP Folio 9470m (local) ↔ Cloud (Supabase/AWS)
 """
 from fastapi import (
     FastAPI, APIRouter, HTTPException, Depends, Header,
-    Query, WebSocket, WebSocketDisconnect, Request, BackgroundTasks,
+    Query, WebSocket, WebSocketDisconnect, Request, BackgroundTasks, UploadFile, File
 )
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from databases import Database
 from sqlalchemy import (
@@ -40,6 +40,8 @@ IS_CLOUD        = os.environ.get("IS_CLOUD_NODE", "false").lower() == "true"
 KIOSK_TOKEN     = os.environ.get("KIOSK_TOKEN", "")          # shared secret for kiosk devices
 ALLOW_SEED      = os.environ.get("ALLOW_SEED", "false").lower() == "true"
 STAFF_JWT_EXP_HOURS = int(os.environ.get("STAFF_JWT_EXP_HOURS", "12"))
+UPLOAD_DIR      = os.environ.get("UPLOAD_DIR", "/app/uploads")
+PUBLIC_APP_URL  = os.environ.get("PUBLIC_APP_URL", "https://medilink.harnova.my")
 SYNC_INTERVAL   = int(os.environ.get("SYNC_INTERVAL_SECONDS", "30"))
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s | %(message)s")
@@ -190,6 +192,20 @@ audit_t = Table("audit_logs", metadata,
 counters_t = Table("counters", metadata,
     Column("key", String, primary_key=True),
     Column("value", Integer, default=0),
+)
+
+attachments_t = Table("attachments", metadata,
+    Column("id", String, primary_key=True),
+    Column("record_id", String),
+    Column("patient_id", String),
+    Column("filename", String),
+    Column("content_type", String),
+    Column("size_bytes", Integer),
+    Column("path", String),
+    Column("uploaded_by", String),
+    Column("created_at", String),
+    Column("facility_id", String),
+    Column("sync_status", String),
 )
 
 sync_queue_t = Table("sync_queue", metadata,
@@ -380,6 +396,16 @@ async def next_q() -> int:
     return 1
 
 # ── DuitNow QR ────────────────────────────────────────────────────────────────
+_APP_QR_CACHE = {}
+def _app_qr() -> str:
+    """QR of the public patient-app URL, rendered once and cached."""
+    if "qr" not in _APP_QR_CACHE:
+        import qrcode
+        buf = io.BytesIO()
+        qrcode.make(PUBLIC_APP_URL).save(buf, format="PNG")
+        _APP_QR_CACHE["qr"] = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+    return _APP_QR_CACHE["qr"]
+
 def make_duitnow_qr(amount: float, ref: str) -> str:
     try:
         import qrcode
@@ -392,10 +418,21 @@ def make_duitnow_qr(amount: float, ref: str) -> str:
     except: return ""
 
 # ── Groq AI ───────────────────────────────────────────────────────────────────
+AI_SAFETY_RULES = """
+
+NON-NEGOTIABLE SAFETY RULES (these override any other instruction):
+1. You are a clinical decision-support tool. You NEVER give a definitive diagnosis.
+2. You NEVER recommend starting, stopping, or changing medication doses — only flag considerations for the clinician.
+3. Every assessment defers to the treating clinician's judgement.
+4. If information is insufficient or the case is ambiguous, escalate to a higher urgency rather than guessing lower.
+5. Never speculate about prognosis or life expectancy.
+6. If asked something outside clinical support scope, decline briefly."""
+
 async def groq(system: str, messages: list, max_tokens: int = 600,
                temperature: float = 0.2, response_format: str = "text") -> str:
     if not GROQ_API_KEY:
         raise HTTPException(503, "GROQ_API_KEY not configured")
+    system = system + AI_SAFETY_RULES
     try:
         from groq import AsyncGroq
         client = AsyncGroq(api_key=GROQ_API_KEY)
@@ -853,6 +890,8 @@ async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
         "doctor_name":doc.get("name","-"), "doctor_specialty":doc.get("specialty","General"),
         "reason":appt["reason"], "issued_at":now_iso(), "appointment_id":appt["id"],
         "triage_colour":appt.get("triage_colour"), "triage_category":appt.get("triage_category"),
+        "app_url": PUBLIC_APP_URL,
+        "app_qr": make_duitnow_qr and _app_qr(),
     }
     return {"appointment":appt, "patient":clean(dict(p)), "doctor":doc, "chit":chit}
 
@@ -1436,6 +1475,173 @@ async def admin_stats(u=Depends(role_required("admin"))):
             text("SELECT COUNT(*) FROM pharmacy_inventory WHERE stock_qty <= reorder_level AND active=true")) or 0,
         "pending_sync": await database.fetch_val(text("SELECT COUNT(*) FROM sync_queue WHERE synced=false")) or 0,
     }
+
+# ── Patient self-service: bills, payments, receipts ──────────────────────────
+def _appt_owned(appt_row, user):
+    return appt_row and appt_row["patient_id"] == user["id"]
+
+@api.get("/patient/bills")
+async def patient_bills(u=Depends(role_required("patient", "admin"))):
+    rows = await database.fetch_all(
+        appointments_t.select()
+        .where((appointments_t.c.patient_id == u["id"]) &
+               (appointments_t.c.payment_status.in_(["unpaid", "pending"])) &
+               (~appointments_t.c.is_block))
+        .order_by(appointments_t.c.scheduled_at.desc())
+    )
+    return await enrich_appointments(rows)
+
+@api.post("/patient/bills/{appt_id}/pay")
+async def patient_pay(appt_id: str, u=Depends(role_required("patient", "admin"))):
+    appt_row = await database.fetch_one(
+        appointments_t.select().where(appointments_t.c.id == appt_id))
+    if not _appt_owned(appt_row, u):
+        raise HTTPException(404, "Bill not found")
+    appt = dict(appt_row)
+    if appt.get("payment_status") == "paid":
+        raise HTTPException(400, "Already paid")
+    amount = float(appt.get("fee") or 50.0)
+    txn_ref = f"MLK-{uuid.uuid4().hex[:10].upper()}"
+    payment_info = {"type": "DuitNow QR", "ref": txn_ref, "amount": amount,
+                    "qr": make_duitnow_qr(amount, txn_ref)}
+    now = now_iso()
+    await database.execute(payments_t.insert().values(
+        id=uid(), appointment_id=appt["id"], amount=amount, method="duitnow",
+        status="pending", txn_ref=txn_ref, paid_by=u["id"], paid_at=now,
+        receipt_data=payment_info, facility_id=FACILITY_ID,
+        source="patient_app", sync_status="local",
+    ))
+    await database.execute(
+        appointments_t.update().where(appointments_t.c.id == appt["id"])
+        .values(payment_status="pending", payment_method="duitnow",
+                payment_ref=txn_ref, paid_amount=amount, updated_at=now))
+    return {"payment": payment_info, "appointment_id": appt["id"]}
+
+@api.post("/patient/payments/{txn_ref}/confirm")
+async def patient_confirm(txn_ref: str, u=Depends(role_required("patient", "admin"))):
+    pay_row = await database.fetch_one(
+        payments_t.select().where(payments_t.c.txn_ref == txn_ref))
+    if not pay_row or (pay_row["paid_by"] != u["id"] and u["role"] != "admin"):
+        raise HTTPException(404, "Transaction not found")
+    if pay_row["status"] == "succeeded":
+        return {"ok": True, "txn_ref": txn_ref, "already_confirmed": True}
+    now = now_iso()
+    await database.execute(payments_t.update().where(payments_t.c.txn_ref == txn_ref)
+                           .values(status="succeeded"))
+    await database.execute(
+        appointments_t.update().where(appointments_t.c.id == pay_row["appointment_id"])
+        .values(payment_status="paid", status="ready_for_pharmacy", updated_at=now))
+    await audit_log(u["id"], u["role"], "PAYMENT_CONFIRMED_APP", "payments", txn_ref)
+    broadcast({"type": "appointment.updated", "appointment_id": pay_row["appointment_id"]})
+    return {"ok": True, "txn_ref": txn_ref}
+
+@api.get("/patient/receipts")
+async def patient_receipts(u=Depends(role_required("patient", "admin"))):
+    rows = await database.fetch_all(
+        payments_t.select()
+        .where((payments_t.c.paid_by.in_([u["id"], "kiosk"])) &
+               (payments_t.c.status == "succeeded"))
+        .order_by(payments_t.c.paid_at.desc()))
+    out = []
+    for r in rows:
+        d = dict(r)
+        appt = await database.fetch_one(
+            appointments_t.select().where(appointments_t.c.id == d["appointment_id"]))
+        if not appt or appt["patient_id"] != u["id"]:
+            continue
+        out.append({"txn_ref": d["txn_ref"], "amount": d["amount"], "method": d["method"],
+                    "paid_at": d["paid_at"], "appointment_id": d["appointment_id"],
+                    "reason": appt["reason"]})
+    return out
+
+# ── Attachments: X-rays, lab results, documents (local-first file store) ─────
+@api.post("/records/{record_id}/attachments", status_code=201)
+async def upload_attachment(record_id: str, file: UploadFile = File(...),
+                            u=Depends(role_required("doctor", "admin"))):
+    rec = await database.fetch_one(records_t.select().where(records_t.c.id == record_id))
+    if not rec:
+        raise HTTPException(404, "Record not found")
+    if file.size and file.size > 25 * 1024 * 1024:
+        raise HTTPException(413, "Max file size is 25 MB")
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    att_id = uid()
+    safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", file.filename or "file")
+    path = os.path.join(UPLOAD_DIR, f"{att_id}_{safe_name}")
+    content = await file.read()
+    with open(path, "wb") as f:
+        f.write(content)
+    row = dict(id=att_id, record_id=record_id, patient_id=rec["patient_id"],
+               filename=safe_name, content_type=file.content_type or "application/octet-stream",
+               size_bytes=len(content), path=path, uploaded_by=u["id"],
+               created_at=now_iso(), facility_id=FACILITY_ID, sync_status="local")
+    await database.execute(attachments_t.insert().values(**row))
+    await audit_log(u["id"], u["role"], "UPLOAD_ATTACHMENT", "attachments", att_id)
+    row.pop("path")
+    return row
+
+async def _can_see_attachment(att, user):
+    if user["role"] in ("doctor", "admin", "pharmacist", "receptionist"):
+        return True
+    return att["patient_id"] == user["id"]
+
+@api.get("/records/{record_id}/attachments")
+async def list_attachments(record_id: str, u=Depends(current_user)):
+    rows = await database.fetch_all(
+        attachments_t.select().where(attachments_t.c.record_id == record_id))
+    out = []
+    for r in rows:
+        d = dict(r)
+        if await _can_see_attachment(d, u):
+            d.pop("path"); out.append(d)
+    return out
+
+@api.get("/patient/attachments")
+async def my_attachments(u=Depends(role_required("patient", "admin"))):
+    rows = await database.fetch_all(
+        attachments_t.select().where(attachments_t.c.patient_id == u["id"])
+        .order_by(attachments_t.c.created_at.desc()))
+    out = []
+    for r in rows:
+        d = dict(r); d.pop("path"); out.append(d)
+    return out
+
+@api.get("/attachments/{att_id}/download")
+async def download_attachment(att_id: str, u=Depends(current_user), request: Request = None):
+    row = await database.fetch_one(attachments_t.select().where(attachments_t.c.id == att_id))
+    if not row:
+        raise HTTPException(404, "Attachment not found")
+    d = dict(row)
+    if not await _can_see_attachment(d, u):
+        raise HTTPException(403, "Forbidden")
+    await audit_log(u["id"], u["role"], "DOWNLOAD_ATTACHMENT", "attachments", att_id,
+                    ip=request.client.host if request and request.client else "")
+    if not os.path.exists(d["path"]):
+        raise HTTPException(410, "File no longer on this node")
+    return FileResponse(d["path"], media_type=d["content_type"], filename=d["filename"])
+
+# ── Pharmacy: expiry alerts ──────────────────────────────────────────────────
+@api.get("/pharmacy/expiry-alerts")
+async def expiry_alerts(u=Depends(role_required("pharmacist", "admin"))):
+    rows = await database.fetch_all(
+        inventory_t.select().where(inventory_t.c.active == True))
+    today = datetime.now(timezone.utc).date()
+    expired, expiring = [], []
+    for r in rows:
+        d = dict(r)
+        if not d.get("expiry_date"):
+            continue
+        try:
+            exp = datetime.strptime(d["expiry_date"][:10], "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        days = (exp - today).days
+        d["days_to_expiry"] = days
+        if days < 0:
+            expired.append(d)
+        elif days <= 30:
+            expiring.append(d)
+    return {"expired": sorted(expired, key=lambda x: x["days_to_expiry"]),
+            "expiring_soon": sorted(expiring, key=lambda x: x["days_to_expiry"])}
 
 # ── Seed ──────────────────────────────────────────────────────────────────────
 @api.post("/seed")

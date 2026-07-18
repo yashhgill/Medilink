@@ -26,6 +26,8 @@ services:
     container_name: medilink_api
     restart: unless-stopped
     env_file: ./backend/.env
+    volumes:
+      - uploads:/app/uploads
     environment:
       DATABASE_URL: postgresql://medilink:${DB_PASSWORD:-changeme}@db:5432/medilink
       IS_CLOUD_NODE: "false"
@@ -64,6 +66,7 @@ services:
 
 volumes:
   pgdata:
+  uploads:
 
 # ── Usage notes ────────────────────────────────────────────────────────────────
 # Local (HP Folio 9470m):
