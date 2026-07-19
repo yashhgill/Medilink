@@ -113,7 +113,7 @@ export default function Login() {
               <Input
                 id="email"
                 data-testid="login-email"
-                type="email"
+                type="text" autoComplete="username" inputMode="text"
                 placeholder="you@email.com or 000000-00-0000"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
