@@ -32,10 +32,10 @@ function SyncIndicatorInner({ compact = false }) {
 
   if (!data) return null;
 
-  const syncing = (data.syncing || 0) > 0;
-  const cloudPct = data.total_records
-    ? Math.round((data.cloud / data.total_records) * 100)
-    : 0;
+  const syncing = (data.pending_sync || 0) > 0;
+  const synced = data.synced_to_cloud ?? data.cloud ?? 0;
+  const total = data.total_records ?? 0;
+  const cloudPct = total > 0 ? Math.round((synced / total) * 100) : 0;
 
   if (compact) {
     return (
@@ -107,7 +107,7 @@ function SyncIndicatorInner({ compact = false }) {
           className="mt-3 flex items-center gap-2 text-xs text-[#B55B49] font-mono"
         >
           <ArrowsClockwise size={14} className="animate-spin" />
-          {data.syncing} record(s) syncing to cloud…
+          {data.pending_sync} record(s) syncing to cloud…
         </motion.div>
       )}
 
