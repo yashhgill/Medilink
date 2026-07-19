@@ -1194,6 +1194,25 @@ async def patient_records(patient_id: str, u=Depends(current_user), request: Req
         records_t.select().where(records_t.c.patient_id == patient_id)
         .order_by(records_t.c.created_at.desc())
     )
+    # National record sharing: pull this patient's records from OTHER facilities
+    # via the cloud mirror, matched by IC (the national identity key).
+    external_rows = []
+    if cloud_db and not IS_CLOUD:
+        try:
+            p_row = await database.fetch_one(users_t.select().where(users_t.c.id == patient_id))
+            ic = dict(p_row).get("ic_number") if p_row else None
+            if ic:
+                cloud_users = await cloud_db.fetch_all(
+                    users_t.select().where(users_t.c.ic_number == ic))
+                cloud_ids = [dict(cu)["id"] for cu in cloud_users]
+                if cloud_ids:
+                    ext = await cloud_db.fetch_all(
+                        records_t.select().where(
+                            (records_t.c.patient_id.in_(cloud_ids)) &
+                            (records_t.c.facility_id != FACILITY_ID)))
+                    external_rows = list(ext)
+        except Exception as e:
+            log.warning(f"Cross-facility fetch unavailable (offline?): {e}")
     await audit_log(u["id"], u["role"], "READ_RECORD", "medical_records", patient_id,
                     ip=request.client.host if request and request.client else "")
     result = []
@@ -1202,6 +1221,7 @@ async def patient_records(patient_id: str, u=Depends(current_user), request: Req
         doc = await database.fetch_one(users_t.select().where(users_t.c.id == rec["doctor_id"]))
         rec["doctor"] = clean(dict(doc)) if doc else None
         att_ids = rec.get("attachment_ids") or []
+        rec["external"] = False
         rec["attachments"] = []
         if att_ids:
             att_rows = await database.fetch_all(
@@ -1211,6 +1231,19 @@ async def patient_records(patient_id: str, u=Depends(current_user), request: Req
                 ad["original_filename"] = ad["filename"]
                 rec["attachments"].append(ad)
         result.append(rec)
+    for r in external_rows:
+        rec = dict(r)
+        doc_name = "-"
+        try:
+            cd = await cloud_db.fetch_one(users_t.select().where(users_t.c.id == rec.get("doctor_id")))
+            if cd: doc_name = dict(cd).get("name", "-")
+        except Exception:
+            pass
+        rec["doctor"] = {"name": doc_name}
+        rec["external"] = True
+        rec["attachments"] = []   # files stay at their origin facility (local-first)
+        result.append(rec)
+    result.sort(key=lambda x: x.get("created_at") or "", reverse=True)
     return result
 
 # ── AI Triage — Manchester Triage System (MTS) ────────────────────────────────
@@ -1957,6 +1990,66 @@ async def history_pdf(u=Depends(role_required("patient", "admin"))):
     await audit_log(u["id"], u["role"], "DOWNLOAD_HISTORY_PDF", "medical_records", u["id"])
     return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
                     headers={"Content-Disposition": 'attachment; filename="medical-history.pdf"'})
+
+# ── Admin: analytics + daily cash report ────────────────────────────────────
+@api.get("/admin/analytics")
+async def admin_analytics(u=Depends(role_required("admin"))):
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    appts = await database.fetch_all(
+        appointments_t.select().where(
+            (appointments_t.c.created_at >= week_ago) &
+            (appointments_t.c.is_block.isnot(True))))
+    pays = await database.fetch_all(
+        payments_t.select().where(
+            (payments_t.c.status == "succeeded") & (payments_t.c.paid_at >= week_ago)))
+    recs = await database.fetch_all(
+        records_t.select().where(records_t.c.created_at >= week_ago))
+    triage = {"Red": 0, "Orange": 0, "Yellow": 0, "Green": 0, "Blue": 0, "None": 0}
+    visits_today = 0
+    for a in appts:
+        d = dict(a)
+        if (d.get("created_at") or "").startswith(today):
+            visits_today += 1
+        key = d.get("triage_colour") or "None"
+        triage[key] = triage.get(key, 0) + 1
+    rev_today = sum((dict(p_).get("amount") or 0) for p_ in pays if (dict(p_).get("paid_at") or "").startswith(today))
+    diag_count = {}
+    for r in recs:
+        dg = (dict(r).get("diagnosis") or "").strip()
+        if dg: diag_count[dg] = diag_count.get(dg, 0) + 1
+    top_diag = sorted(diag_count.items(), key=lambda x: -x[1])[:5]
+    return {"visits_today": visits_today, "visits_7d": len(appts),
+            "revenue_today": round(rev_today, 2),
+            "revenue_7d": round(sum((dict(p_).get("amount") or 0) for p_ in pays), 2),
+            "triage_mix": triage, "top_diagnoses": top_diag}
+
+@api.get("/admin/cash-report/pdf")
+async def cash_report_pdf(u=Depends(role_required("admin"))):
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    pays = await database.fetch_all(
+        payments_t.select().where(
+            (payments_t.c.status == "succeeded") & (payments_t.c.paid_at.like(f"{today}%")))
+        .order_by(payments_t.c.paid_at))
+    pdf = _pdf_doc(f"Daily Collection Report - {today}")
+    total = 0.0
+    by_method = {}
+    for p_ in pays:
+        d = dict(p_)
+        total += d.get("amount") or 0
+        m = d.get("method") or "-"
+        by_method[m] = by_method.get(m, 0) + (d.get("amount") or 0)
+        _pdf_kv(pdf, (d.get("paid_at") or "")[11:19],
+                f"{d.get('txn_ref')}  -  {m.upper()}  -  RM {(d.get('amount') or 0):.2f}")
+    pdf.ln(4)
+    for meth, amt in by_method.items():
+        _pdf_kv(pdf, meth.upper(), f"RM {amt:.2f}")
+    pdf.ln(2)
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.cell(0, 9, _latin(f"TOTAL COLLECTED: RM {total:.2f}  ({len(pays)} transactions)"), ln=1)
+    await audit_log(u["id"], u["role"], "DOWNLOAD_CASH_REPORT", "payments", today)
+    return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="cash-report-{today}.pdf"'})
 
 # ── Vaccinations ─────────────────────────────────────────────────────────────
 class VaccinationIn(BaseModel):

@@ -307,6 +307,11 @@ export default function PatientDashboard() {
               <div key={r.id} className="p-3 rounded-xl bg-[#F3EFE9] border border-[#E2DDD7]" data-testid="record-card">
                 <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C6661]">
                   {new Date(r.created_at).toLocaleDateString()} · {r.doctor?.name}
+                  {r.external && (
+                    <span className="ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-100 text-blue-700">
+                      {r.facility_id}
+                    </span>
+                  )}
                 </div>
                 <div className="text-sm font-medium mt-1">{r.diagnosis}</div>
                 {r.notes && <div className="text-xs text-[#5C6661] mt-1">{r.notes}</div>}

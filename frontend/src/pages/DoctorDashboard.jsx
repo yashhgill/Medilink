@@ -329,6 +329,15 @@ export default function DoctorDashboard() {
                     </div>
                     <div className="text-xs text-[#5C6661] mt-1">
                       {new Date(r.created_at).toLocaleString()} · {r.doctor?.name}
+                      {r.external ? (
+                        <span className="ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-100 text-blue-700">
+                          EXTERNAL · {r.facility_id}
+                        </span>
+                      ) : (
+                        <span className="ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#F3EFE9] text-[#5C6661]">
+                          {r.facility_id || "this clinic"}
+                        </span>
+                      )}
                     </div>
                     {r.notes && <div className="text-sm mt-2">{r.notes}</div>}
                     {r.vitals && (
