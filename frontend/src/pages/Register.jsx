@@ -90,7 +90,7 @@ export default function Register() {
           {form.role === "patient" && (
             <>
               <div className="space-y-1.5">
-                <Label>IC Number (NFC chip)</Label>
+                <Label>IC Number</Label>
                 <Input
                   data-testid="reg-ic"
                   placeholder="IC-YYMMDD-XX-NNNN"

@@ -773,7 +773,7 @@ async def list_patients(search: Optional[str] = None, u=Depends(current_user)):
 @api.get("/patients/{patient_id}")
 async def get_patient(patient_id: str, u=Depends(current_user), request: Request = None):
     row = await database.fetch_one(
-        users_t.select().where((users_t.c.id == patient_id) & (users_t.c.role == "patient"))
+        users_t.select().where((users_t.c.id == patient_id) & (users_t.c.role.in_(["patient", "admin"])))
     )
     if not row: raise HTTPException(404, "Patient not found")
     if u["role"] == "patient" and u["id"] != patient_id:

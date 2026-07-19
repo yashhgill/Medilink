@@ -18,7 +18,7 @@ const kioskAxios = axios.create({
 });
 
 /**
- * ICScanner — replaces NFCScanner.
+ * ICScanner — find a patient by typing their IC or scanning with the camera.
  * Two modes:
  *  1. Camera capture: opens webcam → patient holds IC to camera → snapshot → staff types number from image
  *  2. Manual entry: type IC directly (YYMMDD-SS-NNNN)

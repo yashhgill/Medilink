@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import api from "@/lib/api";
 import SyncIndicator from "@/components/SyncIndicator";
-import NFCScanner from "@/components/ICScanner";
+import ICScanner from "@/components/ICScanner";
 import SlotPicker from "@/components/SlotPicker";
 import useQueueSocket from "@/hooks/useQueueSocket";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ export default function ReceptionDashboard() {
   const [queue, setQueue] = useState([]);
   const [patients, setPatients] = useState([]);
   const [doctors, setDoctors] = useState([]);
-  const [nfcOpen, setNfcOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
   const [scannedPatient, setScannedPatient] = useState(null);
   const [bookOpen, setBookOpen] = useState(false);
   const [booking, setBooking] = useState({ patient_id: "", doctor_id: "", scheduled_at: "", reason: "" });
@@ -66,7 +66,7 @@ export default function ReceptionDashboard() {
     load();
   };
 
-  const onNFCMatch = (data) => {
+  const onPatientFound = (data) => {
     setScannedPatient(data.patient);
     setBooking({ ...booking, patient_id: data.patient.id });
     setBookOpen(true);
@@ -128,8 +128,8 @@ export default function ReceptionDashboard() {
               <h3 className="font-display text-xl mt-1">{queue.length} appointment(s) today</h3>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button data-testid="recep-nfc-btn" onClick={() => setNfcOpen(true)} className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full">
-                <WaveTriangle size={14} weight="duotone" className="mr-1.5" /> NFC Check-in
+              <Button data-testid="recep-find-btn" onClick={() => setScanOpen(true)} className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full">
+                <WaveTriangle size={14} weight="duotone" className="mr-1.5" /> Find patient
               </Button>
               <Button data-testid="recep-book-btn" onClick={() => setBookOpen(true)} variant="outline" className="border-[#E2DDD7] text-[#1C3F39] hover:bg-[#F3EFE9] rounded-full">
                 <Plus size={14} className="mr-1.5" /> New booking
@@ -212,7 +212,7 @@ export default function ReceptionDashboard() {
         </div>
       </div>
 
-      <NFCScanner open={nfcOpen} onOpenChange={setNfcOpen} onMatch={onNFCMatch} />
+      <ICScanner open={scanOpen} onOpenChange={setScanOpen} onMatch={onPatientFound} />
 
       <Dialog open={bookOpen} onOpenChange={(o) => { setBookOpen(o); if (!o) setScannedPatient(null); }}>
         <DialogContent data-testid="recep-book-dialog" className="bg-[#F9F9F6] border-[#E2DDD7] max-w-3xl max-h-[90vh] overflow-y-auto">

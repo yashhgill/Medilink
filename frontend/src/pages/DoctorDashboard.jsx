@@ -77,6 +77,7 @@ export default function DoctorDashboard() {
   });
 
   const openPatient = async (pid) => {
+    try {
     setActivePatientId(pid);
     setAiSummary("");
     setAiDrug("");
@@ -84,11 +85,14 @@ export default function DoctorDashboard() {
       api.get(`/patients/${pid}`),
       api.get(`/records/patient/${pid}`),
     ]);
-    setPatient(p.data);
-    setRecords(rec.data);
+      setPatient(p.data);
+      setRecords(rec.data);
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Could not open this patient's file");
+    }
   };
 
-  const onNFCMatch = (data) => {
+  const onPatientFound = (data) => {
     openPatient(data.patient.id);
     toast.success(`Loaded ${data.patient.name}`);
   };
@@ -200,12 +204,12 @@ export default function DoctorDashboard() {
           <div className="flex items-center justify-between mb-3">
             <div className="overline">Today&apos;s Queue</div>
             <Button
-              data-testid="nfc-open-btn"
+              data-testid="find-patient-btn"
               size="sm"
               onClick={() => setIcScanOpen(true)}
               className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full h-8"
             >
-              <WaveTriangle size={14} weight="duotone" className="mr-1.5" /> Scan NFC
+              <WaveTriangle size={14} weight="duotone" className="mr-1.5" /> Find by IC
             </Button>
           </div>
           <div className="space-y-2 max-h-[480px] overflow-y-auto">
@@ -247,9 +251,9 @@ export default function DoctorDashboard() {
           {!patient ? (
             <div className="h-full min-h-[420px] flex flex-col items-center justify-center text-center text-[#5C6661]">
               <WaveTriangle size={36} weight="duotone" className="mb-3" color="#1C3F39" />
-              <div className="font-display text-xl text-[#0A0F0D] mb-1">Tap an NFC card or pick from queue</div>
+              <div className="font-display text-xl text-[#0A0F0D] mb-1">Select a patient from the queue</div>
               <div className="text-sm max-w-sm">
-                Once a patient is loaded, you&apos;ll see their full PHR, AI-generated summary, and can record this visit.
+                Tap a name on the left, or find a patient by IC. You&apos;ll see their full record, AI summary, and can record this visit.
               </div>
             </div>
           ) : (
@@ -341,7 +345,7 @@ export default function DoctorDashboard() {
         </div>
       </div>
 
-      <ICScanner open={icScanOpen} onOpenChange={setIcScanOpen} onMatch={onNFCMatch} />
+      <ICScanner open={icScanOpen} onOpenChange={setIcScanOpen} onMatch={onPatientFound} />
 
       {/* Record dialog */}
       <Dialog open={recOpen} onOpenChange={setRecOpen}>
