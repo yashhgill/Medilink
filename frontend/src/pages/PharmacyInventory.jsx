@@ -39,19 +39,32 @@ export default function PharmacyInventory() {
   const [loading, setLoading]     = useState(true);
   const [addOpen, setAddOpen]     = useState(false);
   const [editItem, setEditItem]   = useState(null);
+  const [summary, setSummary]     = useState(null);
+  const [historyFor, setHistoryFor] = useState(null);
+  const [movements, setMovements] = useState([]);
   const [form, setForm]           = useState({
     name:"", generic_name:"", category:"", unit:"tablet",
     stock_qty:0, reorder_level:50, unit_price:0, expiry_date:"", batch_no:"", supplier:""
   });
 
+  const openHistory = async (item) => {
+    setHistoryFor(item);
+    try {
+      const r = await api.get(`/inventory/${item.id}/movements`);
+      setMovements(r.data);
+    } catch { setMovements([]); }
+  };
+
   const load = async () => {
     try {
-      const [inv, alr] = await Promise.all([
+      const [inv, alr, sum] = await Promise.all([
         api.get("/inventory"),
         api.get("/inventory/low-stock"),
+        api.get("/inventory/summary").catch(() => ({ data: null })),
       ]);
       setItems(inv.data);
       setAlerts(alr.data);
+      if (sum?.data) setSummary(sum.data);
     } catch { toast.error("Failed to load inventory"); }
     finally { setLoading(false); }
   };
@@ -106,6 +119,22 @@ export default function PharmacyInventory() {
   return (
     <AppShell title="Pharmacy · Inventory" subtitle={user?.name || "Pharmacy"} navItems={[{ label: "Dispense Queue", to: "/pharmacy" }, { label: "Inventory", to: "/pharmacy/inventory" }]}>
     <div className="space-y-6">
+      {summary && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { label: "Medicines", value: summary.items },
+            { label: "Stock value", value: `RM ${Number(summary.stock_value).toFixed(2)}` },
+            { label: "Low stock", value: summary.low_stock, warn: summary.low_stock > 0 },
+            { label: "Expiring ≤30d", value: summary.expiring_soon, warn: summary.expiring_soon > 0 },
+          ].map((c) => (
+            <div key={c.label} className={`rounded-2xl border p-4 ${c.warn ? "border-amber-300 bg-amber-50" : "border-[#E2DDD7] bg-white"}`}>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-[#6B7B6E]">{c.label}</div>
+              <div className={`font-display text-2xl mt-1 ${c.warn ? "text-amber-700" : "text-[#1C3F39]"}`}>{c.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Alerts strip */}
       {alerts.length > 0 && (
         <div className="bg-[#FDE8D8] border border-[#F4A261]/40 rounded-2xl p-4">
@@ -194,6 +223,8 @@ export default function PharmacyInventory() {
                 <button onClick={() => handleStockAdjust(item, 1)}
                   className="w-5 h-5 rounded bg-[#F3EFE9] text-[#6B7B6E] hover:bg-[#E2DDD7] text-xs font-bold flex items-center justify-center">+</button>
                 <span className="text-xs text-[#6B7B6E]">{item.unit}s</span>
+                <button onClick={() => openHistory(item)} title="Stock history"
+                  className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#F3EFE9] text-[#6B7B6E] hover:bg-[#E2DDD7]">history</button>
               </div>
             </div>
 
@@ -257,6 +288,27 @@ export default function PharmacyInventory() {
             <Button onClick={handleSave} className="w-full bg-[#1C3F39] text-white rounded-xl mt-2">
               {editItem ? "Save Changes" : "Add Medicine"}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!historyFor} onOpenChange={(o) => !o && setHistoryFor(null)}>
+        <DialogContent className="bg-[#F9F9F6] border-[#E2DDD7] max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl">Stock history — {historyFor?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1.5 max-h-[360px] overflow-y-auto">
+            {movements.length === 0 && <div className="text-sm text-[#6B7B6E]">No movements recorded yet.</div>}
+            {movements.map((mv) => (
+              <div key={mv.id} className="flex items-center justify-between p-2.5 rounded-xl border border-[#E2DDD7] bg-white text-sm">
+                <div>
+                  <span className={`font-mono font-semibold ${mv.delta < 0 ? "text-red-600" : "text-emerald-700"}`}>
+                    {mv.delta > 0 ? `+${mv.delta}` : mv.delta}
+                  </span>
+                  <span className="ml-2 text-[#6B7B6E]">{mv.reason}</span>
+                </div>
+                <div className="text-[11px] text-[#6B7B6E] font-mono">{new Date(mv.created_at).toLocaleString()}</div>
+              </div>
+            ))}
           </div>
         </DialogContent>
       </Dialog>
