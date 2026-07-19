@@ -7,7 +7,7 @@ import { PaperPlaneTilt, Sparkle, Stethoscope } from "@phosphor-icons/react";
 import { BACKEND_URL } from "@/lib/api";
 
 /**
- * Streaming AI symptom assistant (Gemini).
+ * Streaming AI symptom assistant.
  * Uses fetch + SSE-style chunk reading from the backend.
  */
 export default function AIChat({ open, onOpenChange }) {
@@ -58,8 +58,12 @@ export default function AIChat({ open, onOpenChange }) {
         buffer = lines.pop() || "";
         for (const line of lines) {
           if (!line.startsWith("data:")) continue;
-          const chunk = line.slice(5).replace(/^ /, "");
-          if (chunk === "[DONE]") continue;
+          const raw = line.slice(5).replace(/^ /, "");
+          if (raw === "[DONE]") continue;
+          let chunk = raw;
+          if (raw.startsWith('"')) {
+            try { chunk = JSON.parse(raw); } catch (_) { chunk = raw; }
+          }
           if (chunk.startsWith("[ERROR]")) {
             setMessages((m) => {
               const copy = [...m];
@@ -106,7 +110,7 @@ export default function AIChat({ open, onOpenChange }) {
             </div>
             <div>
               <SheetTitle className="font-display text-lg leading-tight">
-                MediLink AI · Gemini
+                MediLink AI
               </SheetTitle>
               <SheetDescription className="text-xs">
                 Symptom triage assistant
