@@ -41,6 +41,7 @@ export default function DoctorDashboard() {
   const { user } = useAuth();
   const [appts, setAppts] = useState([]);
   const [activePatientId, setActivePatientId] = useState(null);
+  const [activeApptId, setActiveApptId] = useState(null);
   const [patient, setPatient] = useState(null);
   const [records, setRecords] = useState([]);
   const [aiSummary, setAiSummary] = useState("");
@@ -76,7 +77,8 @@ export default function DoctorDashboard() {
     if (ev?.type?.startsWith("appointment.")) load();
   });
 
-  const openPatient = async (pid) => {
+  const openPatient = async (pid, apptId = null) => {
+    setActiveApptId(apptId);
     try {
     setActivePatientId(pid);
     setAiSummary("");
@@ -170,6 +172,7 @@ export default function DoctorDashboard() {
         },
         prescriptions: form.prescriptions.filter((p) => p.medicine),
         attachment_ids: form.attachments.map((a) => a.id),
+        appointment_id: activeApptId,
       });
       toast.success("Record saved · syncing to cloud");
       setRecOpen(false);
@@ -218,7 +221,7 @@ export default function DoctorDashboard() {
               <button
                 key={a.id}
                 data-testid="queue-item"
-                onClick={() => openPatient(a.patient_id)}
+                onClick={() => openPatient(a.patient_id, a.id)}
                 className={`w-full text-left flex items-center gap-3 p-3 rounded-xl border transition-colors ${
                   activePatientId === a.patient_id ? "border-[#1C3F39] bg-[#F3EFE9]" : "border-[#E2DDD7] hover:bg-[#F3EFE9]"
                 }`}

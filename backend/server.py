@@ -984,11 +984,7 @@ async def kiosk_pay(body: KioskPayIn, _=Depends(kiosk_auth)):
     )
     broadcast({"type":"appointment.updated","appointment_id":appt["id"]})
     # Fetch prescriptions for medicine chit
-    rec = await database.fetch_one(
-        records_t.select()
-        .where((records_t.c.patient_id == p["id"]) & (records_t.c.appointment_id == appt["id"]))
-        .order_by(records_t.c.created_at.desc())
-    )
+    rec = await record_for_visit(p["id"], appt["id"])
     prescriptions = (dict(rec).get("prescriptions") or []) if rec else []
     doc_row = await database.fetch_one(users_t.select().where(users_t.c.id == appt["doctor_id"]))
     receipt = {
@@ -1445,6 +1441,24 @@ async def low_stock_alerts(u=Depends(role_required("pharmacist","admin"))):
             except: pass
     return sorted(alerts, key=lambda x: x.get("days_left",9999))
 
+async def record_for_visit(patient_id: str, appointment_id: str):
+    """Prescription lookup for chits/pharmacy: prefer the record linked to this
+    appointment; fall back to the patient's latest record from today (covers
+    records saved without an appointment link)."""
+    rec = await database.fetch_one(
+        records_t.select()
+        .where((records_t.c.patient_id == patient_id) &
+               (records_t.c.appointment_id == appointment_id))
+        .order_by(records_t.c.created_at.desc()))
+    if rec:
+        return rec
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return await database.fetch_one(
+        records_t.select()
+        .where((records_t.c.patient_id == patient_id) &
+               (records_t.c.created_at.like(f"{today}%")))
+        .order_by(records_t.c.created_at.desc()))
+
 @api.get("/pharmacy/queue")
 async def pharmacy_queue(u=Depends(role_required("pharmacist","admin"))):
     rows = await database.fetch_all(
@@ -1457,11 +1471,7 @@ async def pharmacy_queue(u=Depends(role_required("pharmacist","admin"))):
         a = dict(r)
         p = await database.fetch_one(users_t.select().where(users_t.c.id == a["patient_id"]))
         d = await database.fetch_one(users_t.select().where(users_t.c.id == a["doctor_id"]))
-        rec = await database.fetch_one(
-            records_t.select()
-            .where((records_t.c.patient_id == a["patient_id"]) & (records_t.c.appointment_id == a["id"]))
-            .order_by(records_t.c.created_at.desc())
-        )
+        rec = await record_for_visit(a["patient_id"], a["id"])
         a["patient"] = clean(dict(p)) if p else None
         a["doctor"] = clean(dict(d)) if d else None
         a["record"] = dict(rec) if rec else None
