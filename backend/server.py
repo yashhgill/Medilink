@@ -330,6 +330,7 @@ def is_public_request(request: Request) -> bool:
 
 # ── Login brute-force guard (per email+IP, in-memory sliding window) ─────────
 _login_fails: dict = {}
+_AI_SUMMARY_CACHE: dict = {}
 LOGIN_MAX_FAILS, LOGIN_WINDOW_S = 5, 900
 
 def login_guard(key: str):
@@ -1305,7 +1306,18 @@ async def ai_summary(body: AISummaryIn, u=Depends(role_required("doctor","admin"
         "ACTIVE MEDICATIONS | ALLERGIES | RED FLAGS | RECENT VISITS. Bullet points only. "
         "Max 220 words. Be precise and clinical."
     )
-    summary = await groq(system, [{"role":"user","content":prompt}], max_tokens=300)
+    # Stable output: cache by content hash — identical inputs return identical words.
+    # Nothing is written to the database; cache lives in memory and invalidates
+    # automatically when the underlying data (records/complaint) changes.
+    import hashlib
+    cache_key = hashlib.sha256(prompt.encode()).hexdigest()
+    cached = _AI_SUMMARY_CACHE.get(cache_key)
+    if cached:
+        return {"summary": cached, "patient": clean(pd), "record_count": len(rows), "cached": True}
+    summary = await groq(system, [{"role":"user","content":prompt}], max_tokens=300, temperature=0.0)
+    if len(_AI_SUMMARY_CACHE) > 500:
+        _AI_SUMMARY_CACHE.clear()
+    _AI_SUMMARY_CACHE[cache_key] = summary
     return {"summary":summary,"patient":clean(pd),"record_count":len(rows)}
 
 @api.post("/ai/drug-check")
