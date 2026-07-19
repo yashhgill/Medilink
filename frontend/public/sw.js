@@ -1,17 +1,13 @@
-const SHELL = "medilink-shell-v2";
-self.addEventListener("install", (e) => { self.skipWaiting(); });
+// Self-destructing service worker.
+// Earlier versions cached the app shell, which caused stale-bundle bugs across
+// origins/devices. Any client that updates to this version cleans itself up.
+self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(
-    ks.filter(k => k !== SHELL).map(k => caches.delete(k)))).then(() => self.clients.claim()));
-});
-self.addEventListener("fetch", (e) => {
-  const url = new URL(e.request.url);
-  if (e.request.method !== "GET" || url.pathname.startsWith("/api")) return; // never cache API
-  e.respondWith(
-    fetch(e.request).then((res) => {
-      const copy = res.clone();
-      caches.open(SHELL).then((c) => c.put(e.request, copy));
-      return res;
-    }).catch(() => caches.match(e.request))
-  );
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+    await self.registration.unregister();
+    const clients = await self.clients.matchAll({ type: "window" });
+    clients.forEach((c) => c.navigate(c.url)); // reload with fresh network fetch
+  })());
 });

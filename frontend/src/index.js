@@ -22,8 +22,13 @@ root.render(
   </React.StrictMode>,
 );
 
+// Service workers removed: shell caching caused stale-bundle bugs.
+// Actively clean up any old registrations and caches on every load.
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
-  });
+  navigator.serviceWorker.getRegistrations()
+    .then((rs) => rs.forEach((r) => r.unregister()))
+    .catch(() => {});
+  if (window.caches?.keys) {
+    caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {});
+  }
 }
