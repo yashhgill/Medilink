@@ -10,6 +10,8 @@ import {
   ArrowsClockwise, CheckCircle,
 } from "@phosphor-icons/react";
 import api from "@/lib/api";
+import AppShell from "@/components/AppShell";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 const CATEGORY_COLORS = {
@@ -30,6 +32,7 @@ function StockBadge({ qty, reorder }) {
 }
 
 export default function PharmacyInventory() {
+  const { user } = useAuth();
   const [items, setItems]         = useState([]);
   const [alerts, setAlerts]       = useState([]);
   const [search, setSearch]       = useState("");
@@ -101,6 +104,7 @@ export default function PharmacyInventory() {
   );
 
   return (
+    <AppShell title="Pharmacy · Inventory" subtitle={user?.name || "Pharmacy"} navItems={[{ label: "Dispense Queue", to: "/pharmacy" }, { label: "Inventory", to: "/pharmacy/inventory" }]}>
     <div className="space-y-6">
       {/* Alerts strip */}
       {alerts.length > 0 && (
@@ -257,5 +261,6 @@ export default function PharmacyInventory() {
         </DialogContent>
       </Dialog>
     </div>
+    </AppShell>
   );
 }
