@@ -30,8 +30,10 @@ export default api;
 
 // True when the app is being served from the public internet (tunnel) rather
 // than the clinic LAN. Public visitors get the patient experience only.
-export const IS_PUBLIC = !/^(localhost|127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(
-  window.location.hostname
+const _host = window.location.hostname;
+export const IS_PUBLIC = !(
+  /^(localhost|127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(_host) ||
+  _host.endsWith(".local")   // Bonjour clinic-LAN hostname (e.g. mymac.local)
 );
 
 // Safe error message: FastAPI validation errors return arrays, which crash toasts.
