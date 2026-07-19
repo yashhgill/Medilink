@@ -1488,16 +1488,28 @@ async def dispense(body: DispenseIn, u=Depends(role_required("pharmacist","admin
     total = 0.0
     for item in body.items:
         inv_id = item.get("inventory_id")
-        qty = int(item.get("qty",1))
+        qty = int(item.get("qty", 1))
+        inv_row = None
         if inv_id:
-            inv_row = await database.fetch_one(inventory_t.select().where(inventory_t.c.id == inv_id))
-            if inv_row:
-                inv = dict(inv_row)
-                await database.execute(
-                    inventory_t.update().where(inventory_t.c.id == inv_id)
-                    .values(stock_qty=max(0, inv["stock_qty"] - qty), updated_at=now_iso())
-                )
-                total += inv["unit_price"] * qty
+            inv_row = await database.fetch_one(
+                inventory_t.select().where(inventory_t.c.id == inv_id))
+        if not inv_row and item.get("medicine"):
+            # Free-text prescription: match against inventory by name
+            med = item["medicine"].strip()
+            inv_row = await database.fetch_one(
+                inventory_t.select().where(inventory_t.c.name.ilike(f"%{med}%")))
+            if not inv_row:
+                token = med.split()[0]
+                if len(token) >= 4:
+                    inv_row = await database.fetch_one(
+                        inventory_t.select().where(inventory_t.c.name.ilike(f"%{token}%")))
+        if inv_row:
+            inv = dict(inv_row)
+            await database.execute(
+                inventory_t.update().where(inventory_t.c.id == inv["id"])
+                .values(stock_qty=max(0, (inv["stock_qty"] or 0) - qty), updated_at=now_iso())
+            )
+            total += (inv["unit_price"] or 0) * qty
     disp_id = uid(); now = now_iso()
     await database.execute(dispense_t.insert().values(
         id=disp_id, appointment_id=body.appointment_id,
@@ -1984,6 +1996,31 @@ async def startup():
         except Exception as e:
             log.warning(f"Cloud mirror not provisioned yet (will keep queueing): {e}")
     # Auto seed
+    # Starter inventory (demo): only when empty and seeding allowed
+    if ALLOW_SEED:
+        inv_count = await database.fetch_val(text("SELECT COUNT(*) FROM pharmacy_inventory"))
+        if not inv_count:
+            from datetime import date as _date
+            near_expiry = (datetime.now(timezone.utc) + timedelta(days=21)).strftime("%Y-%m-%d")
+            far_expiry = (datetime.now(timezone.utc) + timedelta(days=540)).strftime("%Y-%m-%d")
+            starter = [
+                ("Paracetamol 500mg", "Acetaminophen", "Analgesic", "tablet", 240, 50, 0.15, far_expiry, "PCM-2406"),
+                ("Oral Rehydration Salts (ORS)", "ORS", "Rehydration", "sachet", 120, 30, 0.80, far_expiry, "ORS-1102"),
+                ("Metoclopramide 10mg", "Metoclopramide", "Antiemetic", "tablet", 90, 20, 0.45, far_expiry, "MET-0907"),
+                ("Amoxicillin 500mg", "Amoxicillin", "Antibiotic", "capsule", 150, 40, 0.60, far_expiry, "AMX-3311"),
+                ("Cetirizine 10mg", "Cetirizine", "Antihistamine", "tablet", 180, 40, 0.25, far_expiry, "CTZ-2210"),
+                ("Ibuprofen 400mg", "Ibuprofen", "NSAID", "tablet", 200, 50, 0.30, far_expiry, "IBU-1805"),
+                ("Diphenhydramine Cough Syrup 100ml", "Diphenhydramine", "Antitussive", "bottle", 35, 15, 4.50, near_expiry, "DPH-0603"),
+                ("Chlorpheniramine 4mg", "Chlorpheniramine", "Antihistamine", "tablet", 8, 20, 0.10, far_expiry, "CPM-4410"),
+            ]
+            for name, gen, cat, unit, qty, reorder, price, exp, batch in starter:
+                await database.execute(inventory_t.insert().values(
+                    id=uid(), name=name, generic_name=gen, category=cat, unit=unit,
+                    stock_qty=qty, reorder_level=reorder, unit_price=price,
+                    expiry_date=exp, batch_no=batch, supplier="MediSupply Sdn Bhd",
+                    active=True, facility_id=FACILITY_ID,
+                    created_at=now_iso(), updated_at=now_iso(), sync_status="local"))
+            log.info("Starter pharmacy inventory seeded (8 items)")
     count = await database.fetch_val(text("SELECT COUNT(*) FROM users"))
     if not count:
         if ALLOW_SEED:
