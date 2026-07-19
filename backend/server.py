@@ -211,6 +211,19 @@ attachments_t = Table("attachments", metadata,
     Column("sync_status", String),
 )
 
+stock_movements_t = Table("stock_movements", metadata,
+    Column("id", String, primary_key=True),
+    Column("inventory_id", String),
+    Column("item_name", String),
+    Column("delta", Integer),                # +received / -dispensed / ±adjustment
+    Column("reason", String),                # received | dispensed | adjustment
+    Column("ref", String),                   # dispense/appointment id or note
+    Column("performed_by", String),
+    Column("created_at", String),
+    Column("facility_id", String),
+    Column("sync_status", String),
+)
+
 sync_queue_t = Table("sync_queue", metadata,
     Column("id", String, primary_key=True),
     Column("table_name", String),
@@ -1394,6 +1407,12 @@ async def get_slots(doctor_id: str, date: str = Query(...)):
     return {"date":date,"doctor_id":doctor_id,"slots":slots,"off":False}
 
 # ── Pharmacy inventory ────────────────────────────────────────────────────────
+async def log_stock_movement(inv: dict, delta: int, reason: str, ref: str, user_id: str):
+    await database.execute(stock_movements_t.insert().values(
+        id=uid(), inventory_id=inv["id"], item_name=inv["name"], delta=delta,
+        reason=reason, ref=ref, performed_by=user_id, created_at=now_iso(),
+        facility_id=FACILITY_ID, sync_status="local"))
+
 @api.get("/inventory")
 async def list_inventory(u=Depends(role_required("pharmacist","admin","doctor"))):
     rows = await database.fetch_all(
@@ -1418,11 +1437,19 @@ async def add_inventory(body: InventoryItemIn, u=Depends(role_required("pharmaci
 @api.patch("/inventory/{item_id}")
 async def update_inventory(item_id: str, body: InventoryUpdateIn,
                            u=Depends(role_required("pharmacist","admin"))):
+    _before = await database.fetch_one(inventory_t.select().where(inventory_t.c.id == item_id))
     updates = {k:v for k,v in body.model_dump().items() if v is not None}
     updates["updated_at"] = now_iso()
     await database.execute(inventory_t.update().where(inventory_t.c.id == item_id).values(**updates))
     row = await database.fetch_one(inventory_t.select().where(inventory_t.c.id == item_id))
     if not row: raise HTTPException(404, "Item not found")
+    if _before is not None and body.stock_qty is not None:
+        _delta = int(body.stock_qty) - int(dict(_before).get("stock_qty") or 0)
+        if _delta != 0:
+            await log_stock_movement(dict(_before), _delta,
+                                     "received" if _delta > 0 else "adjustment",
+                                     "manual", u["id"])
+
     return dict(row)
 
 @api.get("/inventory/low-stock")
@@ -1509,6 +1536,7 @@ async def dispense(body: DispenseIn, u=Depends(role_required("pharmacist","admin
                 inventory_t.update().where(inventory_t.c.id == inv["id"])
                 .values(stock_qty=max(0, (inv["stock_qty"] or 0) - qty), updated_at=now_iso())
             )
+            await log_stock_movement(inv, -qty, "dispensed", body.appointment_id, u["id"])
             total += (inv["unit_price"] or 0) * qty
     disp_id = uid(); now = now_iso()
     await database.execute(dispense_t.insert().values(
@@ -1758,6 +1786,33 @@ async def files_upload(file: UploadFile = File(...),
 @api.get("/files/{att_id}/download")
 async def files_download(att_id: str, u=Depends(current_user), request: Request = None):
     return await download_attachment(att_id, u, request)
+
+@api.get("/inventory/summary")
+async def inventory_summary(u=Depends(role_required("pharmacist", "admin"))):
+    rows = await database.fetch_all(inventory_t.select().where(inventory_t.c.active == True))
+    today = datetime.now(timezone.utc).date()
+    total_value, low, expiring = 0.0, 0, 0
+    for r in rows:
+        d = dict(r)
+        total_value += (d.get("stock_qty") or 0) * (d.get("unit_price") or 0)
+        if (d.get("stock_qty") or 0) <= (d.get("reorder_level") or 0):
+            low += 1
+        if d.get("expiry_date"):
+            try:
+                exp = datetime.strptime(d["expiry_date"][:10], "%Y-%m-%d").date()
+                if (exp - today).days <= 30:
+                    expiring += 1
+            except ValueError:
+                pass
+    return {"items": len(rows), "stock_value": round(total_value, 2),
+            "low_stock": low, "expiring_soon": expiring}
+
+@api.get("/inventory/{item_id}/movements")
+async def inventory_movements(item_id: str, u=Depends(role_required("pharmacist", "admin"))):
+    rows = await database.fetch_all(
+        stock_movements_t.select().where(stock_movements_t.c.inventory_id == item_id)
+        .order_by(stock_movements_t.c.created_at.desc()).limit(50))
+    return [dict(r) for r in rows]
 
 # ── Pharmacy: expiry alerts ──────────────────────────────────────────────────
 @api.get("/pharmacy/expiry-alerts")
