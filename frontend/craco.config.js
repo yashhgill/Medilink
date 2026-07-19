@@ -84,6 +84,13 @@ webpackConfig.devServer = (devServerConfig) => {
     overlay: { errors: true, warnings: false, runtimeErrors: false },
   };
 
+  // Forbid browser caching of dev-server responses — stale-bundle bugs on
+  // iPads/phones came from Safari's heuristic caching of unversioned bundles.
+  devServerConfig.headers = {
+    ...(devServerConfig.headers || {}),
+    "Cache-Control": "no-store, must-revalidate",
+  };
+
   return devServerConfig;
 };
 
