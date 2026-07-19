@@ -12,6 +12,18 @@ import { Badge } from "@/components/ui/badge";
 import SyncIndicator from "@/components/SyncIndicator";
 import SlotPicker from "@/components/SlotPicker";
 import { AttachmentList } from "@/components/Attachments";
+import { BACKEND_URL } from "@/lib/api";
+
+const downloadPdf = async (path, filename) => {
+  const token = localStorage.getItem("ml_token");
+  const r = await fetch(`${BACKEND_URL}/api${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!r.ok) throw new Error("download failed");
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+};
 import useQueueSocket from "@/hooks/useQueueSocket";
 import { Calendar, CreditCard, FileText, Pill, Plus, Stethoscope, WaveTriangle } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -36,6 +48,8 @@ export default function PatientDashboard() {
   const [qrPay, setQrPay] = useState(null);      // active DuitNow payment {qr, ref, amount}
   const [receipts, setReceipts] = useState([]);
   const [confirming, setConfirming] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profile, setProfile] = useState({ email: "", phone: "" });
   const [booking, setBooking] = useState({ doctor_id: "", scheduled_at: "", reason: "" });
   const [loading, setLoading] = useState(false);
 
@@ -78,6 +92,16 @@ export default function PatientDashboard() {
       toast.error(errMsg(e, "Booking failed"));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveProfile = async () => {
+    try {
+      await api.patch(`/patients/${user.id}`, { email: profile.email || undefined, phone: profile.phone || undefined });
+      toast.success("Profile updated");
+      setProfileOpen(false);
+    } catch (e) {
+      toast.error(errMsg(e, "Could not update profile"));
     }
   };
 
@@ -215,7 +239,15 @@ export default function PatientDashboard() {
                   <div className="text-[11px] font-mono text-[#5C6661]">{r.txn_ref}</div>
                   <div className="text-[11px] text-[#5C6661]">{new Date(r.paid_at).toLocaleString()} · {r.reason}</div>
                 </div>
-                <Badge className="bg-[#2D6A4F]/20 text-[#2D6A4F]">paid</Badge>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => downloadPdf(`/patient/receipts/${r.txn_ref}/pdf`, `receipt-${r.txn_ref}.pdf`).catch(() => toast.error("Download failed"))}
+                    className="text-[11px] px-2 py-1 rounded-full border border-[#E2DDD7] hover:bg-[#F3EFE9] text-[#1C3F39]"
+                  >
+                    PDF
+                  </button>
+                  <Badge className="bg-[#2D6A4F]/20 text-[#2D6A4F]">paid</Badge>
+                </div>
               </div>
             ))}
           </div>
@@ -225,7 +257,21 @@ export default function PatientDashboard() {
         <div className="rounded-2xl border border-[#E2DDD7] bg-white p-6">
           <div className="flex items-center justify-between mb-3">
             <div className="overline">Medical Records</div>
-            <FileText size={18} weight="duotone" color="#1C3F39" />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => downloadPdf("/patient/history/pdf", "medical-history.pdf").catch(() => toast.error("Download failed"))}
+                className="text-[11px] px-2 py-1 rounded-full border border-[#E2DDD7] hover:bg-[#F3EFE9] text-[#1C3F39]"
+              >
+                Download PDF
+              </button>
+              <button
+                onClick={() => { setProfile({ email: user.email?.includes("@patient.medilink") ? "" : user.email, phone: user.phone || "" }); setProfileOpen(true); }}
+                className="text-[11px] px-2 py-1 rounded-full border border-[#E2DDD7] hover:bg-[#F3EFE9] text-[#1C3F39]"
+              >
+                Edit profile
+              </button>
+              <FileText size={18} weight="duotone" color="#1C3F39" />
+            </div>
           </div>
           {records.length === 0 && <div className="text-sm text-[#5C6661]">No records yet.</div>}
           <div className="space-y-3 max-h-[420px] overflow-y-auto">
@@ -353,6 +399,27 @@ export default function PatientDashboard() {
                 {confirming ? "Checking…" : "I've paid"}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+        <DialogContent className="bg-[#F9F9F6] border-[#E2DDD7]">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl">My profile</DialogTitle>
+            <DialogDescription>Add contact details for reminders and receipts. You always sign in with your IC.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Email (optional)</Label>
+              <Input value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} placeholder="you@email.com" className="border-[#E2DDD7]" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Phone</Label>
+              <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} placeholder="012-345 6789" className="border-[#E2DDD7]" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={saveProfile} className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6]">Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

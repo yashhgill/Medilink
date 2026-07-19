@@ -7,7 +7,7 @@ from fastapi import (
     FastAPI, APIRouter, HTTPException, Depends, Header,
     Query, WebSocket, WebSocketDisconnect, Request, BackgroundTasks, UploadFile, File
 )
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse, FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from databases import Database
 from sqlalchemy import (
@@ -1819,6 +1819,109 @@ async def inventory_movements(item_id: str, u=Depends(role_required("pharmacist"
         stock_movements_t.select().where(stock_movements_t.c.inventory_id == item_id)
         .order_by(stock_movements_t.c.created_at.desc()).limit(50))
     return [dict(r) for r in rows]
+
+# ── Patient PDF exports (receipts + medical history) ────────────────────────
+def _latin(v) -> str:
+    return str(v if v is not None else "-").encode("latin-1", "replace").decode("latin-1")
+
+def _pdf_doc(title: str):
+    from fpdf import FPDF
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=18)
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 9, _latin(CLINIC_NAME), ln=1)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(110, 110, 110)
+    pdf.cell(0, 5, _latin(f"{CLINIC_ADDR}  ·  {CLINIC_PHONE}"), ln=1)
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(3)
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.cell(0, 8, _latin(title), ln=1)
+    pdf.set_draw_color(180, 180, 180)
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(3)
+    return pdf
+
+def _pdf_kv(pdf, label, value):
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(45, 6, _latin(label))
+    pdf.set_font("Helvetica", "", 10)
+    pdf.multi_cell(0, 6, _latin(value))
+
+def _pdf_bytes(pdf) -> bytes:
+    out = pdf.output()
+    return bytes(out)
+
+@api.get("/patient/receipts/{txn_ref}/pdf")
+async def receipt_pdf(txn_ref: str, u=Depends(current_user)):
+    pay = await database.fetch_one(payments_t.select().where(payments_t.c.txn_ref == txn_ref))
+    if not pay: raise HTTPException(404, "Receipt not found")
+    payd = dict(pay)
+    appt = await database.fetch_one(
+        appointments_t.select().where(appointments_t.c.id == payd["appointment_id"]))
+    apptd = dict(appt) if appt else {}
+    if u["role"] == "patient" and apptd.get("patient_id") != u["id"]:
+        raise HTTPException(403, "Forbidden")
+    patient = await database.fetch_one(users_t.select().where(users_t.c.id == apptd.get("patient_id")))
+    pd_ = dict(patient) if patient else {}
+    pdf = _pdf_doc("Official Receipt")
+    _pdf_kv(pdf, "Receipt no.", payd["txn_ref"])
+    _pdf_kv(pdf, "Date", (payd.get("paid_at") or "")[:19].replace("T", " "))
+    _pdf_kv(pdf, "Patient", pd_.get("name"))
+    _pdf_kv(pdf, "IC", pd_.get("ic_number"))
+    _pdf_kv(pdf, "Visit reason", apptd.get("reason"))
+    _pdf_kv(pdf, "Method", (payd.get("method") or "-").upper())
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 10, _latin(f"TOTAL PAID: RM {float(payd.get('amount') or 0):.2f}"), ln=1)
+    pdf.ln(6)
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_text_color(120, 120, 120)
+    pdf.cell(0, 5, _latin("Computer-generated receipt from MediLink. Thank you."), ln=1)
+    await audit_log(u["id"], u["role"], "DOWNLOAD_RECEIPT_PDF", "payments", txn_ref)
+    return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="receipt-{txn_ref}.pdf"'})
+
+@api.get("/patient/history/pdf")
+async def history_pdf(u=Depends(role_required("patient", "admin"))):
+    rows = await database.fetch_all(
+        records_t.select().where(records_t.c.patient_id == u["id"])
+        .order_by(records_t.c.created_at.desc()))
+    pdf = _pdf_doc("Medical History Summary")
+    _pdf_kv(pdf, "Patient", u.get("name"))
+    _pdf_kv(pdf, "IC", u.get("ic_number"))
+    _pdf_kv(pdf, "Generated", now_iso()[:19].replace("T", " "))
+    _pdf_kv(pdf, "Total visits", len(rows))
+    pdf.ln(4)
+    if not rows:
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 6, "No medical records on file.", ln=1)
+    for r in rows:
+        d = dict(r)
+        doc = await database.fetch_one(users_t.select().where(users_t.c.id == d.get("doctor_id")))
+        pdf.set_fill_color(243, 239, 233)
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(0, 8, _latin(f"{(d.get('created_at') or '')[:10]}  -  {d.get('diagnosis') or 'Consultation'}"),
+                 ln=1, fill=True)
+        _pdf_kv(pdf, "Doctor", dict(doc).get("name") if doc else "-")
+        if d.get("notes"): _pdf_kv(pdf, "Notes", d["notes"])
+        v = d.get("vitals") or {}
+        if any(v.values() if isinstance(v, dict) else []):
+            _pdf_kv(pdf, "Vitals", ", ".join(f"{k.upper()}: {val}" for k, val in v.items() if val))
+        rx = d.get("prescriptions") or []
+        if rx:
+            _pdf_kv(pdf, "Prescriptions",
+                    "; ".join(f"{m.get('medicine')} {m.get('dosage','')} {m.get('frequency','')} {m.get('duration','')}".strip()
+                              for m in rx))
+        if d.get("allergies"): _pdf_kv(pdf, "Allergies", d["allergies"])
+        pdf.ln(2)
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_text_color(120, 120, 120)
+    pdf.cell(0, 5, _latin("Generated by MediLink. For personal reference; not a certified medical report."), ln=1)
+    await audit_log(u["id"], u["role"], "DOWNLOAD_HISTORY_PDF", "medical_records", u["id"])
+    return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
+                    headers={"Content-Disposition": 'attachment; filename="medical-history.pdf"'})
 
 # ── Pharmacy: expiry alerts ──────────────────────────────────────────────────
 @api.get("/pharmacy/expiry-alerts")
