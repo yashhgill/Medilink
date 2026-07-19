@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import api from "@/lib/api";
+import api, { errMsg } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,7 +33,7 @@ export default function Activate() {
       toast.success("Account activated — welcome to MediLink");
       window.location.href = "/patient";
     } catch (err) {
-      toast.error(err?.response?.data?.detail || "Activation failed");
+      toast.error(errMsg(err, "Activation failed"));
     } finally {
       setBusy(false);
     }

@@ -33,3 +33,9 @@ export default api;
 export const IS_PUBLIC = !/^(localhost|127\.|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(
   window.location.hostname
 );
+
+// Safe error message: FastAPI validation errors return arrays, which crash toasts.
+export const errMsg = (e, fallback) => {
+  const d = e?.response?.data?.detail;
+  return typeof d === "string" ? d : fallback;
+};

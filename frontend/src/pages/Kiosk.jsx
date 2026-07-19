@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { errMsg } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
@@ -193,7 +194,7 @@ function CheckinFlow({ onPrint }) {
         setStep("register");
         setRegForm({ name: "", phone: "", gender: "", dob: "" });
       } else {
-        toast.error(e?.response?.data?.detail || "Lookup failed");
+        toast.error(errMsg(e, "Lookup failed"));
       }
     } finally {
       setTapping(false);
@@ -221,7 +222,7 @@ function CheckinFlow({ onPrint }) {
       setStep("booked");
       onPrint(r.data.chit);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Registration failed");
+      toast.error(errMsg(e, "Registration failed"));
     } finally {
       setRegistering(false);
     }
@@ -584,7 +585,7 @@ function PayFlow({ onPrint }) {
       const r = await kioskAxios.get(`/kiosk/lookup/${encodeURIComponent(ic)}`);
       setData(r.data);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Patient not found");
+      toast.error(errMsg(e, "Patient not found"));
     } finally {
       setBusy(false);
     }
@@ -593,17 +594,19 @@ function PayFlow({ onPrint }) {
   const pay = async (appt) => {
     setPaying(appt.id);
     try {
+      // Demo mode: instant mock payment. Production would integrate a card
+      // terminal / DuitNow gateway here with auto-inserted amounts.
       const r = await kioskAxios.post("/kiosk/pay", {
         ic_number: ic,
         appointment_id: appt.id,
-        method: "card",
+        method: "cash",
       });
-      toast.success("Payment successful");
+      toast.success("Payment recorded — collect your medicine");
       onPrint(r.data.receipt, r.data.medicine_chit);
       // refresh
       lookup();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Payment failed");
+      toast.error(errMsg(e, "Payment failed"));
     } finally {
       setPaying(null);
     }
@@ -724,7 +727,7 @@ function StatusFlow() {
       const r = await kioskAxios.get(`/kiosk/lookup/${encodeURIComponent(ic)}`);
       setData(r.data);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Patient not found");
+      toast.error(errMsg(e, "Patient not found"));
     } finally {
       setBusy(false);
     }

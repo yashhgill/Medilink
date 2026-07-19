@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
-import api from "@/lib/api";
+import api, { errMsg } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,7 +75,7 @@ export default function PatientDashboard() {
       setBooking({ doctor_id: "", scheduled_at: "", reason: "" });
       load();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Booking failed");
+      toast.error(errMsg(e, "Booking failed"));
     } finally {
       setLoading(false);
     }
@@ -86,7 +86,7 @@ export default function PatientDashboard() {
       const r = await api.post(`/patient/bills/${appt.id}/pay`);
       setQrPay(r.data.payment);
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Could not start payment");
+      toast.error(errMsg(e, "Could not start payment"));
     }
   };
 
@@ -100,7 +100,7 @@ export default function PatientDashboard() {
       setOpenPay(null);
       load();
     } catch (e) {
-      toast.error(e?.response?.data?.detail || "Confirmation failed");
+      toast.error(errMsg(e, "Confirmation failed"));
     } finally {
       setConfirming(false);
     }
