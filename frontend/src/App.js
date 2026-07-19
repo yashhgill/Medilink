@@ -7,6 +7,7 @@ import { IS_PUBLIC } from "@/lib/api";
 import Landing from "@/pages/Landing";
 import Login, { redirectFor } from "@/pages/Login";
 import Activate from "@/pages/Activate";
+import PharmacyInventory from "@/pages/PharmacyInventory";
 import Register from "@/pages/Register";
 import PatientDashboard from "@/pages/PatientDashboard";
 import DoctorDashboard from "@/pages/DoctorDashboard";
@@ -62,6 +63,14 @@ function App() {
               element={
                 <ProtectedRoute roles={["pharmacist", "admin"]}>
                   <PharmacyDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pharmacy/inventory"
+              element={
+                <ProtectedRoute roles={["pharmacist", "admin"]}>
+                  <PharmacyInventory />
                 </ProtectedRoute>
               }
             />

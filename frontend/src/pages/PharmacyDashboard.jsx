@@ -53,7 +53,7 @@ export default function PharmacyDashboard() {
   };
 
   return (
-    <AppShell title="Pharmacy · Dispense Queue" subtitle={`${user.name}`} navItems={[]}>
+    <AppShell title="Pharmacy · Dispense Queue" subtitle={`${user.name}`} navItems={[{ label: "Dispense Queue", to: "/pharmacy" }, { label: "Inventory", to: "/pharmacy/inventory" }]}>
       {(expiry.expired.length > 0 || expiry.expiring_soon.length > 0) && (
         <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5" data-testid="expiry-alerts">
           <div className="overline text-amber-700">Stock expiry alerts</div>
