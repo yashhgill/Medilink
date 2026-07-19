@@ -505,7 +505,7 @@ class RegisterIn(BaseModel):
     license_no: Optional[str] = None
 
 class LoginIn(BaseModel):
-    email: EmailStr
+    email: str          # email address OR IC number
     password: str
 
 class AppointmentIn(BaseModel):
@@ -713,9 +713,15 @@ async def register(body: RegisterIn, request: Request):
 @api.post("/auth/login")
 async def login(body: LoginIn, request: Request):
     ip = request.client.host if request.client else ""
-    guard_key = f"{body.email.lower()}|{ip}"
+    ident = body.email.strip().lower()
+    guard_key = f"{ident}|{ip}"
     login_guard(guard_key)
-    row = await database.fetch_one(users_t.select().where(users_t.c.email == body.email.lower()))
+    parsed = parse_ic(ident)
+    if parsed["valid"]:
+        row = await database.fetch_one(
+            users_t.select().where(users_t.c.ic_number == parsed["formatted"]))
+    else:
+        row = await database.fetch_one(users_t.select().where(users_t.c.email == ident))
     if not row or not verify_pw(body.password, row["password_hash"]):
         login_fail(guard_key)
         await audit_log(row["id"] if row else "unknown", row["role"] if row else "unknown",

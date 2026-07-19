@@ -50,7 +50,7 @@ export default function Activate() {
         <h1 className="font-display text-4xl mt-1">Set your password</h1>
         <p className="text-sm text-[#5C6661] mt-2">
           Use the 6-digit activation code printed on your clinic slip.
-          Codes are valid for 72 hours — visit the kiosk for a fresh one anytime.
+          Codes are valid for 72 hours — visit the kiosk for a fresh one anytime. Afterwards, sign in with your IC number and this password.
         </p>
 
         <form onSubmit={submit} className="mt-8 space-y-4">

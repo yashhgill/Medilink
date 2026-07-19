@@ -114,7 +114,7 @@ export default function Login() {
                 id="email"
                 data-testid="login-email"
                 type="email"
-                placeholder="you@medilink.io"
+                placeholder="you@email.com or 000000-00-0000"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="border-[#E2DDD7] focus-visible:ring-[#1C3F39]"
