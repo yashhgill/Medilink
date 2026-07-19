@@ -224,6 +224,18 @@ stock_movements_t = Table("stock_movements", metadata,
     Column("sync_status", String),
 )
 
+vaccinations_t = Table("vaccinations", metadata,
+    Column("id", String, primary_key=True),
+    Column("patient_id", String),
+    Column("vaccine", String),
+    Column("dose", String),                 # e.g. Dose 1 / Booster
+    Column("batch_no", String),
+    Column("administered_by", String),
+    Column("administered_at", String),
+    Column("facility_id", String),
+    Column("sync_status", String),
+)
+
 sync_queue_t = Table("sync_queue", metadata,
     Column("id", String, primary_key=True),
     Column("table_name", String),
@@ -860,6 +872,19 @@ async def kiosk_register(body: KioskRegisterIn, _=Depends(kiosk_auth)):
     user.pop("activation_code", None); user.pop("activation_expires", None)
     await enqueue_sync("users", uid_, "INSERT", user)
     return {"patient": user, "ic_info": parsed, "activation_code": code}
+
+@api.post("/kiosk/reset-code")
+async def kiosk_reset_code(body: KioskCheckinIn, _=Depends(kiosk_auth)):
+    """Forgot password: issue a fresh one-time code in person at the kiosk.
+    Same machinery as activation — /auth/activate sets the new password."""
+    p = await patient_by_ic(body.ic_number)
+    if not p: raise HTTPException(404, "Patient not registered")
+    code = f"{secrets.randbelow(1000000):06d}"
+    await database.execute(users_t.update().where(users_t.c.id == p["id"]).values(
+        activation_code=code,
+        activation_expires=(datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()))
+    await audit_log(p["id"], "patient", "PASSWORD_RESET_CODE_ISSUED", "auth", p["id"])
+    return {"reset_code": code, "valid_minutes": 60, "name": p["name"]}
 
 async def kiosk_triage(symptoms: str, pain_score, patient: dict) -> dict:
     """Run MTS triage on kiosk-reported symptoms. Fail-safe: Green on any error."""
@@ -1932,6 +1957,102 @@ async def history_pdf(u=Depends(role_required("patient", "admin"))):
     await audit_log(u["id"], u["role"], "DOWNLOAD_HISTORY_PDF", "medical_records", u["id"])
     return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
                     headers={"Content-Disposition": 'attachment; filename="medical-history.pdf"'})
+
+# ── Vaccinations ─────────────────────────────────────────────────────────────
+class VaccinationIn(BaseModel):
+    vaccine: str
+    dose: Optional[str] = None
+    batch_no: Optional[str] = None
+
+@api.post("/patients/{patient_id}/vaccinations", status_code=201)
+async def add_vaccination(patient_id: str, body: VaccinationIn,
+                          u=Depends(role_required("doctor", "admin"))):
+    row = dict(id=uid(), patient_id=patient_id, vaccine=body.vaccine,
+               dose=body.dose or "Dose 1", batch_no=body.batch_no,
+               administered_by=u["id"], administered_at=now_iso(),
+               facility_id=FACILITY_ID, sync_status="local")
+    await database.execute(vaccinations_t.insert().values(**row))
+    await audit_log(u["id"], u["role"], "ADD_VACCINATION", "vaccinations", row["id"])
+    return row
+
+@api.get("/patients/{patient_id}/vaccinations")
+async def list_vaccinations(patient_id: str, u=Depends(current_user)):
+    if u["role"] == "patient" and u["id"] != patient_id:
+        raise HTTPException(403, "Forbidden")
+    rows = await database.fetch_all(
+        vaccinations_t.select().where(vaccinations_t.c.patient_id == patient_id)
+        .order_by(vaccinations_t.c.administered_at.desc()))
+    out = []
+    for r in rows:
+        d = dict(r)
+        doc = await database.fetch_one(users_t.select().where(users_t.c.id == d["administered_by"]))
+        d["doctor_name"] = dict(doc).get("name") if doc else "-"
+        out.append(d)
+    return out
+
+@api.get("/patients/{patient_id}/vaccinations/pdf")
+async def vaccination_cert_pdf(patient_id: str, u=Depends(current_user)):
+    if u["role"] == "patient" and u["id"] != patient_id:
+        raise HTTPException(403, "Forbidden")
+    p_row = await database.fetch_one(users_t.select().where(users_t.c.id == patient_id))
+    if not p_row: raise HTTPException(404, "Patient not found")
+    pd_ = dict(p_row)
+    rows = await database.fetch_all(
+        vaccinations_t.select().where(vaccinations_t.c.patient_id == patient_id)
+        .order_by(vaccinations_t.c.administered_at))
+    pdf = _pdf_doc("Vaccination Certificate")
+    _pdf_kv(pdf, "Name", pd_.get("name"))
+    _pdf_kv(pdf, "IC", pd_.get("ic_number"))
+    _pdf_kv(pdf, "Issued", now_iso()[:10])
+    pdf.ln(3)
+    for r in rows:
+        d = dict(r)
+        doc = await database.fetch_one(users_t.select().where(users_t.c.id == d["administered_by"]))
+        pdf.set_fill_color(243, 239, 233)
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(0, 8, _latin(f"{d['vaccine']}  -  {d.get('dose') or ''}"), ln=1, fill=True)
+        _pdf_kv(pdf, "Date", (d.get("administered_at") or "")[:10])
+        _pdf_kv(pdf, "Batch", d.get("batch_no"))
+        _pdf_kv(pdf, "Administered by", dict(doc).get("name") if doc else "-")
+        pdf.ln(1)
+    if not rows:
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 6, "No vaccinations on record.", ln=1)
+    await audit_log(u["id"], u["role"], "DOWNLOAD_VAX_CERT", "vaccinations", patient_id)
+    return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
+                    headers={"Content-Disposition": 'attachment; filename="vaccination-certificate.pdf"'})
+
+# ── Medical Certificate (MC) ─────────────────────────────────────────────────
+@api.get("/records/{record_id}/mc/pdf")
+async def mc_pdf(record_id: str, days: int = Query(1, ge=1, le=30), u=Depends(current_user)):
+    rec = await database.fetch_one(records_t.select().where(records_t.c.id == record_id))
+    if not rec: raise HTTPException(404, "Record not found")
+    rd = dict(rec)
+    if u["role"] == "patient" and rd["patient_id"] != u["id"]:
+        raise HTTPException(403, "Forbidden")
+    p_row = await database.fetch_one(users_t.select().where(users_t.c.id == rd["patient_id"]))
+    doc_row = await database.fetch_one(users_t.select().where(users_t.c.id == rd["doctor_id"]))
+    pd_, dd = dict(p_row or {}), dict(doc_row or {})
+    start = rd.get("created_at", now_iso())[:10]
+    end = (datetime.strptime(start, "%Y-%m-%d") + timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    pdf = _pdf_doc("Sijil Cuti Sakit / Medical Certificate")
+    _pdf_kv(pdf, "This certifies that", pd_.get("name"))
+    _pdf_kv(pdf, "IC", pd_.get("ic_number"))
+    _pdf_kv(pdf, "Was examined on", start)
+    _pdf_kv(pdf, "Unfit for duty", f"{days} day(s): {start} to {end}")
+    pdf.ln(8)
+    _pdf_kv(pdf, "Attending doctor", f"{dd.get('name','-')}  ({dd.get('license_no') or 'MMC'})")
+    pdf.ln(10)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 6, "_______________________", ln=1)
+    pdf.cell(0, 6, _latin(f"{dd.get('name','-')} - {CLINIC_NAME}"), ln=1)
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_text_color(120, 120, 120)
+    pdf.cell(0, 5, _latin(f"MC ref: {record_id[:8].upper()} - verify with the clinic. Diagnosis is confidential."), ln=1)
+    await audit_log(u["id"], u["role"], "DOWNLOAD_MC", "medical_records", record_id)
+    return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="mc-{start}.pdf"'})
 
 # ── Pharmacy: expiry alerts ──────────────────────────────────────────────────
 @api.get("/pharmacy/expiry-alerts")

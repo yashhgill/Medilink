@@ -299,6 +299,22 @@ export default function DoctorDashboard() {
                 </div>
               )}
 
+              <div className="flex items-center gap-2 mb-2">
+                <button
+                  onClick={async () => {
+                    const vaccine = window.prompt("Vaccine name (e.g. Influenza, Hepatitis B):");
+                    if (!vaccine) return;
+                    const dose = window.prompt("Dose (e.g. Dose 1 / Booster):", "Dose 1") || "Dose 1";
+                    try {
+                      await api.post(`/patients/${activePatientId}/vaccinations`, { vaccine, dose });
+                      toast.success("Vaccination recorded");
+                    } catch (e) { toast.error("Failed to record vaccination"); }
+                  }}
+                  className="text-[11px] px-2 py-1 rounded-full border border-[#E2DDD7] hover:bg-[#F3EFE9] text-[#1C3F39]"
+                >
+                  + Vaccination
+                </button>
+              </div>
               <div className="overline mb-3">Visit History · {records.length}</div>
               {records.length === 0 && <div className="text-sm text-[#5C6661]">No prior records.</div>}
               <div className="space-y-3 max-h-[360px] overflow-y-auto">
@@ -333,6 +349,25 @@ export default function DoctorDashboard() {
                       </div>
                     )}
                     {r.attachments?.length > 0 && <AttachmentList files={r.attachments} />}
+                    <button
+                      onClick={async () => {
+                        const days = window.prompt("MC days:", "1");
+                        if (!days) return;
+                        try {
+                          const token = localStorage.getItem("ml_token");
+                          const resp = await fetch(`/api/records/${r.id}/mc/pdf?days=${encodeURIComponent(days)}`, { headers: { Authorization: `Bearer ${token}` } });
+                          if (!resp.ok) throw new Error();
+                          const blob = await resp.blob();
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url; a.download = `mc-${r.id.slice(0,8)}.pdf`; a.click();
+                          URL.revokeObjectURL(url);
+                        } catch (e) { toast.error("MC download failed"); }
+                      }}
+                      className="mt-2 text-[11px] px-2 py-1 rounded-full border border-[#E2DDD7] hover:bg-[#F3EFE9] text-[#1C3F39]"
+                    >
+                      Issue MC (PDF)
+                    </button>
                   </div>
                 ))}
               </div>

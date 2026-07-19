@@ -411,6 +411,18 @@ function CheckinFlow({ onPrint }) {
           </div>
         </div>
 
+        <button
+          onClick={async () => {
+            try {
+              const r = await kioskAxios.post("/kiosk/reset-code", { ic_number: ic });
+              window.alert(`Password reset code for ${r.data.name}:\n\n${r.data.reset_code}\n\nValid ${r.data.valid_minutes} minutes. Go to the app -> Activate, enter IC + this code + a new password.`);
+            } catch (e) { toast.error(errMsg(e, "Could not issue reset code")); }
+          }}
+          className="mt-4 text-xs px-3 py-1.5 rounded-full border border-[#E2DDD7] hover:bg-white text-[#5C6661]"
+        >
+          Forgot app password? Get a reset code
+        </button>
+
         <div className="flex gap-2 mt-6">
           <Button
             variant="outline"

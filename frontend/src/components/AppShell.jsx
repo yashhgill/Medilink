@@ -2,6 +2,11 @@ import React, { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import api from "@/lib/api";
 import SyncIndicator from "@/components/SyncIndicator";
 import AIChat from "@/components/AIChat";
 import useQueueSocket from "@/hooks/useQueueSocket";
@@ -28,6 +33,8 @@ export default function AppShell({ children, title, subtitle, navItems = [] }) {
   const nav = useNavigate();
   const loc = useLocation();
   const [aiOpen, setAiOpen] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pwForm, setPwForm] = useState({ old_password: "", new_password: "" });
   const [live, setLive] = useState(false);
 
   useQueueSocket((ev) => {
@@ -103,6 +110,10 @@ export default function AppShell({ children, title, subtitle, navItems = [] }) {
                 {roleLabel[user?.role] || user?.role}
               </div>
             </div>
+            <button onClick={() => setPwOpen(true)} title="Change password"
+              className="text-[11px] px-2 py-1 rounded-full border border-[#E2DDD7] hover:bg-[#F3EFE9] text-[#1C3F39] mr-2">
+              Password
+            </button>
             <Button
               data-testid="logout-btn"
               variant="ghost"
@@ -132,6 +143,29 @@ export default function AppShell({ children, title, subtitle, navItems = [] }) {
         {children}
       </main>
 
+      <Dialog open={pwOpen} onOpenChange={setPwOpen}>
+        <DialogContent className="bg-[#F9F9F6] border-[#E2DDD7]">
+          <DialogHeader><DialogTitle className="font-display text-xl">Change password</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5"><Label>Current password</Label>
+              <Input type="password" value={pwForm.old_password} onChange={(e) => setPwForm({ ...pwForm, old_password: e.target.value })} className="border-[#E2DDD7]" /></div>
+            <div className="space-y-1.5"><Label>New password (min 8 chars)</Label>
+              <Input type="password" value={pwForm.new_password} onChange={(e) => setPwForm({ ...pwForm, new_password: e.target.value })} className="border-[#E2DDD7]" /></div>
+          </div>
+          <DialogFooter>
+            <Button onClick={async () => {
+              try {
+                await api.patch("/auth/me/password", pwForm);
+                toast.success("Password changed");
+                setPwOpen(false); setPwForm({ old_password: "", new_password: "" });
+              } catch (e) {
+                const d = e?.response?.data?.detail;
+                toast.error(typeof d === "string" ? d : "Could not change password");
+              }
+            }} className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6]">Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <AIChat open={aiOpen} onOpenChange={setAiOpen} />
     </div>
   );

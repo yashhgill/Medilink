@@ -47,6 +47,7 @@ export default function PatientDashboard() {
   const [openPay, setOpenPay] = useState(null);
   const [qrPay, setQrPay] = useState(null);      // active DuitNow payment {qr, ref, amount}
   const [receipts, setReceipts] = useState([]);
+  const [vax, setVax] = useState([]);
   const [confirming, setConfirming] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState({ email: "", phone: "" });
@@ -54,16 +55,18 @@ export default function PatientDashboard() {
   const [loading, setLoading] = useState(false);
 
   const load = async () => {
-    const [a, d, r, rc] = await Promise.all([
+    const [a, d, r, rc, vx] = await Promise.all([
       api.get("/appointments"),
       api.get("/doctors"),
       api.get(`/records/patient/${user.id}`),
       api.get("/patient/receipts").catch(() => ({ data: [] })),
+      api.get(`/patients/${user.id}/vaccinations`).catch(() => ({ data: [] })),
     ]);
     setAppts(a.data);
     setDoctors(d.data);
     setRecords(r.data);
     setReceipts(rc.data);
+    setVax(vx.data);
   };
 
   useEffect(() => {
@@ -219,6 +222,31 @@ export default function PatientDashboard() {
                     </Button>
                   )}
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Vaccinations */}
+        <div className="rounded-2xl border border-[#E2DDD7] bg-white p-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="overline">Vaccinations</div>
+            <button
+              onClick={() => downloadPdf(`/patients/${user.id}/vaccinations/pdf`, "vaccination-certificate.pdf").catch(() => toast.error("Download failed"))}
+              className="text-[11px] px-2 py-1 rounded-full border border-[#E2DDD7] hover:bg-[#F3EFE9] text-[#1C3F39]"
+            >
+              Certificate PDF
+            </button>
+          </div>
+          {vax.length === 0 && <div className="text-sm text-[#5C6661]">No vaccinations recorded.</div>}
+          <div className="space-y-2 max-h-[240px] overflow-y-auto">
+            {vax.map((v) => (
+              <div key={v.id} className="flex items-center justify-between p-3 rounded-xl border border-[#E2DDD7]">
+                <div>
+                  <div className="text-sm font-medium">{v.vaccine} · <span className="font-normal text-[#5C6661]">{v.dose}</span></div>
+                  <div className="text-[11px] text-[#5C6661]">{(v.administered_at || "").slice(0, 10)} · {v.doctor_name}</div>
+                </div>
+                <Badge className="bg-[#2D6A4F]/20 text-[#2D6A4F]">done</Badge>
               </div>
             ))}
           </div>

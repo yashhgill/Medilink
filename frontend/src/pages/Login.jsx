@@ -167,7 +167,8 @@ export default function Login() {
           </div>
 
           <p className="text-sm text-[#5C6661] mt-6 text-center">
-            First visit?{" "}
+            Forgot your password? Get a reset code at the clinic kiosk, then use{" "}
+            <Link to="/activate" className="text-[#1C3F39] font-medium underline-offset-2 hover:underline">Activate</Link>. First visit?{" "}
             <Link to="/activate" className="text-[#1C3F39] font-medium underline-offset-2 hover:underline" data-testid="goto-activate">
               Activate your account
             </Link>{" "}
