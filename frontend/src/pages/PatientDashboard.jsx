@@ -329,7 +329,7 @@ export default function PatientDashboard() {
           )}
           {qrPay && (
             <div className="rounded-2xl border border-[#E2DDD7] bg-white p-5 text-center">
-              <img src={qrPay.qr} alt="DuitNow QR" className="w-52 h-52 mx-auto rounded-xl border border-[#E2DDD7]" />
+              <img src={`data:image/png;base64,${qrPay.qr}`} alt="DuitNow QR" className="w-52 h-52 mx-auto rounded-xl border border-[#E2DDD7]" />
               <div className="font-mono text-xs text-[#5C6661] mt-2">{qrPay.ref}</div>
               <div className="font-display text-2xl mt-1">RM {Number(qrPay.amount).toFixed(2)}</div>
             </div>
