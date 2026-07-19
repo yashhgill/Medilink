@@ -1265,7 +1265,23 @@ async def ai_summary(body: AISummaryIn, u=Depends(role_required("doctor","admin"
         records_t.select().where(records_t.c.patient_id == body.patient_id)
         .order_by(records_t.c.created_at.desc()).limit(20)
     )
-    if not rows: return {"summary":"No prior medical records found for this patient."}
+    # Today's presenting complaint from the kiosk (reason + AI triage), most recent first
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    todays = await database.fetch_all(
+        appointments_t.select()
+        .where((appointments_t.c.patient_id == body.patient_id) &
+               (appointments_t.c.scheduled_at.like(f"{today}%")) &
+               (appointments_t.c.is_block.isnot(True)))
+        .order_by(appointments_t.c.scheduled_at.desc()))
+    presenting = ""
+    if todays:
+        t = dict(todays[0])
+        presenting = (f"PRESENTING COMPLAINT (self-reported at kiosk today):\n"
+                      f"  \"{t.get('reason','-')}\"\n"
+                      f"  Kiosk AI triage: {t.get('triage_category','-')} ({t.get('triage_colour','-')}) "
+                      f"— target wait {t.get('triage_target_mins','-')} min\n\n")
+    if not rows and not presenting:
+        return {"summary": "No prior records and no visit today — nothing to summarize yet."}
     history_text = "\n\n".join([
         f"Visit {i+1} | {dict(r).get('created_at','')[:10]} | Facility: {dict(r).get('facility_id','-')}\n"
         f"  Triage: {dict(r).get('triage_category','-')} ({dict(r).get('triage_colour','-')})\n"
@@ -1276,12 +1292,18 @@ async def ai_summary(body: AISummaryIn, u=Depends(role_required("doctor","admin"
         for i, r in enumerate(rows)
     ])
     pd = dict(p)
-    prompt = f"Patient: {pd['name']} | DOB: {pd.get('dob','-')} | Gender: {pd.get('gender','-')} | IC: {pd.get('ic_number','-')}\n\n{history_text}"
+    if not rows:
+        history_text = "No prior medical records on file (first visit)."
+    prompt = (f"Patient: {pd['name']} | DOB: {pd.get('dob','-')} | Gender: {pd.get('gender','-')} | "
+              f"IC: {pd.get('ic_number','-')}\n\n{presenting}VISIT HISTORY:\n{history_text}")
     system = (
-        "You are a clinical summarization AI for a doctor. Produce a concise structured summary. "
-        "Use these exact headings: CHRONIC CONDITIONS | RECURRING SYMPTOMS | ACTIVE MEDICATIONS | "
-        "ALLERGIES | RED FLAGS | RECENT VISITS. Bullet points only. Max 200 words. "
-        "Flag any dangerous patterns. Be precise and clinical."
+        "You are a clinical summarization AI briefing a doctor before a consultation. "
+        "Start with TODAY'S PRESENTATION: restate the patient's kiosk-reported complaint in "
+        "clear clinical language, note the triage level, and list 2-4 focused points the doctor "
+        "may wish to explore (symptoms to clarify, systems to examine) — phrased as considerations, "
+        "never as diagnoses. Then, if history exists, add: CHRONIC CONDITIONS | RECURRING SYMPTOMS | "
+        "ACTIVE MEDICATIONS | ALLERGIES | RED FLAGS | RECENT VISITS. Bullet points only. "
+        "Max 220 words. Be precise and clinical."
     )
     summary = await groq(system, [{"role":"user","content":prompt}], max_tokens=300)
     return {"summary":summary,"patient":clean(pd),"record_count":len(rows)}
