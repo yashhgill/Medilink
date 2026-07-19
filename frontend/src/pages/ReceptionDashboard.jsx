@@ -28,10 +28,14 @@ const statusColors = {
 
 export default function ReceptionDashboard() {
   const [queue, setQueue] = useState([]);
+  const [stats, setStats] = useState(null);
   const [patients, setPatients] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [scanOpen, setScanOpen] = useState(false);
   const [scannedPatient, setScannedPatient] = useState(null);
+  useEffect(() => {
+    api.get("/admin/analytics").then((r) => setStats(r.data)).catch(() => {});
+  }, []);
   const [bookOpen, setBookOpen] = useState(false);
   const [booking, setBooking] = useState({ patient_id: "", doctor_id: "", scheduled_at: "", reason: "" });
 
@@ -93,6 +97,49 @@ export default function ReceptionDashboard() {
 
   return (
     <AppShell title="Reception · Live Queue" subtitle="Admin · Operations" navItems={[]}>
+      {stats && (
+        <div className="mb-5 grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {[
+            { label: "Visits today", value: stats.visits_today },
+            { label: "Visits · 7d", value: stats.visits_7d },
+            { label: "Revenue today", value: `RM ${Number(stats.revenue_today).toFixed(0)}` },
+            { label: "Revenue · 7d", value: `RM ${Number(stats.revenue_7d).toFixed(0)}` },
+          ].map((c) => (
+            <div key={c.label} className="rounded-2xl border border-[#E2DDD7] bg-white p-4">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C6661]">{c.label}</div>
+              <div className="font-display text-2xl mt-1 text-[#1C3F39]">{c.value}</div>
+            </div>
+          ))}
+          <div className="rounded-2xl border border-[#E2DDD7] bg-white p-4">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C6661]">Triage · 7d</div>
+            <div className="flex items-center gap-1.5 mt-2">
+              {["Red", "Yellow", "Green"].map((z) => (
+                <span key={z} className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold ${
+                  z === "Red" ? "bg-red-100 text-red-700" : z === "Yellow" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+                  {z[0]} {stats.triage_mix?.[z] || 0}
+                </span>
+              ))}
+            </div>
+            <button
+              onClick={async () => {
+                try {
+                  const token = localStorage.getItem("ml_token");
+                  const resp = await fetch("/api/admin/cash-report/pdf", { headers: { Authorization: `Bearer ${token}` } });
+                  if (!resp.ok) throw new Error();
+                  const blob = await resp.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url; a.download = "cash-report.pdf"; a.click();
+                  URL.revokeObjectURL(url);
+                } catch (e) { toast.error("Report failed"); }
+              }}
+              className="mt-2 text-[10px] px-2 py-0.5 rounded-full border border-[#E2DDD7] hover:bg-[#F3EFE9] text-[#1C3F39]"
+            >
+              Cash report PDF
+            </button>
+          </div>
+        </div>
+      )}
       <div className="grid lg:grid-cols-3 gap-5">
         {/* Now serving */}
         <div className="rounded-2xl border border-[#E2DDD7] bg-[#1C3F39] text-[#F9F9F6] p-6">
