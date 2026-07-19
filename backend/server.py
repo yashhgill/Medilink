@@ -73,6 +73,7 @@ users_t = Table("users", metadata,
     Column("source", String, default="web"),
     Column("activation_code", String),      # one-time app activation (kiosk slip)
     Column("activation_expires", String),
+    Column("activated", Boolean),           # patient has set their own password
     Column("created_at", String),
     Column("updated_at", String),
     Column("sync_status", String, default="local"),
@@ -684,7 +685,7 @@ async def register(body: RegisterIn, request: Request):
     uid_ = uid()
     now = now_iso()
     await database.execute(users_t.insert().values(
-        id=uid_, email=body.email.lower(), password_hash=hash_pw(body.password),
+        id=uid_, email=body.email.lower(), password_hash=hash_pw(body.password), activated=True,
         name=body.name, role=body.role, ic_number=ic, phone=body.phone,
         dob=dob, gender=gender, specialty=body.specialty, license_no=body.license_no,
         availability=DEFAULT_AVAIL if body.role == "doctor" else None,
@@ -734,7 +735,7 @@ async def activate_account(body: ActivateIn, request: Request):
         raise HTTPException(400, "Password must be at least 8 characters")
     await database.execute(users_t.update().where(users_t.c.id == d["id"]).values(
         password_hash=hash_pw(body.password), activation_code=None,
-        activation_expires=None, updated_at=now_iso()))
+        activation_expires=None, activated=True, updated_at=now_iso()))
     await audit_log(d["id"], d["role"], "ACCOUNT_ACTIVATED", "auth", ip=ip)
     return {"token": make_token(d["id"], d["role"]), "user": clean(d)}
 
@@ -828,7 +829,7 @@ async def kiosk_register(body: KioskRegisterIn, _=Depends(kiosk_auth)):
     await database.execute(users_t.insert().values(
         id=uid_, email=email,
         password_hash=hash_pw(secrets.token_urlsafe(32)),  # unusable until activated
-        activation_code=code, activation_expires=expires,
+        activation_code=code, activation_expires=expires, activated=False,
         name=body.name, role="patient",
         ic_number=parsed["formatted"], phone=body.phone,
         dob=parsed.get("dob"), gender=parsed.get("gender_hint"),
@@ -917,7 +918,7 @@ async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
         broadcast({"type":"appointment.created","appointment_id":appt_id})
 
     activation_code = None
-    if dict(p).get("activation_code") is not None:
+    if p["role"] == "patient" and not dict(p).get("activated"):
         activation_code = f"{secrets.randbelow(1000000):06d}"
         await database.execute(users_t.update().where(users_t.c.id == p["id"]).values(
             activation_code=activation_code,
@@ -1910,7 +1911,8 @@ async def startup():
     if "sqlite" not in sync_db_url:
         with engine.connect() as conn:
             for ddl in ("ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_code VARCHAR",
-                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_expires VARCHAR"):
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_expires VARCHAR",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS activated BOOLEAN"):
                 try:
                     conn.execute(text(ddl)); conn.commit()
                 except Exception:
@@ -1927,7 +1929,8 @@ async def startup():
             metadata.create_all(cengine)
             with cengine.connect() as conn:
                 for ddl in ("ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_code VARCHAR",
-                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_expires VARCHAR"):
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_expires VARCHAR",
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS activated BOOLEAN"):
                     try:
                         conn.execute(text(ddl)); conn.commit()
                     except Exception:
