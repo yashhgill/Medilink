@@ -41,7 +41,13 @@ export default function AIChat({ open, onOpenChange }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({
+          message: text,
+          history: messages
+            .slice(1, 12)  // skip greeting, cap context
+            .filter((m) => m.content)
+            .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content })),
+        }),
       });
 
       if (!res.ok || !res.body) throw new Error("Failed");

@@ -1257,14 +1257,23 @@ Apply MTS strictly. Output JSON only."""
 @api.post("/ai/symptom-check")
 async def ai_symptom_check(body: AISymptomIn, u=Depends(current_user)):
     system = (
-        "You are MediLink's patient-facing health assistant for a Malaysian clinic. "
-        "You help patients understand symptoms and urgency. "
+        "You are MediLink's symptom triage assistant for a Malaysian clinic, following the "
+        "Malaysian ED three-zone triage model (HIJAU/Green = non-critical, KUNING/Yellow = "
+        "semi-critical, MERAH/Red = critical). "
         f"{'Patient context: ' + body.patient_context if body.patient_context else ''} "
-        "Ask ONE clarifying question at a time. Identify possible causes (non-diagnostic). "
-        "Rate urgency: Self-care / See doctor within a week / See doctor today / Go to ER now. "
-        "Be warm, clear, and multilingual-friendly (patient may mix English and Bahasa Malaysia). "
-        "End every response with: '⚠️ Ini bukan nasihat perubatan. Sila berjumpa doktor.' "
-        "Max 120 words. Plain text only."
+        "CONVERSATION RULES: You have the full chat history — NEVER re-ask something already "
+        "answered. Ask at most ONE new clarifying question, and only if truly needed. After "
+        "you know the symptom, duration, and severity (usually 2-3 exchanges), STOP asking and "
+        "give your assessment. Reply in the language the patient last used (English or Bahasa "
+        "Malaysia) — do not switch languages mid-conversation. "
+        "ASSESSMENT FORMAT: state the zone as 'Triage: HIJAU/Green' (or KUNING/MERAH), one short "
+        "explanation, then clear next steps: "
+        "Green -> self-care advice + 'if it worsens or lasts >48h, book a clinic visit'. "
+        "Yellow -> recommend booking an appointment at this clinic today/tomorrow using the "
+        "'Book appointment' button on the dashboard. "
+        "Red -> tell them to go to the nearest Emergency Department or call 999 now. "
+        "Only include the disclaimer '(Bukan nasihat perubatan / not medical advice)' on "
+        "assessment messages, not on questions. Max 100 words. Plain text only."
     )
     messages = body.history + [{"role":"user","content":body.message}]
     return StreamingResponse(
@@ -1844,10 +1853,11 @@ def _pdf_doc(title: str):
     return pdf
 
 def _pdf_kv(pdf, label, value):
+    pdf.set_x(pdf.l_margin)
     pdf.set_font("Helvetica", "B", 10)
     pdf.cell(45, 6, _latin(label))
     pdf.set_font("Helvetica", "", 10)
-    pdf.multi_cell(0, 6, _latin(value))
+    pdf.multi_cell(0, 6, _latin(value), new_x="LMARGIN", new_y="NEXT")
 
 def _pdf_bytes(pdf) -> bytes:
     out = pdf.output()
