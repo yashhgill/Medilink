@@ -995,7 +995,11 @@ async def kiosk_pay(body: KioskPayIn, _=Depends(kiosk_auth)):
     appt = dict(appt_row)
     if appt.get("payment_status") == "paid":
         raise HTTPException(400, "Already paid")
-    amount = float(appt.get("fee") or 50.0)
+    consult_fee = float(appt.get("fee") or 50.0)
+    rec_for_bill = await record_for_visit(p["id"], appt["id"])
+    med_total, med_lines = await price_prescriptions(
+        (dict(rec_for_bill).get("prescriptions") or []) if rec_for_bill else [])
+    amount = round(consult_fee + med_total, 2)
     txn_ref = f"MLK-{uuid.uuid4().hex[:10].upper()}"
     # Build payment info
     if body.method == "duitnow":
@@ -1034,6 +1038,7 @@ async def kiosk_pay(body: KioskPayIn, _=Depends(kiosk_auth)):
     receipt = {
         "type":"RECEIPT","clinic_name":CLINIC_NAME,"clinic_address":CLINIC_ADDR,
         "clinic_phone":CLINIC_PHONE,"patient_name":p["name"],"patient_ic":p["ic_number"],
+        "consultation_fee":consult_fee,"medication_total":med_total,"medication_lines":med_lines,
         "amount":amount,"method":body.method,"txn_ref":txn_ref,"paid_at":now,"appointment_id":appt["id"],
     }
     medicine_chit = {
@@ -1541,6 +1546,29 @@ async def low_stock_alerts(u=Depends(role_required("pharmacist","admin"))):
             except: pass
     return sorted(alerts, key=lambda x: x.get("days_left",9999))
 
+async def price_prescriptions(prescriptions):
+    """Match each prescribed medicine to inventory by name and price it.
+    Returns (total_rm, priced_lines). Unmatched meds are listed at RM0."""
+    import re as _re
+    total = 0.0
+    lines = []
+    for m in (prescriptions or []):
+        name = (m.get("medicine") or "").strip()
+        if not name:
+            continue
+        qty_match = _re.search(r"\d+", m.get("dosage") or "")
+        qty = int(qty_match.group()) if qty_match else 1
+        inv = await database.fetch_one(inventory_t.select().where(inventory_t.c.name.ilike(f"%{name}%")))
+        if not inv:
+            tok = name.split()[0]
+            if len(tok) >= 4:
+                inv = await database.fetch_one(inventory_t.select().where(inventory_t.c.name.ilike(f"%{tok}%")))
+        unit = float(dict(inv).get("unit_price") or 0) if inv else 0.0
+        line_total = round(unit * qty, 2)
+        total += line_total
+        lines.append({"medicine": name, "qty": qty, "unit_price": unit, "line_total": line_total})
+    return round(total, 2), lines
+
 async def record_for_visit(patient_id: str, appointment_id: str):
     """Prescription lookup for chits/pharmacy: prefer the record linked to this
     appointment; fall back to the patient's latest record from today (covers
@@ -1714,7 +1742,10 @@ async def patient_pay(appt_id: str, u=Depends(role_required("patient", "admin"))
     appt = dict(appt_row)
     if appt.get("payment_status") == "paid":
         raise HTTPException(400, "Already paid")
-    amount = float(appt.get("fee") or 50.0)
+    consult_fee = float(appt.get("fee") or 50.0)
+    _rec = await record_for_visit(appt["patient_id"], appt["id"])
+    med_total, _ = await price_prescriptions((dict(_rec).get("prescriptions") or []) if _rec else [])
+    amount = round(consult_fee + med_total, 2)
     txn_ref = f"MLK-{uuid.uuid4().hex[:10].upper()}"
     payment_info = {"type": "DuitNow QR", "ref": txn_ref, "amount": amount,
                     "qr": make_duitnow_qr(amount, txn_ref)}
@@ -1940,6 +1971,12 @@ async def receipt_pdf(txn_ref: str, u=Depends(current_user)):
     _pdf_kv(pdf, "IC", pd_.get("ic_number"))
     _pdf_kv(pdf, "Visit reason", apptd.get("reason"))
     _pdf_kv(pdf, "Method", (payd.get("method") or "-").upper())
+    rd = payd.get("receipt_data") or {}
+    if isinstance(rd, dict) and rd.get("medication_lines"):
+        pdf.ln(2)
+        _pdf_kv(pdf, "Consultation", f"RM {float(rd.get('consultation_fee') or 0):.2f}")
+        for ln in rd.get("medication_lines", []):
+            _pdf_kv(pdf, f"  {ln.get('medicine')} x{ln.get('qty')}", f"RM {float(ln.get('line_total') or 0):.2f}")
     pdf.ln(4)
     pdf.set_font("Helvetica", "B", 14)
     pdf.cell(0, 10, _latin(f"TOTAL PAID: RM {float(payd.get('amount') or 0):.2f}"), ln=1)

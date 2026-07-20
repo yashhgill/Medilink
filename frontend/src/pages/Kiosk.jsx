@@ -61,6 +61,24 @@ export default function Kiosk() {
     setChitOpen(true);
   };
 
+  // ── PHR privacy: auto-clear the kiosk after inactivity so the next patient
+  // never sees the previous person's data. Any touch resets the timer. ──
+  useEffect(() => {
+    const IDLE_MS = 40000;      // 40s of no interaction
+    let t;
+    const arm = () => {
+      clearTimeout(t);
+      t = setTimeout(() => window.location.reload(), IDLE_MS);
+    };
+    const events = ["pointerdown", "keydown", "touchstart", "mousemove"];
+    events.forEach((e) => window.addEventListener(e, arm, { passive: true }));
+    arm();
+    return () => {
+      clearTimeout(t);
+      events.forEach((e) => window.removeEventListener(e, arm));
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#1C3F39] relative overflow-hidden">
       {/* Decorative pattern */}
