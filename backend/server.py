@@ -1547,26 +1547,23 @@ async def low_stock_alerts(u=Depends(role_required("pharmacist","admin"))):
     return sorted(alerts, key=lambda x: x.get("days_left",9999))
 
 async def price_prescriptions(prescriptions):
-    """Match each prescribed medicine to inventory by name and price it.
-    Returns (total_rm, priced_lines). Unmatched meds are listed at RM0."""
-    import re as _re
+    """Charge one dispensing unit (strip/bottle/course) per prescribed medicine
+    at the inventory unit_price — NOT per tablet. The pharmacist prices each
+    inventory item at its dispensing-unit level. Returns (total_rm, priced_lines)."""
     total = 0.0
     lines = []
     for m in (prescriptions or []):
         name = (m.get("medicine") or "").strip()
         if not name:
             continue
-        qty_match = _re.search(r"\d+", m.get("dosage") or "")
-        qty = int(qty_match.group()) if qty_match else 1
         inv = await database.fetch_one(inventory_t.select().where(inventory_t.c.name.ilike(f"%{name}%")))
         if not inv:
             tok = name.split()[0]
             if len(tok) >= 4:
                 inv = await database.fetch_one(inventory_t.select().where(inventory_t.c.name.ilike(f"%{tok}%")))
         unit = float(dict(inv).get("unit_price") or 0) if inv else 0.0
-        line_total = round(unit * qty, 2)
-        total += line_total
-        lines.append({"medicine": name, "qty": qty, "unit_price": unit, "line_total": line_total})
+        total += unit
+        lines.append({"medicine": name, "unit_price": unit, "line_total": round(unit, 2)})
     return round(total, 2), lines
 
 async def record_for_visit(patient_id: str, appointment_id: str):
@@ -1976,7 +1973,7 @@ async def receipt_pdf(txn_ref: str, u=Depends(current_user)):
         pdf.ln(2)
         _pdf_kv(pdf, "Consultation", f"RM {float(rd.get('consultation_fee') or 0):.2f}")
         for ln in rd.get("medication_lines", []):
-            _pdf_kv(pdf, f"  {ln.get('medicine')} x{ln.get('qty')}", f"RM {float(ln.get('line_total') or 0):.2f}")
+            _pdf_kv(pdf, f"  {ln.get('medicine')}", f"RM {float(ln.get('line_total') or 0):.2f}")
     pdf.ln(4)
     pdf.set_font("Helvetica", "B", 14)
     pdf.cell(0, 10, _latin(f"TOTAL PAID: RM {float(payd.get('amount') or 0):.2f}"), ln=1)

@@ -122,7 +122,7 @@ function ChitContent({ chit }) {
             <div className="mt-3 pt-2 border-t border-dashed border-[#E2DDD7] space-y-1">
               <Row label="Consultation" value={`RM ${Number(chit.consultation_fee || 0).toFixed(2)}`} />
               {chit.medication_lines.map((l, i) => (
-                <Row key={i} label={`${l.medicine} ×${l.qty}`} value={`RM ${Number(l.line_total).toFixed(2)}`} />
+                <Row key={i} label={l.medicine} value={`RM ${Number(l.line_total).toFixed(2)}`} />
               ))}
             </div>
           )}
