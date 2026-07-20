@@ -141,7 +141,12 @@ export default function PatientDashboard() {
     <AppShell
       title={`Hello, ${user.name.split(" ")[0]}.`}
       subtitle="Patient dashboard"
-      navItems={[]}
+      sections={[
+        { id: "sec-appointments", label: "Appointments" },
+        { id: "sec-records", label: "Medical Records" },
+        { id: "sec-billing", label: "Receipts & Billing" },
+        { id: "sec-vaccines", label: "Vaccinations" },
+      ]}
     >
       {/* Bento grid */}
       <div className="grid lg:grid-cols-3 gap-5">
@@ -186,7 +191,7 @@ export default function PatientDashboard() {
         </div>
 
         {/* Appointments */}
-        <div className="lg:col-span-2 rounded-2xl border border-[#E2DDD7] bg-white p-6">
+        <div id="sec-appointments" className="lg:col-span-2 rounded-2xl border border-[#E2DDD7] bg-white p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="overline">My Appointments</div>
@@ -229,7 +234,7 @@ export default function PatientDashboard() {
         </div>
 
         {/* Vaccinations */}
-        <div className="rounded-2xl border border-[#E2DDD7] bg-white p-6">
+        <div id="sec-vaccines" className="rounded-2xl border border-[#E2DDD7] bg-white p-6">
           <div className="flex items-center justify-between mb-3">
             <div className="overline">Vaccinations</div>
             <button
@@ -254,7 +259,7 @@ export default function PatientDashboard() {
         </div>
 
         {/* Receipts */}
-        <div className="rounded-2xl border border-[#E2DDD7] bg-white p-6">
+        <div id="sec-billing" className="rounded-2xl border border-[#E2DDD7] bg-white p-6">
           <div className="flex items-center justify-between mb-3">
             <div className="overline">Receipts</div>
             <CreditCard size={18} weight="duotone" color="#1C3F39" />
@@ -283,7 +288,7 @@ export default function PatientDashboard() {
         </div>
 
         {/* Records */}
-        <div className="rounded-2xl border border-[#E2DDD7] bg-white p-6">
+        <div id="sec-records" className="rounded-2xl border border-[#E2DDD7] bg-white p-6">
           <div className="flex items-center justify-between mb-3">
             <div className="overline">Medical Records</div>
             <div className="flex items-center gap-2">

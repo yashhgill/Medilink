@@ -200,10 +200,10 @@ export default function DoctorDashboard() {
   );
 
   return (
-    <AppShell title={`Dr. ${user.name.split(" ").slice(-1)[0]}`} subtitle={`${user.specialty || "General"} · Doctor`} navItems={[]}>
+    <AppShell title={`Dr. ${user.name.split(" ").slice(-1)[0]}`} subtitle={`${user.specialty || "General"} · Doctor`} sections={[{ id: "sec-queue", label: "Today\u2019s Queue" }, { id: "sec-patient", label: "Patient Record" }]}>
       <div className="grid lg:grid-cols-3 gap-5">
         {/* Queue */}
-        <div className="rounded-2xl border border-[#E2DDD7] bg-white p-6">
+        <div id="sec-queue" className="rounded-2xl border border-[#E2DDD7] bg-white p-6">
           <div className="flex items-center justify-between mb-3">
             <div className="overline">Today&apos;s Queue</div>
             <Button
@@ -250,7 +250,7 @@ export default function DoctorDashboard() {
         </div>
 
         {/* Patient panel */}
-        <div className="lg:col-span-2 rounded-2xl border border-[#E2DDD7] bg-white p-6">
+        <div id="sec-patient" className="lg:col-span-2 rounded-2xl border border-[#E2DDD7] bg-white p-6">
           {!patient ? (
             <div className="h-full min-h-[420px] flex flex-col items-center justify-center text-center text-[#5C6661]">
               <WaveTriangle size={36} weight="duotone" className="mb-3" color="#1C3F39" />
