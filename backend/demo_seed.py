@@ -2,7 +2,7 @@
 Run inside the backend container:  python demo_seed.py
 """
 import asyncio, random
-from server import (database, users_t, appointments_t, records_t, payments_t,
+from server import (database, users_t, appointments_t, records_t, payments_t, ic_store, ic_index,
                     vaccinations_t, hash_pw, uid, now_iso, next_q, FACILITY_ID)
 from datetime import datetime, timezone, timedelta
 
@@ -82,7 +82,7 @@ async def main():
         else:
             pid, _ = await get_or_create_user(
                 f"{ic.replace('-','')}@patient.medilink", pw, name, "patient",
-                ic_number=ic, phone=phone, gender=gender,
+                ic_number=ic_store(ic), ic_hash=ic_index(ic), phone=phone, gender=gender,
                 dob=f"{'19' if int(ic[:2]) > 30 else '20'}{ic[:2]}-{ic[2:4]}-{ic[4:6]}")
             created["patients"] += 1
         # ~8 of 12 get an appointment today in varied states

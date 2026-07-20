@@ -133,8 +133,9 @@ export default function PatientDashboard() {
     }
   };
 
-  const upcoming = appts.filter((a) => a.status !== "completed" && a.status !== "cancelled");
-  const nextAppt = upcoming[upcoming.length - 1] || null;
+  const ACTIVE = ["scheduled", "checked_in", "in_progress", "ready_for_pharmacy"];
+  const active = appts.filter((a) => ACTIVE.includes(a.status));
+  const nextAppt = active[active.length - 1] || null;
 
   return (
     <AppShell

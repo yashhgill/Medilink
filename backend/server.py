@@ -16,10 +16,11 @@ from sqlalchemy import (
 )
 from dotenv import load_dotenv
 from pathlib import Path
-import os, logging, asyncio, uuid, json, re, io, base64, httpx, hmac, time, secrets
+import os, logging, asyncio, uuid, json, re, io, base64, httpx, hmac, time, secrets, hashlib
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any, Literal, Set
 from pydantic import BaseModel, Field, EmailStr
+import hashlib
 import bcrypt, jwt
 
 ROOT_DIR = Path(__file__).parent
@@ -43,6 +44,41 @@ STAFF_JWT_EXP_HOURS = int(os.environ.get("STAFF_JWT_EXP_HOURS", "12"))
 UPLOAD_DIR      = os.environ.get("UPLOAD_DIR", "/app/uploads")
 PUBLIC_APP_URL  = os.environ.get("PUBLIC_APP_URL", "https://medilink.harnova.my")
 SYNC_INTERVAL   = int(os.environ.get("SYNC_INTERVAL_SECONDS", "30"))
+IC_ENCRYPTION_KEY = os.environ.get("IC_ENCRYPTION_KEY", "")
+try:
+    from cryptography.fernet import Fernet as _Fernet
+    _ic_cipher = _Fernet(IC_ENCRYPTION_KEY.encode()) if IC_ENCRYPTION_KEY else None
+except Exception:
+    _ic_cipher = None
+
+def _ic_canonical(plain: str) -> str:
+    return "".join(ch for ch in (plain or "") if ch.isdigit())
+
+def ic_store(plain):
+    """Value written to the ic_number column — encrypted at rest when a key is set."""
+    if not plain or not _ic_cipher:
+        return plain
+    return "enc:" + _ic_cipher.encrypt(plain.encode()).decode()
+
+def ic_show(stored):
+    """Decrypt for display. Transparently handles legacy plaintext rows."""
+    if not stored or not isinstance(stored, str) or not stored.startswith("enc:"):
+        return stored
+    if not _ic_cipher:
+        return stored
+    try:
+        return _ic_cipher.decrypt(stored[4:].encode()).decode()
+    except Exception:
+        return stored
+
+def ic_index(plain):
+    """Deterministic blind index for equality lookups + cross-facility matching.
+    A DB dump reveals only this HMAC, never the IC itself."""
+    if not plain:
+        return None
+    key = (IC_ENCRYPTION_KEY or "medilink-blind-index").encode()
+    return hmac.new(key, _ic_canonical(plain).encode(), hashlib.sha256).hexdigest()
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s | %(message)s")
 log = logging.getLogger("medilink")
@@ -62,6 +98,7 @@ users_t = Table("users", metadata,
     Column("name", String, nullable=False),
     Column("role", String, nullable=False),
     Column("ic_number", String),
+    Column("ic_hash", String),
     Column("phone", String),
     Column("dob", String),
     Column("gender", String),
@@ -275,8 +312,10 @@ def make_token(uid_: str, role: str) -> str:
 def clean(d: dict) -> dict:
     if not d: return d
     r = dict(d)
-    for k in ("password_hash", "activation_code", "activation_expires"):
+    for k in ("password_hash", "activation_code", "activation_expires", "ic_hash"):
         r.pop(k, None)
+    if r.get("ic_number"):
+        r["ic_number"] = ic_show(r["ic_number"])
     return r
 
 # ── NRIC parser ───────────────────────────────────────────────────────────────
@@ -657,7 +696,8 @@ async def patient_by_ic(ic: str):
     parsed = parse_ic(ic)
     search_ic = parsed["formatted"] if parsed["valid"] else ic.strip()
     return await database.fetch_one(
-        users_t.select().where(users_t.c.ic_number == search_ic)
+        users_t.select().where(
+            (users_t.c.ic_hash == ic_index(search_ic)) | (users_t.c.ic_number == search_ic))
     )
 
 async def enrich_appointments(rows) -> list:
@@ -712,7 +752,7 @@ async def register(body: RegisterIn, request: Request):
     now = now_iso()
     await database.execute(users_t.insert().values(
         id=uid_, email=body.email.lower(), password_hash=hash_pw(body.password), activated=True,
-        name=body.name, role=body.role, ic_number=ic, phone=body.phone,
+        name=body.name, role=body.role, ic_number=ic_store(ic), ic_hash=ic_index(ic), phone=body.phone,
         dob=dob, gender=gender, specialty=body.specialty, license_no=body.license_no,
         availability=DEFAULT_AVAIL if body.role == "doctor" else None,
         slot_minutes=30, facility_id=FACILITY_ID, source="web",
@@ -731,7 +771,9 @@ async def login(body: LoginIn, request: Request):
     parsed = parse_ic(ident)
     if parsed["valid"]:
         row = await database.fetch_one(
-            users_t.select().where(users_t.c.ic_number == parsed["formatted"]))
+            users_t.select().where(
+                (users_t.c.ic_hash == ic_index(parsed["formatted"])) |
+                (users_t.c.ic_number == parsed["formatted"])))
     else:
         row = await database.fetch_one(users_t.select().where(users_t.c.email == ident))
     if not row or not verify_pw(body.password, row["password_hash"]):
@@ -757,7 +799,8 @@ async def activate_account(body: ActivateIn, request: Request):
     login_guard(guard_key)
     parsed = parse_ic(body.ic_number)
     search_ic = parsed["formatted"] if parsed["valid"] else body.ic_number.strip()
-    row = await database.fetch_one(users_t.select().where(users_t.c.ic_number == search_ic))
+    row = await database.fetch_one(users_t.select().where(
+        (users_t.c.ic_hash == ic_index(search_ic)) | (users_t.c.ic_number == search_ic)))
     d = dict(row) if row else {}
     if (not row or not d.get("activation_code") or d["activation_code"] != body.code.strip()
             or (d.get("activation_expires") and d["activation_expires"] < now_iso())):
@@ -863,7 +906,7 @@ async def kiosk_register(body: KioskRegisterIn, _=Depends(kiosk_auth)):
         password_hash=hash_pw(secrets.token_urlsafe(32)),  # unusable until activated
         activation_code=code, activation_expires=expires, activated=False,
         name=body.name, role="patient",
-        ic_number=parsed["formatted"], phone=body.phone,
+        ic_number=ic_store(parsed["formatted"]), ic_hash=ic_index(parsed["formatted"]), phone=body.phone,
         dob=parsed.get("dob"), gender=parsed.get("gender_hint"),
         facility_id=FACILITY_ID, source="kiosk",
         created_at=now, updated_at=now, sync_status="local",
@@ -972,7 +1015,7 @@ async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
     doc = clean(dict(doc_row)) if doc_row else {}
     chit = {
         "type":"QUEUE", "clinic_name":CLINIC_NAME,
-        "patient_name":p["name"], "patient_ic":p["ic_number"],
+        "patient_name":p["name"], "patient_ic":ic_show(p["ic_number"]),
         "queue_number":appt["queue_number"],
         "doctor_name":doc.get("name","-"), "doctor_specialty":doc.get("specialty","General"),
         "reason":appt["reason"], "issued_at":now_iso(), "appointment_id":appt["id"],
@@ -1037,13 +1080,13 @@ async def kiosk_pay(body: KioskPayIn, _=Depends(kiosk_auth)):
     doc_row = await database.fetch_one(users_t.select().where(users_t.c.id == appt["doctor_id"]))
     receipt = {
         "type":"RECEIPT","clinic_name":CLINIC_NAME,"clinic_address":CLINIC_ADDR,
-        "clinic_phone":CLINIC_PHONE,"patient_name":p["name"],"patient_ic":p["ic_number"],
+        "clinic_phone":CLINIC_PHONE,"patient_name":p["name"],"patient_ic":ic_show(p["ic_number"]),
         "consultation_fee":consult_fee,"medication_total":med_total,"medication_lines":med_lines,
         "amount":amount,"method":body.method,"txn_ref":txn_ref,"paid_at":now,"appointment_id":appt["id"],
     }
     medicine_chit = {
         "type":"MEDICINE","clinic_name":f"{CLINIC_NAME} — Pharmacy",
-        "patient_name":p["name"],"patient_ic":p["ic_number"],
+        "patient_name":p["name"],"patient_ic":ic_show(p["ic_number"]),
         "queue_number":appt["queue_number"],
         "doctor_name":doc_row["name"] if doc_row else "-",
         "prescriptions":prescriptions,"appointment_id":appt["id"],"issued_at":now,
@@ -2001,7 +2044,7 @@ async def receipt_pdf(txn_ref: str, u=Depends(current_user)):
     _pdf_kv(pdf, "Receipt no.", payd["txn_ref"])
     _pdf_kv(pdf, "Date", (payd.get("paid_at") or "")[:19].replace("T", " "))
     _pdf_kv(pdf, "Patient", pd_.get("name"))
-    _pdf_kv(pdf, "IC", pd_.get("ic_number"))
+    _pdf_kv(pdf, "IC", ic_show(pd_.get("ic_number")))
     _pdf_kv(pdf, "Visit reason", apptd.get("reason"))
     _pdf_kv(pdf, "Method", (payd.get("method") or "-").upper())
     rd = payd.get("receipt_data") or {}
@@ -2028,7 +2071,7 @@ async def history_pdf(u=Depends(role_required("patient", "admin"))):
         .order_by(records_t.c.created_at.desc()))
     pdf = _pdf_doc("Medical History Summary")
     _pdf_kv(pdf, "Patient", u.get("name"))
-    _pdf_kv(pdf, "IC", u.get("ic_number"))
+    _pdf_kv(pdf, "IC", ic_show(u.get("ic_number")))
     _pdf_kv(pdf, "Generated", now_iso()[:19].replace("T", " "))
     _pdf_kv(pdf, "Total visits", len(rows))
     pdf.ln(4)
@@ -2165,7 +2208,7 @@ async def vaccination_cert_pdf(patient_id: str, u=Depends(current_user)):
         .order_by(vaccinations_t.c.administered_at))
     pdf = _pdf_doc("Vaccination Certificate")
     _pdf_kv(pdf, "Name", pd_.get("name"))
-    _pdf_kv(pdf, "IC", pd_.get("ic_number"))
+    _pdf_kv(pdf, "IC", ic_show(pd_.get("ic_number")))
     _pdf_kv(pdf, "Issued", now_iso()[:10])
     pdf.ln(3)
     for r in rows:
@@ -2200,7 +2243,7 @@ async def mc_pdf(record_id: str, days: int = Query(1, ge=1, le=30), u=Depends(cu
     end = (datetime.strptime(start, "%Y-%m-%d") + timedelta(days=days - 1)).strftime("%Y-%m-%d")
     pdf = _pdf_doc("Sijil Cuti Sakit / Medical Certificate")
     _pdf_kv(pdf, "This certifies that", pd_.get("name"))
-    _pdf_kv(pdf, "IC", pd_.get("ic_number"))
+    _pdf_kv(pdf, "IC", ic_show(pd_.get("ic_number")))
     _pdf_kv(pdf, "Was examined on", start)
     _pdf_kv(pdf, "Unfit for duty", f"{days} day(s): {start} to {end}")
     pdf.ln(8)
@@ -2426,13 +2469,35 @@ async def startup():
         with engine.connect() as conn:
             for ddl in ("ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_code VARCHAR",
                         "ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_expires VARCHAR",
-                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS activated BOOLEAN"):
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS activated BOOLEAN",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS ic_hash VARCHAR"):
                 try:
                     conn.execute(text(ddl)); conn.commit()
                 except Exception:
                     pass
     engine.dispose()
     log.info(f"Tables ready | Facility: {FACILITY_ID} | Node: {'cloud' if IS_CLOUD else 'local'}")
+
+    # Backfill IC encryption + blind index for pre-existing rows (idempotent)
+    if _ic_cipher:
+        try:
+            urows = await database.fetch_all(users_t.select().where(users_t.c.ic_number.isnot(None)))
+            fixed = 0
+            for ur in urows:
+                d = dict(ur)
+                raw = d.get("ic_number")
+                if not raw:
+                    continue
+                plain = ic_show(raw)  # handles both enc: and legacy plaintext
+                needs = (not str(raw).startswith("enc:")) or (not d.get("ic_hash"))
+                if needs:
+                    await database.execute(users_t.update().where(users_t.c.id == d["id"])
+                        .values(ic_number=ic_store(plain), ic_hash=ic_index(plain), sync_status="local"))
+                    fixed += 1
+            if fixed:
+                log.info(f"IC encryption backfill: secured {fixed} records")
+        except Exception as e:
+            log.warning(f"IC backfill skipped: {e}")
     # Self-provision the cloud mirror: create tables there too on first connect
     if CLOUD_DB_URL and not IS_CLOUD:
         try:
@@ -2444,7 +2509,8 @@ async def startup():
             with cengine.connect() as conn:
                 for ddl in ("ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_code VARCHAR",
                             "ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_expires VARCHAR",
-                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS activated BOOLEAN"):
+                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS activated BOOLEAN",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS ic_hash VARCHAR"):
                     try:
                         conn.execute(text(ddl)); conn.commit()
                     except Exception:
@@ -2488,6 +2554,7 @@ async def startup():
     # Start background sync loop
     if not IS_CLOUD and cloud_db:
         asyncio.create_task(sync_loop())
+        asyncio.create_task(reconcile_loop())
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -2495,6 +2562,48 @@ async def shutdown():
     if cloud_db:
         try: await cloud_db.disconnect()
         except: pass
+
+async def reconcile_local_only():
+    """Every 30 min: push rows still marked sync_status='local' to the cloud.
+    Non-redundant — anything already 'cloud' is skipped. Catches data created
+    offline or outside the live app (e.g. seeds) that the queue-based loop missed."""
+    if not cloud_db or IS_CLOUD:
+        return
+    tables = {"users": users_t, "appointments": appointments_t,
+              "medical_records": records_t, "payments": payments_t,
+              "dispense_records": dispense_t, "vaccinations": vaccinations_t}
+    total = 0
+    for name, tbl in tables.items():
+        if "sync_status" not in tbl.c:
+            continue
+        try:
+            rows = await database.fetch_all(tbl.select().where(tbl.c.sync_status != "cloud"))
+            for r in rows:
+                d = dict(r)
+                try:
+                    existing = await cloud_db.fetch_one(tbl.select().where(tbl.c.id == d["id"]))
+                    if existing:
+                        await cloud_db.execute(tbl.update().where(tbl.c.id == d["id"])
+                            .values(**{k: v for k, v in d.items() if k != "id"}))
+                    else:
+                        await cloud_db.execute(tbl.insert().values(**d))
+                    await database.execute(tbl.update().where(tbl.c.id == d["id"])
+                        .values(sync_status="cloud"))
+                    total += 1
+                except Exception as e:
+                    log.warning(f"reconcile {name}:{d.get('id')} failed: {e}")
+        except Exception as e:
+            log.warning(f"reconcile table {name} failed: {e}")
+    if total:
+        log.info(f"Reconcile: pushed {total} local-only rows to cloud")
+
+async def reconcile_loop():
+    while True:
+        await asyncio.sleep(1800)   # 30 minutes
+        try:
+            await reconcile_local_only()
+        except Exception as e:
+            log.warning(f"reconcile loop error: {e}")
 
 async def sync_loop():
     """Background loop — syncs every SYNC_INTERVAL seconds."""
