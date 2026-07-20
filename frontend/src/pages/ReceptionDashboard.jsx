@@ -137,6 +137,19 @@ export default function ReceptionDashboard() {
             >
               Cash report PDF
             </button>
+            <button
+              onClick={async () => {
+                toast.message("Pushing all records to cloud…");
+                try {
+                  const r = await api.post("/sync/full");
+                  const total = Object.values(r.data.pushed).reduce((a, b) => a + b, 0);
+                  toast.success(`Synced ${total} records to cloud`);
+                } catch (e) { toast.error("Sync failed"); }
+              }}
+              className="mt-1 ml-1 text-[10px] px-2 py-0.5 rounded-full border border-[#2D6A4F] text-[#2D6A4F] hover:bg-[#2D6A4F]/10"
+            >
+              Sync all to cloud
+            </button>
           </div>
         </div>
       )}

@@ -1676,6 +1676,42 @@ async def sync_status(u=Depends(current_user)):
         "hardware": "HP Folio 9470m (local)" if not IS_CLOUD else "Cloud Node",
     }
 
+@api.post("/sync/full")
+async def sync_full(u=Depends(role_required("admin"))):
+    """Push EVERY local row to the cloud mirror (upsert). Covers data created
+    outside the live app (e.g. seed scripts) that never entered the sync queue."""
+    if not cloud_db or IS_CLOUD:
+        raise HTTPException(400, "No cloud mirror configured on this node")
+    tables = {"users": users_t, "appointments": appointments_t,
+              "medical_records": records_t, "payments": payments_t,
+              "dispense_records": dispense_t, "vaccinations": vaccinations_t,
+              "pharmacy_inventory": inventory_t}
+    result = {}
+    for name, tbl in tables.items():
+        pushed = 0
+        try:
+            rows = await database.fetch_all(tbl.select())
+            for r in rows:
+                d = dict(r)
+                try:
+                    existing = await cloud_db.fetch_one(tbl.select().where(tbl.c.id == d["id"]))
+                    if existing:
+                        await cloud_db.execute(tbl.update().where(tbl.c.id == d["id"])
+                            .values(**{k: v for k, v in d.items() if k != "id"}))
+                    else:
+                        await cloud_db.execute(tbl.insert().values(**d))
+                    pushed += 1
+                    if "sync_status" in d:
+                        await database.execute(tbl.update().where(tbl.c.id == d["id"])
+                            .values(sync_status="cloud"))
+                except Exception as e:
+                    log.warning(f"sync_full {name}:{d.get('id')} failed: {e}")
+        except Exception as e:
+            log.warning(f"sync_full table {name} failed: {e}")
+        result[name] = pushed
+    await audit_log(u["id"], u["role"], "SYNC_FULL", "sync", "all")
+    return {"ok": True, "pushed": result}
+
 @api.post("/sync/trigger")
 async def trigger_sync(bg: BackgroundTasks, u=Depends(role_required("admin"))):
     bg.add_task(run_sync_job)
