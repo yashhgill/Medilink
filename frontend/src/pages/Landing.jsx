@@ -34,7 +34,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen" style={{ background: "#FFFFFF", color: C.ink }}>
       {/* Nav */}
-      <header className="sticky top-0 z-30 backdrop-blur-md" style={{ background: "rgba(255,255,255,0.9)", borderBottom: `1px solid ${C.mist}` }}>
+      <header className="sticky top-0 z-30 backdrop-blur-md" style={{ background: "rgba(255,255,255,0.9)", borderBottom: `1px solid ${C.mist}`, paddingTop: "env(safe-area-inset-top)" }}>
         <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: C.teal }}>
@@ -61,12 +61,7 @@ export default function Landing() {
       {/* Hero */}
       <section className="relative overflow-hidden" style={{ background: `linear-gradient(160deg, ${C.mist} 0%, #FFFFFF 60%)` }}>
         <div className="max-w-[1200px] mx-auto px-6 pt-20 pb-24 text-center">
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium mb-6"
-            style={{ background: "#fff", color: C.teal, border: `1px solid ${C.mist}` }}>
-            <span className="w-1.5 h-1.5 rounded-full breathe" style={{ background: C.teal }} />
-            The operating system for Malaysian clinics
-          </motion.div>
+          
           <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
             className="font-display font-semibold tracking-tight leading-[1.05]"
             style={{ fontSize: "clamp(2.4rem,6vw,4.4rem)", color: C.navy }}>

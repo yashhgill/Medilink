@@ -46,7 +46,7 @@ export default function AppShell({ children, title, subtitle, navItems = [], sec
 
   return (
     <div className="min-h-screen bg-[#F4F9F9]">
-      <header className="sticky top-0 z-30 backdrop-blur-md bg-[#F4F9F9]/85 border-b" style={{ borderColor: "var(--ml-border)" }}>
+      <header className="sticky top-0 z-30 backdrop-blur-md bg-[#F4F9F9]/85 border-b" style={{ borderColor: "var(--ml-border)", paddingTop: "env(safe-area-inset-top)" }}>
         <div className="h-1 w-full" style={{ background: roleAccent[user?.role] || "#0B7C8C" }} />
         <div className="max-w-[1400px] mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">

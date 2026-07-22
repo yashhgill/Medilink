@@ -32,7 +32,8 @@ export default function InstallPrompt() {
 
   if (!show) return null;
   return (
-    <div className="fixed bottom-4 inset-x-4 z-[60] max-w-md mx-auto rounded-2xl shadow-2xl border border-[#DCE8E9] bg-white p-4 flex items-center gap-3">
+    <div style={{ bottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+      className="fixed inset-x-4 z-[60] max-w-md mx-auto rounded-2xl shadow-2xl border border-[#DCE8E9] bg-white p-4 flex items-center gap-3">
       <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#0B7C8C" }}>
         <DownloadSimple size={22} color="#fff" weight="duotone" />
       </div>
