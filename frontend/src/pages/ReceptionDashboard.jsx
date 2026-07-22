@@ -96,7 +96,7 @@ export default function ReceptionDashboard() {
   const next = queue.find((q) => ["checked_in", "scheduled"].includes(q.status));
 
   return (
-    <AppShell title="Reception · Live Queue" subtitle="Admin · Operations" sections={[{ id: "sec-analytics", label: "Analytics & Reports" }, { id: "sec-patients", label: "Registered Patients" }]}>
+    <AppShell title="Reception · Live Queue" subtitle="Admin · Operations" navItems={[{ label: "Operations", to: "/reception" }, { label: "Facilities", to: "/facilities" }]} sections={[{ id: "sec-analytics", label: "Analytics & Reports" }, { id: "sec-patients", label: "Registered Patients" }]}>
       <div id="sec-analytics" />
       {stats && (
         <div className="mb-5 grid grid-cols-2 lg:grid-cols-5 gap-3">

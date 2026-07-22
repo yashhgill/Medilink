@@ -261,6 +261,18 @@ stock_movements_t = Table("stock_movements", metadata,
     Column("sync_status", String),
 )
 
+facilities_t = Table("facilities", metadata,
+    Column("id", String, primary_key=True),
+    Column("code", String),                  # short id used as facility_id on records
+    Column("name", String),
+    Column("type", String),                   # clinic | hospital | dental
+    Column("address", String),
+    Column("phone", String),
+    Column("active", Boolean),
+    Column("created_at", String),
+    Column("sync_status", String),
+)
+
 vaccinations_t = Table("vaccinations", metadata,
     Column("id", String, primary_key=True),
     Column("patient_id", String),
@@ -2104,6 +2116,44 @@ async def history_pdf(u=Depends(role_required("patient", "admin"))):
     return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
                     headers={"Content-Disposition": 'attachment; filename="medical-history.pdf"'})
 
+# ── Facilities registry (multi-clinic / multi-hospital / dental) ────────────
+class FacilityIn(BaseModel):
+    code: str
+    name: str
+    type: str = "clinic"          # clinic | hospital | dental
+    address: Optional[str] = None
+    phone: Optional[str] = None
+
+@api.get("/facilities")
+async def list_facilities(u=Depends(current_user)):
+    rows = await database.fetch_all(facilities_t.select().order_by(facilities_t.c.name))
+    return [dict(r) for r in rows]
+
+@api.post("/facilities", status_code=201)
+async def add_facility(body: FacilityIn, u=Depends(role_required("admin"))):
+    code = re.sub(r"[^a-z0-9-]", "", body.code.strip().lower())
+    if not code:
+        raise HTTPException(400, "Facility code required (letters, numbers, hyphens)")
+    if await database.fetch_one(facilities_t.select().where(facilities_t.c.code == code)):
+        raise HTTPException(400, "A facility with this code already exists")
+    if body.type not in ("clinic", "hospital", "dental"):
+        raise HTTPException(400, "Type must be clinic, hospital, or dental")
+    row = dict(id=uid(), code=code, name=body.name.strip(), type=body.type,
+               address=body.address, phone=body.phone, active=True,
+               created_at=now_iso(), sync_status="local")
+    await database.execute(facilities_t.insert().values(**row))
+    await audit_log(u["id"], u["role"], "ADD_FACILITY", "facilities", row["id"])
+    return row
+
+@api.patch("/facilities/{fid}")
+async def update_facility(fid: str, body: dict, u=Depends(role_required("admin"))):
+    allowed = {"name", "type", "address", "phone", "active"}
+    upd = {k: v for k, v in body.items() if k in allowed}
+    if upd:
+        await database.execute(facilities_t.update().where(facilities_t.c.id == fid).values(**upd))
+    row = await database.fetch_one(facilities_t.select().where(facilities_t.c.id == fid))
+    return dict(row) if row else {}
+
 # ── Admin: analytics + daily cash report ────────────────────────────────────
 @api.get("/admin/analytics")
 async def admin_analytics(u=Depends(role_required("admin"))):
@@ -2476,6 +2526,17 @@ async def startup():
                 except Exception:
                     pass
     engine.dispose()
+    try:
+        _fac = await database.fetch_one(facilities_t.select().where(facilities_t.c.code == FACILITY_ID))
+        if not _fac:
+            await database.execute(facilities_t.insert().values(
+                id=uid(), code=FACILITY_ID, name=CLINIC_NAME,
+                type=os.environ.get("FACILITY_TYPE", "clinic"),
+                address=CLINIC_ADDR, phone=CLINIC_PHONE, active=True,
+                created_at=now_iso(), sync_status="local"))
+            log.info(f"Registered this node as facility '{FACILITY_ID}'")
+    except Exception as e:
+        log.warning(f"facility self-register skipped: {e}")
     log.info(f"Tables ready | Facility: {FACILITY_ID} | Node: {'cloud' if IS_CLOUD else 'local'}")
 
     # Backfill IC encryption + blind index for pre-existing rows (idempotent)

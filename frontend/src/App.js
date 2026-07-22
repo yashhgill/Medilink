@@ -8,6 +8,7 @@ import Landing from "@/pages/Landing";
 import Login, { redirectFor } from "@/pages/Login";
 import Activate from "@/pages/Activate";
 import PharmacyInventory from "@/pages/PharmacyInventory";
+import Facilities from "@/pages/Facilities";
 import Register from "@/pages/Register";
 import PatientDashboard from "@/pages/PatientDashboard";
 import DoctorDashboard from "@/pages/DoctorDashboard";
@@ -55,6 +56,14 @@ function App() {
               element={
                 <ProtectedRoute roles={["admin"]}>
                   <ReceptionDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/facilities"
+              element={
+                <ProtectedRoute roles={["admin"]}>
+                  <Facilities />
                 </ProtectedRoute>
               }
             />
