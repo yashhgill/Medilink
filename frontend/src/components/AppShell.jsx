@@ -149,6 +149,9 @@ export default function AppShell({ children, title, subtitle, navItems = [], sec
               ))}
             </nav>
             <div className="p-3 border-t border-[#DCE8E9] space-y-1">
+              <button onClick={openProfile} className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#EAF5F5] text-[#0B7C8C]">
+                <User size={18} weight="duotone" /> <span className="text-sm font-medium">My profile</span>
+              </button>
               <button onClick={() => { setMenuOpen(false); setPwOpen(true); }} className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#EAF5F5] text-[#0B7C8C]">
                 <Lock size={18} weight="duotone" /> <span className="text-sm font-medium">Change password</span>
               </button>
