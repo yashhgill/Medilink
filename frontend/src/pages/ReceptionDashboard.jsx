@@ -17,13 +17,13 @@ import { toast } from "sonner";
 
 const statusOptions = ["scheduled", "checked_in", "in_progress", "completed", "ready_for_pharmacy", "dispensed", "cancelled"];
 const statusColors = {
-  scheduled: "bg-[#F3EFE9] text-[#1C3F39]",
-  checked_in: "bg-[#D4A373]/30 text-[#1C3F39]",
-  in_progress: "bg-[#B55B49]/20 text-[#9B2226]",
+  scheduled: "bg-[#EAF5F5] text-[#0B7C8C]",
+  checked_in: "bg-[#086788]/30 text-[#0B7C8C]",
+  in_progress: "bg-[#0A3D62]/20 text-[#9B2226]",
   completed: "bg-[#2D6A4F]/20 text-[#2D6A4F]",
-  ready_for_pharmacy: "bg-[#1C3F39] text-[#F9F9F6]",
-  dispensed: "bg-[#2D6A4F] text-[#F9F9F6]",
-  cancelled: "bg-[#5C6661]/15 text-[#5C6661]",
+  ready_for_pharmacy: "bg-[#0B7C8C] text-[#F4F9F9]",
+  dispensed: "bg-[#2D6A4F] text-[#F4F9F9]",
+  cancelled: "bg-[#5A6B70]/15 text-[#5A6B70]",
 };
 
 export default function ReceptionDashboard() {
@@ -106,13 +106,13 @@ export default function ReceptionDashboard() {
             { label: "Revenue today", value: `RM ${Number(stats.revenue_today).toFixed(0)}` },
             { label: "Revenue · 7d", value: `RM ${Number(stats.revenue_7d).toFixed(0)}` },
           ].map((c) => (
-            <div key={c.label} className="rounded-2xl border border-[#E2DDD7] bg-white p-4">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C6661]">{c.label}</div>
-              <div className="font-display text-2xl mt-1 text-[#1C3F39]">{c.value}</div>
+            <div key={c.label} className="rounded-2xl border border-[#DCE8E9] bg-white p-4">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-[#5A6B70]">{c.label}</div>
+              <div className="font-display text-2xl mt-1 text-[#0B7C8C]">{c.value}</div>
             </div>
           ))}
-          <div className="rounded-2xl border border-[#E2DDD7] bg-white p-4">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C6661]">Triage · 7d</div>
+          <div className="rounded-2xl border border-[#DCE8E9] bg-white p-4">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-[#5A6B70]">Triage · 7d</div>
             <div className="flex items-center gap-1.5 mt-2">
               {["Red", "Yellow", "Green"].map((z) => (
                 <span key={z} className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold ${
@@ -134,7 +134,7 @@ export default function ReceptionDashboard() {
                   URL.revokeObjectURL(url);
                 } catch (e) { toast.error("Report failed"); }
               }}
-              className="mt-2 text-[10px] px-2 py-0.5 rounded-full border border-[#E2DDD7] hover:bg-[#F3EFE9] text-[#1C3F39]"
+              className="mt-2 text-[10px] px-2 py-0.5 rounded-full border border-[#DCE8E9] hover:bg-[#EAF5F5] text-[#0B7C8C]"
             >
               Cash report PDF
             </button>
@@ -156,7 +156,7 @@ export default function ReceptionDashboard() {
       )}
       <div className="grid lg:grid-cols-3 gap-5">
         {/* Now serving */}
-        <div className="rounded-2xl border border-[#E2DDD7] bg-[#1C3F39] text-[#F9F9F6] p-6">
+        <div className="rounded-2xl border border-[#DCE8E9] bg-[#0B7C8C] text-[#F4F9F9] p-6">
           <div className="overline text-white/60">Now Serving</div>
           <div className="font-display text-7xl tabular-nums mt-2 font-mono leading-none" data-testid="now-serving">
             {next ? `#${String(next.queue_number).padStart(3, "0")}` : "—"}
@@ -169,7 +169,7 @@ export default function ReceptionDashboard() {
         </div>
 
         {/* Stats */}
-        <div className="rounded-2xl border border-[#E2DDD7] bg-white p-6">
+        <div className="rounded-2xl border border-[#DCE8E9] bg-white p-6">
           <div className="overline mb-3">Today&apos;s Stats</div>
           <div className="grid grid-cols-2 gap-3">
             <Stat label="Scheduled" value={upcoming} />
@@ -182,20 +182,20 @@ export default function ReceptionDashboard() {
         <SyncIndicator />
 
         {/* Actions */}
-        <div className="lg:col-span-3 rounded-2xl border border-[#E2DDD7] bg-white p-6">
+        <div className="lg:col-span-3 rounded-2xl border border-[#DCE8E9] bg-white p-6">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
             <div>
               <div className="overline">Live Queue</div>
               <h3 className="font-display text-xl mt-1">{queue.length} appointment(s) today</h3>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button data-testid="recep-find-btn" onClick={() => setScanOpen(true)} className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full">
+              <Button data-testid="recep-find-btn" onClick={() => setScanOpen(true)} className="bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9] rounded-full">
                 <WaveTriangle size={14} weight="duotone" className="mr-1.5" /> Find patient
               </Button>
-              <Button data-testid="recep-book-btn" onClick={() => setBookOpen(true)} variant="outline" className="border-[#E2DDD7] text-[#1C3F39] hover:bg-[#F3EFE9] rounded-full">
+              <Button data-testid="recep-book-btn" onClick={() => setBookOpen(true)} variant="outline" className="border-[#DCE8E9] text-[#0B7C8C] hover:bg-[#EAF5F5] rounded-full">
                 <Plus size={14} className="mr-1.5" /> New booking
               </Button>
-              <Button data-testid="trigger-sync-btn" onClick={triggerSync} variant="outline" className="border-[#E2DDD7] text-[#1C3F39] hover:bg-[#F3EFE9] rounded-full">
+              <Button data-testid="trigger-sync-btn" onClick={triggerSync} variant="outline" className="border-[#DCE8E9] text-[#0B7C8C] hover:bg-[#EAF5F5] rounded-full">
                 Trigger sync
               </Button>
             </div>
@@ -203,8 +203,8 @@ export default function ReceptionDashboard() {
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-[10px] uppercase tracking-[0.18em] text-[#5C6661]">
-                <tr className="border-b border-[#E2DDD7]">
+              <thead className="text-[10px] uppercase tracking-[0.18em] text-[#5A6B70]">
+                <tr className="border-b border-[#DCE8E9]">
                   <th className="text-left py-3 pl-2">#</th>
                   <th className="text-left py-3">Patient</th>
                   <th className="text-left py-3">Doctor</th>
@@ -216,26 +216,26 @@ export default function ReceptionDashboard() {
               </thead>
               <tbody>
                 {queue.length === 0 && (
-                  <tr><td colSpan={7} className="py-6 text-center text-[#5C6661]">No appointments today.</td></tr>
+                  <tr><td colSpan={7} className="py-6 text-center text-[#5A6B70]">No appointments today.</td></tr>
                 )}
                 {queue.map((q) => (
-                  <tr key={q.id} data-testid="queue-row" className="border-b border-[#E2DDD7]/60 hover:bg-[#F3EFE9]/50">
-                    <td className="py-3 pl-2 font-mono text-[#1C3F39]">#{q.queue_number}</td>
+                  <tr key={q.id} data-testid="queue-row" className="border-b border-[#DCE8E9]/60 hover:bg-[#EAF5F5]/50">
+                    <td className="py-3 pl-2 font-mono text-[#0B7C8C]">#{q.queue_number}</td>
                     <td className="py-3">
                       <div className="font-medium">{q.patient?.name}</div>
-                      <div className="text-xs text-[#5C6661] font-mono">{q.patient?.ic_number}</div>
+                      <div className="text-xs text-[#5A6B70] font-mono">{q.patient?.ic_number}</div>
                     </td>
-                    <td className="py-3">{q.doctor?.name}<div className="text-xs text-[#5C6661]">{q.doctor?.specialty}</div></td>
+                    <td className="py-3">{q.doctor?.name}<div className="text-xs text-[#5A6B70]">{q.doctor?.specialty}</div></td>
                     <td className="py-3 font-mono text-xs">{new Date(q.scheduled_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</td>
                     <td className="py-3 text-xs max-w-[180px] truncate">{q.reason}</td>
                     <td className="py-3">
-                      <Badge className={q.payment_status === "paid" ? "bg-[#2D6A4F]/20 text-[#2D6A4F]" : "bg-[#5C6661]/15 text-[#5C6661]"}>
+                      <Badge className={q.payment_status === "paid" ? "bg-[#2D6A4F]/20 text-[#2D6A4F]" : "bg-[#5A6B70]/15 text-[#5A6B70]"}>
                         {q.payment_status}
                       </Badge>
                     </td>
                     <td className="py-3">
                       <Select value={q.status} onValueChange={(v) => setStatus(q.id, v)}>
-                        <SelectTrigger data-testid={`status-select-${q.id}`} className={`w-[140px] h-8 border-[#E2DDD7] ${statusColors[q.status]}`}>
+                        <SelectTrigger data-testid={`status-select-${q.id}`} className={`w-[140px] h-8 border-[#DCE8E9] ${statusColors[q.status]}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -254,20 +254,20 @@ export default function ReceptionDashboard() {
 
         <div id="sec-patients" />
         {/* Patients table */}
-        <div className="lg:col-span-3 rounded-2xl border border-[#E2DDD7] bg-white p-6">
+        <div className="lg:col-span-3 rounded-2xl border border-[#DCE8E9] bg-white p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="overline">Registered Patients</div>
               <h3 className="font-display text-xl mt-1">{patients.length} on file</h3>
             </div>
-            <Users size={18} weight="duotone" color="#1C3F39" />
+            <Users size={18} weight="duotone" color="#0B7C8C" />
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {patients.map((p) => (
-              <div key={p.id} className="p-3 rounded-xl border border-[#E2DDD7] bg-[#F9F9F6]" data-testid="patient-card">
+              <div key={p.id} className="p-3 rounded-xl border border-[#DCE8E9] bg-[#F4F9F9]" data-testid="patient-card">
                 <div className="text-sm font-medium">{p.name}</div>
-                <div className="text-xs text-[#5C6661] font-mono mt-1">{p.ic_number}</div>
-                <div className="text-xs text-[#5C6661]">{p.phone || "—"} · {p.gender || "—"}</div>
+                <div className="text-xs text-[#5A6B70] font-mono mt-1">{p.ic_number}</div>
+                <div className="text-xs text-[#5A6B70]">{p.phone || "—"} · {p.gender || "—"}</div>
               </div>
             ))}
           </div>
@@ -277,7 +277,7 @@ export default function ReceptionDashboard() {
       <ICScanner open={scanOpen} onOpenChange={setScanOpen} onMatch={onPatientFound} />
 
       <Dialog open={bookOpen} onOpenChange={(o) => { setBookOpen(o); if (!o) setScannedPatient(null); }}>
-        <DialogContent data-testid="recep-book-dialog" className="bg-[#F9F9F6] border-[#E2DDD7] max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent data-testid="recep-book-dialog" className="bg-[#F4F9F9] border-[#DCE8E9] max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl">New appointment</DialogTitle>
             <DialogDescription>
@@ -289,7 +289,7 @@ export default function ReceptionDashboard() {
               <div className="space-y-1.5">
                 <Label>Patient</Label>
                 <Select value={booking.patient_id} onValueChange={(v) => setBooking({ ...booking, patient_id: v })}>
-                  <SelectTrigger data-testid="book-patient-select" className="border-[#E2DDD7]">
+                  <SelectTrigger data-testid="book-patient-select" className="border-[#DCE8E9]">
                     <SelectValue placeholder="Choose patient" />
                   </SelectTrigger>
                   <SelectContent>
@@ -301,7 +301,7 @@ export default function ReceptionDashboard() {
             <div className="space-y-1.5">
               <Label>Doctor</Label>
               <Select value={booking.doctor_id} onValueChange={(v) => setBooking({ ...booking, doctor_id: v })}>
-                <SelectTrigger data-testid="book-doctor-select-r" className="border-[#E2DDD7]"><SelectValue placeholder="Choose doctor" /></SelectTrigger>
+                <SelectTrigger data-testid="book-doctor-select-r" className="border-[#DCE8E9]"><SelectValue placeholder="Choose doctor" /></SelectTrigger>
                 <SelectContent>
                   {doctors.map((d) => (<SelectItem key={d.id} value={d.id}>{d.name} · {d.specialty || "General"}</SelectItem>))}
                 </SelectContent>
@@ -317,7 +317,7 @@ export default function ReceptionDashboard() {
             </div>
             <div className="space-y-1.5">
               <Label>Reason</Label>
-              <Textarea data-testid="book-reason-r" value={booking.reason} onChange={(e) => setBooking({ ...booking, reason: e.target.value })} className="border-[#E2DDD7]" />
+              <Textarea data-testid="book-reason-r" value={booking.reason} onChange={(e) => setBooking({ ...booking, reason: e.target.value })} className="border-[#DCE8E9]" />
             </div>
           </div>
           <DialogFooter>
@@ -325,7 +325,7 @@ export default function ReceptionDashboard() {
               data-testid="book-confirm-r"
               disabled={!booking.patient_id || !booking.doctor_id || !booking.scheduled_at}
               onClick={createBooking}
-              className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6]"
+              className="bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9]"
             >
               Create & assign token
             </Button>
@@ -338,9 +338,9 @@ export default function ReceptionDashboard() {
 
 function Stat({ label, value }) {
   return (
-    <div className="rounded-xl p-3 bg-[#F3EFE9] border border-[#E2DDD7]">
+    <div className="rounded-xl p-3 bg-[#EAF5F5] border border-[#DCE8E9]">
       <div className="overline">{label}</div>
-      <div className="font-display text-3xl mt-1 text-[#1C3F39] tabular-nums">{value}</div>
+      <div className="font-display text-3xl mt-1 text-[#0B7C8C] tabular-nums">{value}</div>
     </div>
   );
 }

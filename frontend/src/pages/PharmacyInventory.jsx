@@ -112,7 +112,7 @@ export default function PharmacyInventory() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
-      <ArrowsClockwise size={28} className="text-[#1C3F39] animate-spin" />
+      <ArrowsClockwise size={28} className="text-[#0B7C8C] animate-spin" />
     </div>
   );
 
@@ -127,9 +127,9 @@ export default function PharmacyInventory() {
             { label: "Low stock", value: summary.low_stock, warn: summary.low_stock > 0 },
             { label: "Expiring ≤30d", value: summary.expiring_soon, warn: summary.expiring_soon > 0 },
           ].map((c) => (
-            <div key={c.label} className={`rounded-2xl border p-4 ${c.warn ? "border-amber-300 bg-amber-50" : "border-[#E2DDD7] bg-white"}`}>
+            <div key={c.label} className={`rounded-2xl border p-4 ${c.warn ? "border-amber-300 bg-amber-50" : "border-[#DCE8E9] bg-white"}`}>
               <div className="text-[10px] uppercase tracking-[0.18em] text-[#6B7B6E]">{c.label}</div>
-              <div className={`font-display text-2xl mt-1 ${c.warn ? "text-amber-700" : "text-[#1C3F39]"}`}>{c.value}</div>
+              <div className={`font-display text-2xl mt-1 ${c.warn ? "text-amber-700" : "text-[#0B7C8C]"}`}>{c.value}</div>
             </div>
           ))}
         </div>
@@ -164,10 +164,10 @@ export default function PharmacyInventory() {
           <Input
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search medicines…"
-            className="pl-9 rounded-xl border-[#E2DDD7] bg-white"
+            className="pl-9 rounded-xl border-[#DCE8E9] bg-white"
           />
         </div>
-        <Button onClick={openAdd} className="bg-[#1C3F39] text-white rounded-xl gap-1.5">
+        <Button onClick={openAdd} className="bg-[#0B7C8C] text-white rounded-xl gap-1.5">
           <Plus size={16} /> Add Medicine
         </Button>
       </div>
@@ -175,11 +175,11 @@ export default function PharmacyInventory() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Total SKUs", value: items.length, color: "text-[#1C3F39]" },
+          { label: "Total SKUs", value: items.length, color: "text-[#0B7C8C]" },
           { label: "Low Stock", value: alerts.filter(a=>a.alert==="low_stock").length, color: "text-[#854F0B]" },
           { label: "Expiring Soon", value: alerts.filter(a=>a.alert==="expiring_soon").length, color: "text-[#A32D2D]" },
         ].map(s => (
-          <div key={s.label} className="bg-white rounded-2xl p-4 border border-[#E2DDD7]">
+          <div key={s.label} className="bg-white rounded-2xl p-4 border border-[#DCE8E9]">
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
             <p className="text-xs text-[#6B7B6E] mt-0.5">{s.label}</p>
           </div>
@@ -187,8 +187,8 @@ export default function PharmacyInventory() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-[#E2DDD7] overflow-hidden">
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 bg-[#F3EFE9] text-xs font-semibold text-[#6B7B6E] uppercase tracking-wider border-b border-[#E2DDD7]">
+      <div className="bg-white rounded-2xl border border-[#DCE8E9] overflow-hidden">
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 bg-[#EAF5F5] text-xs font-semibold text-[#6B7B6E] uppercase tracking-wider border-b border-[#DCE8E9]">
           <span>Medicine</span><span>Stock</span><span>Price</span><span>Expiry</span><span>Actions</span>
         </div>
         {filtered.length === 0 ? (
@@ -202,13 +202,13 @@ export default function PharmacyInventory() {
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.02 }}
-            className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-4 border-b border-[#E2DDD7] last:border-0 items-center hover:bg-[#F9F9F6] transition-colors"
+            className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-4 border-b border-[#DCE8E9] last:border-0 items-center hover:bg-[#F4F9F9] transition-colors"
           >
             <div>
-              <p className="font-medium text-[#1C3F39] text-sm">{item.name}</p>
+              <p className="font-medium text-[#0B7C8C] text-sm">{item.name}</p>
               {item.generic_name && <p className="text-xs text-[#6B7B6E]">{item.generic_name}</p>}
               {item.category && (
-                <span className={`inline-block text-[10px] px-2 py-0.5 rounded-full mt-1 font-medium ${CATEGORY_COLORS[item.category] || "bg-[#F3EFE9] text-[#6B7B6E]"}`}>
+                <span className={`inline-block text-[10px] px-2 py-0.5 rounded-full mt-1 font-medium ${CATEGORY_COLORS[item.category] || "bg-[#EAF5F5] text-[#6B7B6E]"}`}>
                   {item.category}
                 </span>
               )}
@@ -218,22 +218,22 @@ export default function PharmacyInventory() {
               <StockBadge qty={item.stock_qty} reorder={item.reorder_level} />
               <div className="flex items-center gap-1">
                 <button onClick={() => handleStockAdjust(item, -1)}
-                  className="w-5 h-5 rounded bg-[#F3EFE9] text-[#6B7B6E] hover:bg-[#E2DDD7] text-xs font-bold flex items-center justify-center">−</button>
-                <span className="text-sm font-semibold text-[#1C3F39] w-8 text-center">{item.stock_qty}</span>
+                  className="w-5 h-5 rounded bg-[#EAF5F5] text-[#6B7B6E] hover:bg-[#DCE8E9] text-xs font-bold flex items-center justify-center">−</button>
+                <span className="text-sm font-semibold text-[#0B7C8C] w-8 text-center">{item.stock_qty}</span>
                 <button onClick={() => handleStockAdjust(item, 1)}
-                  className="w-5 h-5 rounded bg-[#F3EFE9] text-[#6B7B6E] hover:bg-[#E2DDD7] text-xs font-bold flex items-center justify-center">+</button>
+                  className="w-5 h-5 rounded bg-[#EAF5F5] text-[#6B7B6E] hover:bg-[#DCE8E9] text-xs font-bold flex items-center justify-center">+</button>
                 <span className="text-xs text-[#6B7B6E]">{item.unit}s</span>
                 <button onClick={() => openHistory(item)} title="Stock history"
-                  className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#F3EFE9] text-[#6B7B6E] hover:bg-[#E2DDD7]">history</button>
+                  className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#EAF5F5] text-[#6B7B6E] hover:bg-[#DCE8E9]">history</button>
               </div>
             </div>
 
-            <div className="text-sm text-[#1C3F39] font-medium">
+            <div className="text-sm text-[#0B7C8C] font-medium">
               RM {Number(item.unit_price).toFixed(2)}
               <p className="text-xs text-[#6B7B6E] font-normal">per {item.unit}</p>
             </div>
 
-            <div className="text-sm text-[#1C3F39]">
+            <div className="text-sm text-[#0B7C8C]">
               {item.expiry_date ? (
                 (() => {
                   const days = Math.ceil((new Date(item.expiry_date) - new Date()) / 86400000);
@@ -248,7 +248,7 @@ export default function PharmacyInventory() {
             </div>
 
             <Button size="sm" variant="ghost" onClick={() => openEdit(item)}
-              className="text-[#6B7B6E] hover:text-[#1C3F39] hover:bg-[#F3EFE9] rounded-lg text-xs">
+              className="text-[#6B7B6E] hover:text-[#0B7C8C] hover:bg-[#EAF5F5] rounded-lg text-xs">
               Edit
             </Button>
           </motion.div>
@@ -257,9 +257,9 @@ export default function PharmacyInventory() {
 
       {/* Add / Edit dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-md rounded-3xl bg-[#F9F9F6] border-0">
+        <DialogContent className="max-w-md rounded-3xl bg-[#F4F9F9] border-0">
           <DialogHeader>
-            <DialogTitle className="text-[#1C3F39] font-display">
+            <DialogTitle className="text-[#0B7C8C] font-display">
               {editItem ? "Edit Medicine" : "Add Medicine"}
             </DialogTitle>
           </DialogHeader>
@@ -281,25 +281,25 @@ export default function PharmacyInventory() {
                 <Input
                   type={type} value={form[field] ?? ""}
                   onChange={e => setForm(f => ({ ...f, [field]: type === "number" ? Number(e.target.value) : e.target.value }))}
-                  className="rounded-xl border-[#E2DDD7] text-sm"
+                  className="rounded-xl border-[#DCE8E9] text-sm"
                 />
               </div>
             ))}
-            <Button onClick={handleSave} className="w-full bg-[#1C3F39] text-white rounded-xl mt-2">
+            <Button onClick={handleSave} className="w-full bg-[#0B7C8C] text-white rounded-xl mt-2">
               {editItem ? "Save Changes" : "Add Medicine"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
       <Dialog open={!!historyFor} onOpenChange={(o) => !o && setHistoryFor(null)}>
-        <DialogContent className="bg-[#F9F9F6] border-[#E2DDD7] max-w-lg">
+        <DialogContent className="bg-[#F4F9F9] border-[#DCE8E9] max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-display text-xl">Stock history — {historyFor?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-1.5 max-h-[360px] overflow-y-auto">
             {movements.length === 0 && <div className="text-sm text-[#6B7B6E]">No movements recorded yet.</div>}
             {movements.map((mv) => (
-              <div key={mv.id} className="flex items-center justify-between p-2.5 rounded-xl border border-[#E2DDD7] bg-white text-sm">
+              <div key={mv.id} className="flex items-center justify-between p-2.5 rounded-xl border border-[#DCE8E9] bg-white text-sm">
                 <div>
                   <span className={`font-mono font-semibold ${mv.delta < 0 ? "text-red-600" : "text-emerald-700"}`}>
                     {mv.delta > 0 ? `+${mv.delta}` : mv.delta}

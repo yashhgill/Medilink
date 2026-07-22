@@ -50,7 +50,7 @@ export function AttachmentUploader({ value = [], onChange }) {
           size="sm"
           type="button"
           variant="outline"
-          className="border-[#E2DDD7] text-[#1C3F39] hover:bg-[#F3EFE9] rounded-full h-8"
+          className="border-[#DCE8E9] text-[#0B7C8C] hover:bg-[#EAF5F5] rounded-full h-8"
           onClick={pick}
           disabled={uploading}
         >
@@ -81,16 +81,16 @@ function FilePill({ f, onRemove }) {
   const isImage = f.content_type?.startsWith("image/");
   const Icon = isImage ? ImageIcon : FileText;
   return (
-    <div className="flex items-center gap-2 p-2 rounded-xl border border-[#E2DDD7] bg-white">
-      <div className="w-8 h-8 rounded-lg bg-[#F3EFE9] flex items-center justify-center shrink-0">
-        <Icon size={16} weight="duotone" color="#1C3F39" />
+    <div className="flex items-center gap-2 p-2 rounded-xl border border-[#DCE8E9] bg-white">
+      <div className="w-8 h-8 rounded-lg bg-[#EAF5F5] flex items-center justify-center shrink-0">
+        <Icon size={16} weight="duotone" color="#0B7C8C" />
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-xs font-medium truncate">{f.original_filename}</div>
-        <div className="text-[10px] text-[#5C6661] font-mono">{(f.size / 1024).toFixed(1)} KB</div>
+        <div className="text-[10px] text-[#5A6B70] font-mono">{(f.size / 1024).toFixed(1)} KB</div>
       </div>
       {onRemove && (
-        <button type="button" onClick={onRemove} className="text-[#5C6661] hover:text-[#9B2226]" data-testid={`attach-remove-${f.id}`}>
+        <button type="button" onClick={onRemove} className="text-[#5A6B70] hover:text-[#9B2226]" data-testid={`attach-remove-${f.id}`}>
           <X size={14} />
         </button>
       )}
@@ -132,16 +132,16 @@ export function AttachmentList({ files = [] }) {
             type="button"
             data-testid={`attachment-${f.id}`}
             onClick={() => download(f)}
-            className="flex items-center gap-2 p-2 rounded-xl border border-[#E2DDD7] bg-white hover:bg-[#F3EFE9] text-left"
+            className="flex items-center gap-2 p-2 rounded-xl border border-[#DCE8E9] bg-white hover:bg-[#EAF5F5] text-left"
           >
-            <div className="w-8 h-8 rounded-lg bg-[#F3EFE9] flex items-center justify-center shrink-0">
-              <Icon size={16} weight="duotone" color="#1C3F39" />
+            <div className="w-8 h-8 rounded-lg bg-[#EAF5F5] flex items-center justify-center shrink-0">
+              <Icon size={16} weight="duotone" color="#0B7C8C" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-xs font-medium truncate">{f.original_filename}</div>
-              <div className="text-[10px] text-[#5C6661] font-mono">{(f.size / 1024).toFixed(1)} KB</div>
+              <div className="text-[10px] text-[#5A6B70] font-mono">{(f.size / 1024).toFixed(1)} KB</div>
             </div>
-            <Download size={14} className="text-[#1C3F39] shrink-0" />
+            <Download size={14} className="text-[#0B7C8C] shrink-0" />
           </button>
         );
       })}

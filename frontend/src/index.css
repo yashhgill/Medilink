@@ -3,15 +3,15 @@
 @tailwind utilities;
 
 :root {
-  --ml-bg: #F9F9F6;
+  --ml-bg: #F4F9F9;
   --ml-surface: #FFFFFF;
-  --ml-border: #E2DDD7;
-  --ml-primary: #1C3F39;
-  --ml-primary-soft: #2D5A52;
-  --ml-secondary: #B55B49;
-  --ml-accent: #D4A373;
-  --ml-text: #0A0F0D;
-  --ml-muted: #5C6661;
+  --ml-border: #DCE8E9;
+  --ml-primary: #0B7C8C;
+  --ml-primary-soft: #075F6C;
+  --ml-secondary: #0A3D62;
+  --ml-accent: #086788;
+  --ml-text: #12262B;
+  --ml-muted: #5A6B70;
   --ml-success: #2D6A4F;
   --ml-warn: #E07A5F;
   --ml-error: #9B2226;
@@ -139,7 +139,7 @@ h1, h2, h3, h4, h5 {
   inset: -1px;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(90deg, transparent 0%, #2D6A4F 25%, #D4A373 50%, #2D6A4F 75%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, #2D6A4F 25%, #086788 50%, #2D6A4F 75%, transparent 100%);
   background-size: 200% 100%;
   animation: trace 2.4s linear infinite;
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);

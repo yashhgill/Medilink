@@ -23,35 +23,35 @@ export default function PrintChit({ open, onOpenChange, chit, onClose, secondary
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) onClose?.(); }}>
       <DialogContent
         data-testid="print-chit-dialog"
-        className="bg-[#F9F9F6] border-[#E2DDD7] max-w-md p-0 overflow-hidden no-print-overlay"
+        className="bg-[#F4F9F9] border-[#DCE8E9] max-w-md p-0 overflow-hidden no-print-overlay"
         aria-describedby="chit-description"
       >
         <DialogTitle className="sr-only">Printable chit</DialogTitle>
         <DialogDescription id="chit-description" className="sr-only">
           Your ticket details. Click Print chit to print.
         </DialogDescription>
-        <div ref={ref} className="chit-print-area bg-white p-8 m-4 rounded-2xl border border-dashed border-[#1C3F39]/40" data-testid="print-chit">
+        <div ref={ref} className="chit-print-area bg-white p-8 m-4 rounded-2xl border border-dashed border-[#0B7C8C]/40" data-testid="print-chit">
           <ChitContent chit={chit} />
           {secondary && (
             <>
-              <div className="my-6 border-t border-dashed border-[#1C3F39]/30" />
+              <div className="my-6 border-t border-dashed border-[#0B7C8C]/30" />
               <ChitContent chit={secondary} />
             </>
           )}
         </div>
-        <div className="flex justify-between gap-2 p-4 bg-[#F3EFE9] border-t border-[#E2DDD7]">
+        <div className="flex justify-between gap-2 p-4 bg-[#EAF5F5] border-t border-[#DCE8E9]">
           <Button
             variant="outline"
             data-testid="chit-close"
             onClick={() => { onOpenChange(false); onClose?.(); }}
-            className="border-[#E2DDD7] text-[#1C3F39] hover:bg-white rounded-full"
+            className="border-[#DCE8E9] text-[#0B7C8C] hover:bg-white rounded-full"
           >
             <X size={14} className="mr-1.5" /> Close
           </Button>
           <Button
             data-testid="chit-print-btn"
             onClick={doPrint}
-            className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full"
+            className="bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9] rounded-full"
           >
             <Printer size={14} className="mr-1.5" /> Print chit
           </Button>
@@ -68,18 +68,18 @@ function ChitContent({ chit }) {
     chit.type === "MEDICINE" ? "MEDICINE COLLECTION" : "TICKET";
 
   return (
-    <div className="font-mono text-[#0A0F0D]">
+    <div className="font-mono text-[#12262B]">
       <div className="flex items-center justify-center gap-2 mb-1">
-        <Heartbeat size={18} weight="duotone" color="#1C3F39" />
+        <Heartbeat size={18} weight="duotone" color="#0B7C8C" />
         <div className="font-display text-base font-semibold">{chit.clinic_name}</div>
       </div>
-      <div className="text-center text-[10px] uppercase tracking-[0.25em] text-[#5C6661] mb-4">{headline}</div>
+      <div className="text-center text-[10px] uppercase tracking-[0.25em] text-[#5A6B70] mb-4">{headline}</div>
 
       {chit.type === "QUEUE" && (
         <>
           <div className="text-center">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C6661]">Queue Number</div>
-            <div className="font-display text-7xl font-semibold text-[#1C3F39] leading-none mt-1 tabular-nums">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-[#5A6B70]">Queue Number</div>
+            <div className="font-display text-7xl font-semibold text-[#0B7C8C] leading-none mt-1 tabular-nums">
               #{String(chit.queue_number).padStart(3, "0")}
             </div>
           </div>
@@ -91,19 +91,19 @@ function ChitContent({ chit }) {
             <Row label="Triage" value={`${chit.triage_colour}${chit.triage_category ? " — " + chit.triage_category : ""}`} />
           )}
           {chit.activation_code && (
-            <div className="mt-3 pt-3 border-t border-dashed border-[#E2DDD7] text-center">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C6661]">App activation code</div>
+            <div className="mt-3 pt-3 border-t border-dashed border-[#DCE8E9] text-center">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-[#5A6B70]">App activation code</div>
               <div className="font-mono text-2xl tracking-[0.35em] font-semibold">{chit.activation_code}</div>
-              <div className="text-[10px] text-[#5C6661]">Set your password at {chit.app_url || "the app"} · valid 72h</div>
+              <div className="text-[10px] text-[#5A6B70]">Set your password at {chit.app_url || "the app"} · valid 72h</div>
             </div>
           )}
           {chit.app_qr && (
-            <div className="mt-3 pt-3 border-t border-dashed border-[#E2DDD7] text-center">
+            <div className="mt-3 pt-3 border-t border-dashed border-[#DCE8E9] text-center">
               <img src={chit.app_qr} alt="MediLink app QR" className="w-24 h-24 mx-auto" />
-              <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C6661] mt-1">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-[#5A6B70] mt-1">
                 Scan to view your records &amp; pay bills
               </div>
-              <div className="text-[10px] font-mono text-[#5C6661]">{chit.app_url}</div>
+              <div className="text-[10px] font-mono text-[#5A6B70]">{chit.app_url}</div>
             </div>
           )}
           <Row label="Issued" value={new Date(chit.issued_at).toLocaleString()} mono />
@@ -113,13 +113,13 @@ function ChitContent({ chit }) {
       {chit.type === "RECEIPT" && (
         <>
           <div className="text-center">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C6661]">Total Paid</div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-[#5A6B70]">Total Paid</div>
             <div className="font-display text-5xl font-semibold text-[#2D6A4F] mt-1">
               RM {Number(chit.amount).toFixed(2)}
             </div>
           </div>
           {chit.medication_lines && chit.medication_lines.length > 0 && (
-            <div className="mt-3 pt-2 border-t border-dashed border-[#E2DDD7] space-y-1">
+            <div className="mt-3 pt-2 border-t border-dashed border-[#DCE8E9] space-y-1">
               <Row label="Consultation" value={`RM ${Number(chit.consultation_fee || 0).toFixed(2)}`} />
               {chit.medication_lines.map((l, i) => (
                 <Row key={i} label={l.medicine} value={`RM ${Number(l.line_total).toFixed(2)}`} />
@@ -131,15 +131,15 @@ function ChitContent({ chit }) {
           <Row label="Patient" value={chit.patient_name} />
           <Row label="IC" value={chit.patient_ic} mono />
           <Row label="Paid at" value={new Date(chit.paid_at).toLocaleString()} mono />
-          <div className="text-center mt-4 text-[10px] text-[#5C6661]">— Thank you —</div>
+          <div className="text-center mt-4 text-[10px] text-[#5A6B70]">— Thank you —</div>
         </>
       )}
 
       {chit.type === "MEDICINE" && (
         <>
           <div className="text-center mb-3">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C6661]">Collect at Pharmacy</div>
-            <div className="font-display text-4xl font-semibold text-[#B55B49] mt-1 tabular-nums">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-[#5A6B70]">Collect at Pharmacy</div>
+            <div className="font-display text-4xl font-semibold text-[#0A3D62] mt-1 tabular-nums">
               #{String(chit.queue_number).padStart(3, "0")}
             </div>
           </div>
@@ -148,9 +148,9 @@ function ChitContent({ chit }) {
           <Row label="Doctor" value={chit.doctor_name} />
           <Row label="Diagnosis" value={chit.diagnosis} />
           <div className="mt-3">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C6661] mb-1.5">Prescriptions</div>
+            <div className="text-[10px] uppercase tracking-[0.18em] text-[#5A6B70] mb-1.5">Prescriptions</div>
             {(!chit.prescriptions || chit.prescriptions.length === 0) ? (
-              <div className="text-xs text-[#5C6661]">No medicine prescribed.</div>
+              <div className="text-xs text-[#5A6B70]">No medicine prescribed.</div>
             ) : (
               <ul className="space-y-1 text-xs">
                 {chit.prescriptions.map((p, i) => (
@@ -161,7 +161,7 @@ function ChitContent({ chit }) {
               </ul>
             )}
           </div>
-          <div className="text-center mt-4 text-[10px] text-[#5C6661]">Show this chit to the pharmacist</div>
+          <div className="text-center mt-4 text-[10px] text-[#5A6B70]">Show this chit to the pharmacist</div>
         </>
       )}
     </div>
@@ -171,7 +171,7 @@ function ChitContent({ chit }) {
 function Row({ label, value, mono }) {
   return (
     <div className="flex justify-between text-xs mt-2 gap-3">
-      <div className="text-[#5C6661] shrink-0">{label}</div>
+      <div className="text-[#5A6B70] shrink-0">{label}</div>
       <div className={`text-right ${mono ? "font-mono" : ""}`}>{value}</div>
     </div>
   );

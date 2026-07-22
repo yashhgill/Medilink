@@ -40,15 +40,15 @@ export default function Activate() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9F9F6] flex items-center justify-center px-6">
+    <div className="min-h-screen bg-[#F4F9F9] flex items-center justify-center px-6">
       <Toaster position="top-center" richColors />
       <div className="w-full max-w-md">
-        <div className="w-12 h-12 rounded-2xl bg-[#1C3F39] flex items-center justify-center mb-6">
-          <ShieldCheck size={24} weight="duotone" color="#F9F9F6" />
+        <div className="w-12 h-12 rounded-2xl bg-[#0B7C8C] flex items-center justify-center mb-6">
+          <ShieldCheck size={24} weight="duotone" color="#F4F9F9" />
         </div>
         <div className="overline">Activate your account</div>
         <h1 className="font-display text-4xl mt-1">Set or reset your password</h1>
-        <p className="text-sm text-[#5C6661] mt-2">
+        <p className="text-sm text-[#5A6B70] mt-2">
           Use the 6-digit activation code printed on your clinic slip.
           Codes are valid for 72 hours — visit the kiosk for a fresh one anytime. Afterwards, sign in with your IC number and this password.
         </p>
@@ -62,7 +62,7 @@ export default function Activate() {
               onChange={(e) => setIc(fmtIc(e.target.value))}
               placeholder="000000-00-0000"
               inputMode="numeric"
-              className="font-mono border-[#E2DDD7] h-11"
+              className="font-mono border-[#DCE8E9] h-11"
             />
           </div>
           <div className="space-y-1.5">
@@ -73,32 +73,32 @@ export default function Activate() {
               onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
               placeholder="6-digit code from your slip"
               inputMode="numeric"
-              className="font-mono border-[#E2DDD7] h-11 tracking-[0.3em]"
+              className="font-mono border-[#DCE8E9] h-11 tracking-[0.3em]"
             />
           </div>
           <div className="space-y-1.5">
             <Label>New password</Label>
             <Input data-testid="act-pw" type="password" value={pw}
-              onChange={(e) => setPw(e.target.value)} className="border-[#E2DDD7] h-11" />
+              onChange={(e) => setPw(e.target.value)} className="border-[#DCE8E9] h-11" />
           </div>
           <div className="space-y-1.5">
             <Label>Confirm password</Label>
             <Input data-testid="act-pw2" type="password" value={pw2}
-              onChange={(e) => setPw2(e.target.value)} className="border-[#E2DDD7] h-11" />
+              onChange={(e) => setPw2(e.target.value)} className="border-[#DCE8E9] h-11" />
           </div>
           <Button
             data-testid="act-submit"
             type="submit"
             disabled={busy || ic.replace(/[^0-9]/g, "").length !== 12 || code.length !== 6}
-            className="w-full h-11 bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full"
+            className="w-full h-11 bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9] rounded-full"
           >
             {busy ? "Activating…" : (<>Activate <ArrowRight size={16} className="ml-1.5" /></>)}
           </Button>
         </form>
 
-        <p className="text-sm text-[#5C6661] mt-6 text-center">
+        <p className="text-sm text-[#5A6B70] mt-6 text-center">
           Already activated?{" "}
-          <Link to="/login" className="text-[#1C3F39] font-medium underline-offset-2 hover:underline">
+          <Link to="/login" className="text-[#0B7C8C] font-medium underline-offset-2 hover:underline">
             Sign in
           </Link>
         </p>

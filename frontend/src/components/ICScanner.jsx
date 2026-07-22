@@ -103,10 +103,10 @@ export default function ICScanner({ open, onOpenChange, onMatch }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md rounded-3xl bg-[#F9F9F6] border-0 shadow-2xl p-0 overflow-hidden">
-        <div className="bg-[#1C3F39] px-6 pt-6 pb-8">
+      <DialogContent className="max-w-md rounded-3xl bg-[#F4F9F9] border-0 shadow-2xl p-0 overflow-hidden">
+        <div className="bg-[#0B7C8C] px-6 pt-6 pb-8">
           <DialogHeader>
-            <DialogTitle className="text-[#F9F9F6] text-xl font-display flex items-center gap-2">
+            <DialogTitle className="text-[#F4F9F9] text-xl font-display flex items-center gap-2">
               <Cardholder size={22} weight="duotone" /> IC Identification
             </DialogTitle>
             <DialogDescription className="text-white/60 text-sm mt-1">
@@ -120,7 +120,7 @@ export default function ICScanner({ open, onOpenChange, onMatch }) {
               onClick={() => { setMode("manual"); stopCam(); }}
               className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${
                 mode === "manual"
-                  ? "bg-white text-[#1C3F39]"
+                  ? "bg-white text-[#0B7C8C]"
                   : "bg-white/10 text-white/70 hover:bg-white/20"
               }`}
             >
@@ -130,7 +130,7 @@ export default function ICScanner({ open, onOpenChange, onMatch }) {
               onClick={() => { setMode("camera"); startCam(); }}
               className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
                 mode === "camera"
-                  ? "bg-white text-[#1C3F39]"
+                  ? "bg-white text-[#0B7C8C]"
                   : "bg-white/10 text-white/70 hover:bg-white/20"
               }`}
             >
@@ -175,7 +175,7 @@ export default function ICScanner({ open, onOpenChange, onMatch }) {
                     />
                     {/* IC overlay guide */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="border-2 border-[#D4A373] rounded-xl w-3/4 h-2/5 opacity-70" />
+                      <div className="border-2 border-[#086788] rounded-xl w-3/4 h-2/5 opacity-70" />
                     </div>
                     <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60">
                       <p className="text-white text-xs text-center mb-2">
@@ -183,7 +183,7 @@ export default function ICScanner({ open, onOpenChange, onMatch }) {
                       </p>
                       <Button
                         onClick={takeSnapshot}
-                        className="w-full bg-[#D4A373] hover:bg-[#c4935f] text-white rounded-xl"
+                        className="w-full bg-[#086788] hover:bg-[#c4935f] text-white rounded-xl"
                         size="sm"
                       >
                         Capture
@@ -201,14 +201,14 @@ export default function ICScanner({ open, onOpenChange, onMatch }) {
 
           {/* IC input */}
           <div className="space-y-2">
-            <Label className="text-[#1C3F39] font-medium">
-              IC Number <span className="text-[#B55B49] font-normal text-xs">(YYMMDD-SS-NNNN)</span>
+            <Label className="text-[#0B7C8C] font-medium">
+              IC Number <span className="text-[#0A3D62] font-normal text-xs">(YYMMDD-SS-NNNN)</span>
             </Label>
             <Input
               value={ic}
               onChange={e => setIc(e.target.value)}
               placeholder="e.g. 040412-08-1035"
-              className="rounded-xl border-[#E2DDD7] focus:border-[#1C3F39] text-[#1C3F39] text-base tracking-wider"
+              className="rounded-xl border-[#DCE8E9] focus:border-[#0B7C8C] text-[#0B7C8C] text-base tracking-wider"
               maxLength={14}
               onKeyDown={e => e.key === "Enter" && handleLookup()}
               autoFocus={mode === "manual"}
@@ -251,7 +251,7 @@ export default function ICScanner({ open, onOpenChange, onMatch }) {
           <Button
             onClick={handleLookup}
             disabled={loading || !ic}
-            className="w-full bg-[#1C3F39] hover:bg-[#154f44] text-[#F9F9F6] rounded-xl h-11 font-medium"
+            className="w-full bg-[#0B7C8C] hover:bg-[#154f44] text-[#F4F9F9] rounded-xl h-11 font-medium"
           >
             {loading ? "Looking up…" : "Find Patient"}
           </Button>

@@ -33,11 +33,11 @@ const kioskAxios = axios.create({
 });
 
 const statusBadge = {
-  scheduled: "bg-[#F3EFE9] text-[#1C3F39]",
-  checked_in: "bg-[#D4A373]/30 text-[#1C3F39]",
-  in_progress: "bg-[#B55B49]/20 text-[#9B2226]",
+  scheduled: "bg-[#EAF5F5] text-[#0B7C8C]",
+  checked_in: "bg-[#086788]/30 text-[#0B7C8C]",
+  in_progress: "bg-[#0A3D62]/20 text-[#9B2226]",
   completed: "bg-[#2D6A4F]/20 text-[#2D6A4F]",
-  ready_for_pharmacy: "bg-[#1C3F39] text-[#F9F9F6]",
+  ready_for_pharmacy: "bg-[#0B7C8C] text-[#F4F9F9]",
   dispensed: "bg-[#2D6A4F]/20 text-[#2D6A4F]",
 };
 
@@ -80,22 +80,22 @@ export default function Kiosk() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#1C3F39] relative overflow-hidden">
+    <div className="min-h-screen bg-[#0B7C8C] relative overflow-hidden">
       {/* Decorative pattern */}
       <div
         className="absolute inset-0 opacity-[0.06] pointer-events-none"
         style={{
           backgroundImage:
-            "radial-gradient(#F9F9F6 1px, transparent 1px), radial-gradient(#F9F9F6 1px, transparent 1px)",
+            "radial-gradient(#F4F9F9 1px, transparent 1px), radial-gradient(#F4F9F9 1px, transparent 1px)",
           backgroundSize: "32px 32px",
           backgroundPosition: "0 0, 16px 16px",
         }}
       />
 
       <header className="relative z-10 max-w-5xl mx-auto px-6 pt-6 flex items-center justify-between">
-        <div className="flex items-center gap-2.5 text-[#F9F9F6]">
+        <div className="flex items-center gap-2.5 text-[#F4F9F9]">
           <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center">
-            <Heartbeat size={22} color="#F9F9F6" weight="duotone" />
+            <Heartbeat size={22} color="#F4F9F9" weight="duotone" />
           </div>
           <div>
             <div className="font-display text-xl leading-none">MediLink Kiosk</div>
@@ -114,7 +114,7 @@ export default function Kiosk() {
       </header>
 
       <div className="kiosk-orb w-[420px] h-[420px] bg-[#2D6A4F] -top-24 -left-24" />
-      <div className="kiosk-orb w-[360px] h-[360px] bg-[#D4A373] top-1/3 -right-28" style={{ animationDelay: "-6s" }} />
+      <div className="kiosk-orb w-[360px] h-[360px] bg-[#086788] top-1/3 -right-28" style={{ animationDelay: "-6s" }} />
 
       <main className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 pt-4 landscape:pt-3 pb-8">
         <motion.div
@@ -125,7 +125,7 @@ export default function Kiosk() {
         >
           Welcome
         </motion.div>
-        <h1 className="font-display text-3xl sm:text-4xl landscape:text-3xl text-[#F9F9F6] tracking-tight font-semibold leading-[1.05]">
+        <h1 className="font-display text-3xl sm:text-4xl landscape:text-3xl text-[#F4F9F9] tracking-tight font-semibold leading-[1.05]">
           <motion.span
             initial={{ opacity: 0, y: 26 }}
             animate={{ opacity: 1, y: 0 }}
@@ -139,7 +139,7 @@ export default function Kiosk() {
             initial={{ opacity: 0, y: 26 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-            className="text-[#D4A373] inline-block"
+            className="text-[#086788] inline-block"
           >
             your IC to begin.
           </motion.span>
@@ -149,17 +149,17 @@ export default function Kiosk() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.65, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
-          className="mt-5 landscape:mt-4 rounded-3xl bg-[#F9F9F6] p-2"
+          className="mt-5 landscape:mt-4 rounded-3xl bg-[#F4F9F9] p-2"
         >
           <Tabs value={mode} onValueChange={setMode}>
-            <TabsList className="grid grid-cols-3 w-full bg-[#F3EFE9] border border-[#E2DDD7] rounded-full p-1 h-12">
-              <TabsTrigger value="checkin" data-testid="kiosk-tab-checkin" className="data-[state=active]:bg-[#1C3F39] data-[state=active]:text-[#F9F9F6] rounded-full">
+            <TabsList className="grid grid-cols-3 w-full bg-[#EAF5F5] border border-[#DCE8E9] rounded-full p-1 h-12">
+              <TabsTrigger value="checkin" data-testid="kiosk-tab-checkin" className="data-[state=active]:bg-[#0B7C8C] data-[state=active]:text-[#F4F9F9] rounded-full">
                 <Ticket size={14} weight="duotone" className="mr-1.5" /> Check-in
               </TabsTrigger>
-              <TabsTrigger value="pay" data-testid="kiosk-tab-pay" className="data-[state=active]:bg-[#1C3F39] data-[state=active]:text-[#F9F9F6] rounded-full">
+              <TabsTrigger value="pay" data-testid="kiosk-tab-pay" className="data-[state=active]:bg-[#0B7C8C] data-[state=active]:text-[#F4F9F9] rounded-full">
                 <CreditCard size={14} weight="duotone" className="mr-1.5" /> Pay & Collect
               </TabsTrigger>
-              <TabsTrigger value="status" data-testid="kiosk-tab-status" className="data-[state=active]:bg-[#1C3F39] data-[state=active]:text-[#F9F9F6] rounded-full">
+              <TabsTrigger value="status" data-testid="kiosk-tab-status" className="data-[state=active]:bg-[#0B7C8C] data-[state=active]:text-[#F4F9F9] rounded-full">
                 <Clock size={14} weight="duotone" className="mr-1.5" /> My status
               </TabsTrigger>
             </TabsList>
@@ -297,8 +297,8 @@ function CheckinFlow({ onPrint }) {
       <motion.div initial={{ opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }} data-testid="kiosk-register-screen">
         <div className="overline">First time here</div>
         <h2 className="font-display text-3xl mt-1">Quick register</h2>
-        <p className="text-sm text-[#5C6661] mt-1 mb-6">
-          We couldn&apos;t find your IC <span className="font-mono text-[#0A0F0D]">{ic}</span> in our system.
+        <p className="text-sm text-[#5A6B70] mt-1 mb-6">
+          We couldn&apos;t find your IC <span className="font-mono text-[#12262B]">{ic}</span> in our system.
           Fill these basics and we&apos;ll check you in right after.
         </p>
 
@@ -309,7 +309,7 @@ function CheckinFlow({ onPrint }) {
               data-testid="kiosk-reg-name"
               value={regForm.name}
               onChange={(e) => setRegForm({ ...regForm, name: e.target.value })}
-              className="border-[#E2DDD7]"
+              className="border-[#DCE8E9]"
               autoFocus
             />
           </div>
@@ -320,7 +320,7 @@ function CheckinFlow({ onPrint }) {
               value={regForm.phone}
               onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })}
               placeholder="+60 12-345 6789"
-              className="border-[#E2DDD7]"
+              className="border-[#DCE8E9]"
             />
           </div>
           <div className="space-y-1.5">
@@ -330,7 +330,7 @@ function CheckinFlow({ onPrint }) {
               data-testid="kiosk-reg-dob"
               value={regForm.dob}
               onChange={(e) => setRegForm({ ...regForm, dob: e.target.value })}
-              className="border-[#E2DDD7]"
+              className="border-[#DCE8E9]"
             />
           </div>
           <div className="space-y-1.5">
@@ -339,7 +339,7 @@ function CheckinFlow({ onPrint }) {
               data-testid="kiosk-reg-gender"
               value={regForm.gender}
               onChange={(e) => setRegForm({ ...regForm, gender: e.target.value })}
-              className="w-full h-10 px-3 rounded-md border border-[#E2DDD7] bg-white text-sm"
+              className="w-full h-10 px-3 rounded-md border border-[#DCE8E9] bg-white text-sm"
             >
               <option value="">Select</option>
               <option value="Male">Male</option>
@@ -354,7 +354,7 @@ function CheckinFlow({ onPrint }) {
             variant="outline"
             data-testid="kiosk-reg-back"
             onClick={reset}
-            className="border-[#E2DDD7] text-[#1C3F39] rounded-full"
+            className="border-[#DCE8E9] text-[#0B7C8C] rounded-full"
           >
             <ArrowLeft size={14} className="mr-1.5" /> Back
           </Button>
@@ -362,7 +362,7 @@ function CheckinFlow({ onPrint }) {
             data-testid="kiosk-reg-submit"
             onClick={registerAndCheckin}
             disabled={!regForm.name || registering}
-            className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full flex-1 btn-shimmer"
+            className="bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9] rounded-full flex-1 btn-shimmer"
           >
             <Ticket size={14} className="mr-1.5" /> {registering ? "Setting up…" : "Register & get my ticket"}
           </Button>
@@ -379,23 +379,23 @@ function CheckinFlow({ onPrint }) {
       <motion.div initial={{ opacity: 0, x: 28 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }} data-testid="kiosk-found-screen">
         <div className="overline">Identified</div>
         <h2 className="font-display text-3xl mt-1">{data.patient.name}</h2>
-        <div className="text-sm text-[#5C6661] font-mono mt-1">{data.patient.ic_number} · {data.patient.gender || "—"}</div>
+        <div className="text-sm text-[#5A6B70] font-mono mt-1">{data.patient.ic_number} · {data.patient.gender || "—"}</div>
 
         {existing ? (
-          <div className="mt-6 rounded-2xl border border-[#E2DDD7] bg-[#F3EFE9] p-5">
+          <div className="mt-6 rounded-2xl border border-[#DCE8E9] bg-[#EAF5F5] p-5">
             <div className="overline">Existing appointment today</div>
             <div className="mt-2 font-display text-2xl">{existing.doctor?.name || "Doctor"}</div>
-            <div className="text-sm text-[#5C6661]">{existing.reason}</div>
+            <div className="text-sm text-[#5A6B70]">{existing.reason}</div>
             <Badge className={`mt-3 ${statusBadge[existing.status]}`}>{existing.status.replaceAll("_", " ")}</Badge>
-            <div className="text-xs text-[#5C6661] mt-2">Queue #{String(existing.queue_number).padStart(3, "0")}</div>
+            <div className="text-xs text-[#5A6B70] mt-2">Queue #{String(existing.queue_number).padStart(3, "0")}</div>
           </div>
         ) : (
-          <div className="mt-6 rounded-2xl border border-dashed border-[#E2DDD7] bg-[#F9F9F6] p-5 text-sm text-[#5C6661]">
+          <div className="mt-6 rounded-2xl border border-dashed border-[#DCE8E9] bg-[#F4F9F9] p-5 text-sm text-[#5A6B70]">
             No appointment today. You can check in as a walk-in — we&apos;ll assign the first available doctor.
           </div>
         )}
 
-        <div className="mt-5 rounded-2xl border border-[#E2DDD7] bg-white p-5">
+        <div className="mt-5 rounded-2xl border border-[#DCE8E9] bg-white p-5">
           <div className="overline">How are you feeling?</div>
           <textarea
             data-testid="kiosk-symptoms"
@@ -403,10 +403,10 @@ function CheckinFlow({ onPrint }) {
             onChange={(e) => setSymptoms(e.target.value)}
             placeholder="Describe your symptoms — e.g. fever and sore throat since yesterday…"
             rows={3}
-            className="mt-3 w-full rounded-xl border border-[#E2DDD7] bg-[#F9F9F6] p-3 text-sm outline-none focus:border-[#1C3F39] resize-none"
+            className="mt-3 w-full rounded-xl border border-[#DCE8E9] bg-[#F4F9F9] p-3 text-sm outline-none focus:border-[#0B7C8C] resize-none"
           />
           <div className="mt-3 flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-[#5C6661] font-mono mr-1">Pain level:</span>
+            <span className="text-xs text-[#5A6B70] font-mono mr-1">Pain level:</span>
             {[0,1,2,3,4,5,6,7,8,9,10].map((n) => (
               <motion.button
                 key={n}
@@ -416,15 +416,15 @@ function CheckinFlow({ onPrint }) {
                 onClick={() => setPainScore(painScore === n ? null : n)}
                 className={`w-8 h-8 rounded-full text-xs font-mono border transition-colors ${
                   painScore === n
-                    ? "bg-[#1C3F39] text-white border-[#1C3F39]"
-                    : "bg-white text-[#5C6661] border-[#E2DDD7] hover:border-[#1C3F39]"
+                    ? "bg-[#0B7C8C] text-white border-[#0B7C8C]"
+                    : "bg-white text-[#5A6B70] border-[#DCE8E9] hover:border-[#0B7C8C]"
                 }`}
               >
                 {n}
               </motion.button>
             ))}
           </div>
-          <div className="text-[11px] text-[#5C6661] mt-2">
+          <div className="text-[11px] text-[#5A6B70] mt-2">
             Optional — helps our doctors see urgent cases first.
           </div>
         </div>
@@ -436,7 +436,7 @@ function CheckinFlow({ onPrint }) {
               window.alert(`Password reset code for ${r.data.name}:\n\n${r.data.reset_code}\n\nValid ${r.data.valid_minutes} minutes. Go to the app -> Activate, enter IC + this code + a new password.`);
             } catch (e) { toast.error(errMsg(e, "Could not issue reset code")); }
           }}
-          className="mt-4 text-xs px-3 py-1.5 rounded-full border border-[#E2DDD7] hover:bg-white text-[#5C6661]"
+          className="mt-4 text-xs px-3 py-1.5 rounded-full border border-[#DCE8E9] hover:bg-white text-[#5A6B70]"
         >
           Forgot app password? Get a reset code
         </button>
@@ -446,7 +446,7 @@ function CheckinFlow({ onPrint }) {
             variant="outline"
             data-testid="kiosk-back-btn"
             onClick={reset}
-            className="border-[#E2DDD7] text-[#1C3F39] rounded-full"
+            className="border-[#DCE8E9] text-[#0B7C8C] rounded-full"
           >
             <ArrowLeft size={14} className="mr-1.5" /> Back
           </Button>
@@ -454,7 +454,7 @@ function CheckinFlow({ onPrint }) {
             data-testid="kiosk-confirm-checkin"
             onClick={confirmCheckin}
             disabled={tapping}
-            className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full flex-1 btn-shimmer"
+            className="bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9] rounded-full flex-1 btn-shimmer"
           >
             <Ticket size={14} className="mr-1.5" /> {existing ? "Check in" : "Walk-in & get ticket"}
           </Button>
@@ -480,7 +480,7 @@ function CheckinFlow({ onPrint }) {
           initial={{ scale: 0.3, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: "spring", stiffness: 200, damping: 14, delay: 0.15 }}
-          className="font-display text-7xl text-[#1C3F39] font-mono tabular-nums leading-none mt-3"
+          className="font-display text-7xl text-[#0B7C8C] font-mono tabular-nums leading-none mt-3"
           data-testid="kiosk-queue-number"
         >
           #{String(data.chit.queue_number).padStart(3, "0")}
@@ -506,7 +506,7 @@ function CheckinFlow({ onPrint }) {
               : "Standard queue"}
           </motion.div>
         )}
-        <div className="text-sm text-[#5C6661] mt-3">
+        <div className="text-sm text-[#5A6B70] mt-3">
           See {data.doctor?.name || "the doctor"} when called.
         </div>
         <div className="flex gap-2 mt-8 justify-center">
@@ -514,14 +514,14 @@ function CheckinFlow({ onPrint }) {
             variant="outline"
             onClick={reset}
             data-testid="kiosk-done-btn"
-            className="border-[#E2DDD7] text-[#1C3F39] rounded-full"
+            className="border-[#DCE8E9] text-[#0B7C8C] rounded-full"
           >
             Done
           </Button>
           <Button
             onClick={() => onPrint(data.chit)}
             data-testid="kiosk-reprint-btn"
-            className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full"
+            className="bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9] rounded-full"
           >
             Print ticket again
           </Button>
@@ -534,7 +534,7 @@ function CheckinFlow({ onPrint }) {
     <div>
       <div className="overline">Step 1</div>
       <h2 className="font-display text-2xl mt-1">Identify yourself</h2>
-      <p className="text-sm text-[#5C6661] mt-1 mb-6">Key in your IC number — or use the camera to scan the QR code on your appointment slip.</p>
+      <p className="text-sm text-[#5A6B70] mt-1 mb-6">Key in your IC number — or use the camera to scan the QR code on your appointment slip.</p>
 
       <div className="grid md:grid-cols-2 gap-4">
         {/* Manual IC entry — primary */}
@@ -553,25 +553,25 @@ function CheckinFlow({ onPrint }) {
             inputMode="numeric"
             autoComplete="off"
             placeholder="000000-00-0000"
-            className="mt-3 h-16 text-2xl tracking-widest text-center font-mono border-[#E2DDD7] bg-white rounded-2xl"
+            className="mt-3 h-16 text-2xl tracking-widest text-center font-mono border-[#DCE8E9] bg-white rounded-2xl"
           />
           <Button
             data-testid="kiosk-lookup-btn"
             onClick={() => ic && lookup(ic)}
             disabled={ic.replace(/[^0-9]/g, "").length !== 12 || tapping}
-            className="w-full mt-4 h-12 text-base bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-2xl btn-shimmer"
+            className="w-full mt-4 h-12 text-base bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9] rounded-2xl btn-shimmer"
           >
             {tapping ? "Checking…" : "Continue"}
           </Button>
-          <div className="text-[11px] text-[#5C6661] mt-3 text-center">
+          <div className="text-[11px] text-[#5A6B70] mt-3 text-center">
             12 digits, as printed on your MyKad
           </div>
         </div>
 
         {/* QR camera */}
-        <div className="rounded-2xl border border-[#E2DDD7] bg-white p-4 flex flex-col">
+        <div className="rounded-2xl border border-[#DCE8E9] bg-white p-4 flex flex-col">
           <div className="overline mb-2 flex items-center gap-1.5"><QrCode size={12} weight="duotone" /> QR scan</div>
-          <div className="relative rounded-2xl overflow-hidden border border-[#E2DDD7] bg-black aspect-[4/3] flex-1">
+          <div className="relative rounded-2xl overflow-hidden border border-[#DCE8E9] bg-black aspect-[4/3] flex-1">
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             {!scanning && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/55 text-white text-sm">
@@ -580,8 +580,8 @@ function CheckinFlow({ onPrint }) {
             )}
             {scanning && (
               <>
-                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-[#D4A373] shadow-[0_0_12px_#D4A373] animate-pulse" />
-                <div className="absolute inset-6 border-2 border-[#D4A373] rounded-xl" />
+                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-[#086788] shadow-[0_0_12px_#086788] animate-pulse" />
+                <div className="absolute inset-6 border-2 border-[#086788] rounded-xl" />
               </>
             )}
           </div>
@@ -590,7 +590,7 @@ function CheckinFlow({ onPrint }) {
             disabled={scanning}
             onClick={startCam}
             variant="outline"
-            className="mt-3 border-[#E2DDD7] text-[#1C3F39] hover:bg-[#F3EFE9]"
+            className="mt-3 border-[#DCE8E9] text-[#0B7C8C] hover:bg-[#EAF5F5]"
           >
             {scanning ? "Scanning…" : "Start QR scan"}
           </Button>
@@ -653,19 +653,19 @@ function PayFlow({ onPrint }) {
       <div className="max-w-md">
         <div className="overline">Pay outstanding fees</div>
         <h2 className="font-display text-2xl mt-1">Identify yourself</h2>
-        <p className="text-sm text-[#5C6661] mt-1 mb-4">Enter your IC to view today&apos;s charges.</p>
+        <p className="text-sm text-[#5A6B70] mt-1 mb-4">Enter your IC to view today&apos;s charges.</p>
         <Input
           data-testid="kiosk-pay-ic"
           value={ic}
           onChange={(e) => setIc(e.target.value)}
           placeholder="880421-14-5567"
-          className="font-mono border-[#E2DDD7]"
+          className="font-mono border-[#DCE8E9]"
         />
         <Button
           data-testid="kiosk-pay-lookup"
           onClick={lookup}
           disabled={!ic || busy}
-          className="w-full mt-3 bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6]"
+          className="w-full mt-3 bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9]"
         >
           {busy ? "Loading…" : "Continue"}
         </Button>
@@ -683,7 +683,7 @@ function PayFlow({ onPrint }) {
         <Button
           variant="outline"
           onClick={() => { setIc(""); setData(null); }}
-          className="border-[#E2DDD7] text-[#1C3F39] rounded-full"
+          className="border-[#DCE8E9] text-[#0B7C8C] rounded-full"
           data-testid="kiosk-pay-back"
         >
           <ArrowLeft size={14} className="mr-1.5" /> Back
@@ -692,16 +692,16 @@ function PayFlow({ onPrint }) {
 
       <div className="overline">Outstanding</div>
       {outstanding.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#E2DDD7] p-5 mt-2 text-sm text-[#5C6661]">
+        <div className="rounded-2xl border border-dashed border-[#DCE8E9] p-5 mt-2 text-sm text-[#5A6B70]">
           Nothing to pay right now.
         </div>
       ) : (
         <div className="space-y-2 mt-2">
           {outstanding.map((a) => (
-            <div key={a.id} data-testid="kiosk-pay-row" className="flex items-center justify-between p-3 rounded-xl border border-[#E2DDD7] bg-white">
+            <div key={a.id} data-testid="kiosk-pay-row" className="flex items-center justify-between p-3 rounded-xl border border-[#DCE8E9] bg-white">
               <div>
-                <div className="text-sm font-medium">{a.doctor?.name} <span className="text-[#5C6661] font-normal">· {a.doctor?.specialty || "General"}</span></div>
-                <div className="text-xs text-[#5C6661] font-mono">#{a.queue_number} · {a.reason}</div>
+                <div className="text-sm font-medium">{a.doctor?.name} <span className="text-[#5A6B70] font-normal">· {a.doctor?.specialty || "General"}</span></div>
+                <div className="text-xs text-[#5A6B70] font-mono">#{a.queue_number} · {a.reason}</div>
                 <Badge className={`mt-1 ${statusBadge[a.status]}`}>{a.status.replaceAll("_", " ")}</Badge>
               </div>
               <div className="text-right">
@@ -711,7 +711,7 @@ function PayFlow({ onPrint }) {
                   onClick={() => pay(a)}
                   disabled={paying === a.id || a.status === "scheduled"}
                   size="sm"
-                  className="bg-[#B55B49] hover:bg-[#9b4a3b] text-[#F9F9F6] rounded-full mt-2"
+                  className="bg-[#0A3D62] hover:bg-[#083150] text-[#F4F9F9] rounded-full mt-2"
                   title={a.status === "scheduled" ? "Wait until your consultation finishes" : ""}
                 >
                   <CreditCard size={12} className="mr-1.5" />
@@ -728,10 +728,10 @@ function PayFlow({ onPrint }) {
           <div className="overline mt-6">Paid today</div>
           <div className="space-y-2 mt-2">
             {paid.map((a) => (
-              <div key={a.id} className="flex items-center justify-between p-3 rounded-xl border border-[#E2DDD7] bg-[#F3EFE9]">
+              <div key={a.id} className="flex items-center justify-between p-3 rounded-xl border border-[#DCE8E9] bg-[#EAF5F5]">
                 <div>
                   <div className="text-sm font-medium">{a.doctor?.name}</div>
-                  <div className="text-xs text-[#5C6661] font-mono">#{a.queue_number}</div>
+                  <div className="text-xs text-[#5A6B70] font-mono">#{a.queue_number}</div>
                 </div>
                 <Badge className={statusBadge[a.status]}>{a.status.replaceAll("_", " ")}</Badge>
               </div>
@@ -781,13 +781,13 @@ function StatusFlow() {
           value={ic}
           onChange={(e) => setIc(e.target.value)}
           placeholder="880421-14-5567"
-          className="font-mono border-[#E2DDD7] mt-4"
+          className="font-mono border-[#DCE8E9] mt-4"
         />
         <Button
           data-testid="kiosk-status-lookup"
           onClick={lookup}
           disabled={!ic || busy}
-          className="w-full mt-3 bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6]"
+          className="w-full mt-3 bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9]"
         >
           {busy ? "Loading…" : "View status"}
         </Button>
@@ -806,14 +806,14 @@ function StatusFlow() {
         <Button
           variant="outline"
           onClick={() => { setIc(""); setData(null); }}
-          className="border-[#E2DDD7] text-[#1C3F39] rounded-full"
+          className="border-[#DCE8E9] text-[#0B7C8C] rounded-full"
           data-testid="kiosk-status-back"
         >
           <ArrowLeft size={14} className="mr-1.5" /> Back
         </Button>
       </div>
       {appts.length === 0 && (
-        <div className="text-sm text-[#5C6661]">No appointments today.</div>
+        <div className="text-sm text-[#5A6B70]">No appointments today.</div>
       )}
       <div className="space-y-2">
         <AnimatePresence>
@@ -822,14 +822,14 @@ function StatusFlow() {
               key={a.id}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-3 p-4 rounded-xl border border-[#E2DDD7] bg-white"
+              className="flex items-center gap-3 p-4 rounded-xl border border-[#DCE8E9] bg-white"
             >
-              <div className="w-12 h-12 rounded-full bg-[#1C3F39] text-[#F9F9F6] flex items-center justify-center font-mono">
+              <div className="w-12 h-12 rounded-full bg-[#0B7C8C] text-[#F4F9F9] flex items-center justify-center font-mono">
                 #{a.queue_number}
               </div>
               <div className="flex-1">
                 <div className="text-sm font-medium">{a.doctor?.name}</div>
-                <div className="text-xs text-[#5C6661]">{a.reason}</div>
+                <div className="text-xs text-[#5A6B70]">{a.reason}</div>
               </div>
               <Badge className={statusBadge[a.status]} data-testid={`kiosk-status-pill-${a.id}`}>
                 {a.status.replaceAll("_", " ")}

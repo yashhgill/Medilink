@@ -46,10 +46,10 @@ function SyncIndicatorInner({ compact = false }) {
       >
         <span
           className={`w-2 h-2 rounded-full breathe ${
-            syncing ? "bg-[#D4A373]" : "bg-[#2D6A4F]"
+            syncing ? "bg-[#086788]" : "bg-[#2D6A4F]"
           }`}
         />
-        <span className="text-[#5C6661]">
+        <span className="text-[#5A6B70]">
           {syncing ? "Syncing…" : "Synced"} · {cloudPct}%
         </span>
       </div>
@@ -66,10 +66,10 @@ function SyncIndicatorInner({ compact = false }) {
     >
       <div className="flex items-center justify-between mb-4">
         <div className="overline">Storage Sync</div>
-        <div className="flex items-center gap-2 text-xs font-mono text-[#5C6661]">
+        <div className="flex items-center gap-2 text-xs font-mono text-[#5A6B70]">
           <span
             className={`w-1.5 h-1.5 rounded-full breathe ${
-              syncing ? "bg-[#D4A373]" : "bg-[#2D6A4F]"
+              syncing ? "bg-[#086788]" : "bg-[#2D6A4F]"
             }`}
           />
           {syncing ? "syncing" : "stable"}
@@ -77,26 +77,26 @@ function SyncIndicatorInner({ compact = false }) {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-xl p-4 border bg-[#F3EFE9]" style={{ borderColor: "var(--ml-border)" }}>
-          <div className="flex items-center gap-2 mb-2 text-[#1C3F39]">
+        <div className="rounded-xl p-4 border bg-[#EAF5F5]" style={{ borderColor: "var(--ml-border)" }}>
+          <div className="flex items-center gap-2 mb-2 text-[#0B7C8C]">
             <HardDrives size={18} weight="duotone" />
             <span className="text-sm font-medium">Local NVMe SSD</span>
           </div>
-          <div className="font-display text-3xl text-[#1C3F39]" data-testid="ssd-count">
+          <div className="font-display text-3xl text-[#0B7C8C]" data-testid="ssd-count">
             {data.local_ssd}
           </div>
-          <div className="text-xs text-[#5C6661] mt-1">records on disk</div>
+          <div className="text-xs text-[#5A6B70] mt-1">records on disk</div>
         </div>
 
         <div className="rounded-xl p-4 border bg-white relative overflow-hidden" style={{ borderColor: "var(--ml-border)" }}>
-          <div className="flex items-center gap-2 mb-2 text-[#1C3F39]">
+          <div className="flex items-center gap-2 mb-2 text-[#0B7C8C]">
             <CloudCheck size={18} weight="duotone" />
             <span className="text-sm font-medium">MediLink Cloud</span>
           </div>
-          <div className="font-display text-3xl text-[#1C3F39]" data-testid="cloud-count">
+          <div className="font-display text-3xl text-[#0B7C8C]" data-testid="cloud-count">
             {data.cloud}
           </div>
-          <div className="text-xs text-[#5C6661] mt-1">{cloudPct}% mirrored</div>
+          <div className="text-xs text-[#5A6B70] mt-1">{cloudPct}% mirrored</div>
         </div>
       </div>
 
@@ -104,7 +104,7 @@ function SyncIndicatorInner({ compact = false }) {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="mt-3 flex items-center gap-2 text-xs text-[#B55B49] font-mono"
+          className="mt-3 flex items-center gap-2 text-xs text-[#0A3D62] font-mono"
         >
           <ArrowsClockwise size={14} className="animate-spin" />
           {data.pending_sync} record(s) syncing to cloud…
@@ -112,7 +112,7 @@ function SyncIndicatorInner({ compact = false }) {
       )}
 
       {data.last_synced && (
-        <div className="mt-3 text-[11px] text-[#5C6661] font-mono">
+        <div className="mt-3 text-[11px] text-[#5A6B70] font-mono">
           Last sync: {new Date(data.last_synced).toLocaleString()}
         </div>
       )}

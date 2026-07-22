@@ -53,7 +53,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2 bg-[#F9F9F6]">
+    <div className="min-h-screen grid lg:grid-cols-2 bg-[#F4F9F9]">
       {/* Left visual */}
       <div className="relative hidden lg:block overflow-hidden">
         <img
@@ -61,16 +61,16 @@ export default function Login() {
           alt="Clinic"
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-[#1C3F39]/70" />
-        <div className="relative h-full p-12 flex flex-col justify-between text-[#F9F9F6]">
+        <div className="absolute inset-0 bg-[#0B7C8C]/70" />
+        <div className="relative h-full p-12 flex flex-col justify-between text-[#F4F9F9]">
           <Link to="/" className="flex items-center gap-2.5" data-testid="brand-home">
             <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur">
-              <Heartbeat size={20} color="#F9F9F6" weight="duotone" />
+              <Heartbeat size={20} color="#F4F9F9" weight="duotone" />
             </div>
             <div>
               <div className="font-display text-lg leading-none">MediLink</div>
               <div className="text-[10px] uppercase tracking-[0.18em] text-white/70">
-                Cloud · AI · IoT
+                Health Systems
               </div>
             </div>
           </Link>
@@ -79,11 +79,10 @@ export default function Login() {
               MediLink Health Systems
             </div>
             <div className="font-display text-4xl lg:text-5xl leading-tight max-w-md">
-              Check in. Triage. Treat. <br />Zero downtime.
+              Check in. Triage.<br />Treat.
             </div>
             <div className="text-white/70 mt-4 max-w-md">
-              A local-first clinic system — every record lives in the clinic and
-              mirrors to the cloud, so care never stops when the internet does.
+              One system for the whole clinic — check-in, consultation, dispensing and records. Built for Malaysian clinics.
             </div>
           </div>
         </div>
@@ -93,8 +92,8 @@ export default function Login() {
       <div className="flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-9 h-9 rounded-xl bg-[#1C3F39] flex items-center justify-center">
-              <Heartbeat size={20} color="#F9F9F6" weight="duotone" />
+            <div className="w-9 h-9 rounded-xl bg-[#0B7C8C] flex items-center justify-center">
+              <Heartbeat size={20} color="#F4F9F9" weight="duotone" />
             </div>
             <div className="font-display text-lg">MediLink</div>
           </div>
@@ -103,7 +102,7 @@ export default function Login() {
           <h2 className="font-display text-3xl sm:text-4xl tracking-tight mb-1">
             Welcome back
           </h2>
-          <p className="text-sm text-[#5C6661] mb-8">
+          <p className="text-sm text-[#5A6B70] mb-8">
             Sign in to view your records and bills.
           </p>
 
@@ -117,7 +116,7 @@ export default function Login() {
                 placeholder="you@email.com or 000000-00-0000"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="border-[#E2DDD7] focus-visible:ring-[#1C3F39]"
+                className="border-[#DCE8E9] focus-visible:ring-[#0B7C8C]"
               />
             </div>
             <div className="space-y-1.5">
@@ -129,22 +128,22 @@ export default function Login() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="border-[#E2DDD7] focus-visible:ring-[#1C3F39]"
+                className="border-[#DCE8E9] focus-visible:ring-[#0B7C8C]"
               />
             </div>
             <Button
               data-testid="login-submit"
               type="submit"
               disabled={loading}
-              className="w-full h-11 bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full lift-on-hover"
+              className="w-full h-11 bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9] rounded-full lift-on-hover"
             >
               {loading ? "Signing in…" : (<>Sign in <ArrowRight size={16} className="ml-1.5" /></>)}
             </Button>
           </form>
 
           {!IS_PUBLIC && (
-          <div className="flex items-center gap-3 my-8 text-[10px] uppercase tracking-[0.2em] text-[#5C6661]">
-            <div className="h-px flex-1 bg-[#E2DDD7]" /> Demo accounts <div className="h-px flex-1 bg-[#E2DDD7]" />
+          <div className="flex items-center gap-3 my-8 text-[10px] uppercase tracking-[0.2em] text-[#5A6B70]">
+            <div className="h-px flex-1 bg-[#DCE8E9]" /> Demo accounts <div className="h-px flex-1 bg-[#DCE8E9]" />
           </div>
           )}
 
@@ -155,29 +154,29 @@ export default function Login() {
                 data-testid={`demo-login-${d.role.toLowerCase()}`}
                 onClick={() => quick(d)}
                 disabled={loading}
-                className="text-left p-3 rounded-xl border border-[#E2DDD7] bg-white hover:bg-[#F3EFE9] transition-colors flex items-center justify-between"
+                className="text-left p-3 rounded-xl border border-[#DCE8E9] bg-white hover:bg-[#EAF5F5] transition-colors flex items-center justify-between"
               >
                 <div>
                   <div className="text-sm font-medium">{d.role}</div>
-                  <div className="text-xs font-mono text-[#5C6661]">{d.email}</div>
+                  <div className="text-xs font-mono text-[#5A6B70]">{d.email}</div>
                 </div>
-                <ArrowRight size={16} className="text-[#1C3F39]" />
+                <ArrowRight size={16} className="text-[#0B7C8C]" />
               </button>
             ))}
           </div>
 
-          <p className="text-sm text-[#5C6661] mt-6 text-center">
+          <p className="text-sm text-[#5A6B70] mt-6 text-center">
             Forgot your password? Get a reset code at the clinic kiosk, then use{" "}
-            <Link to="/activate" className="text-[#1C3F39] font-medium underline-offset-2 hover:underline">Activate</Link>. First visit?{" "}
-            <Link to="/activate" className="text-[#1C3F39] font-medium underline-offset-2 hover:underline" data-testid="goto-activate">
+            <Link to="/activate" className="text-[#0B7C8C] font-medium underline-offset-2 hover:underline">Activate</Link>. First visit?{" "}
+            <Link to="/activate" className="text-[#0B7C8C] font-medium underline-offset-2 hover:underline" data-testid="goto-activate">
               Activate your account
             </Link>{" "}
             with the code on your clinic slip.
           </p>
           {!IS_PUBLIC && (
-          <p className="text-sm text-[#5C6661] mt-2 text-center">
+          <p className="text-sm text-[#5A6B70] mt-2 text-center">
             New here?{" "}
-            <Link to="/register" className="text-[#1C3F39] font-medium underline-offset-2 hover:underline" data-testid="goto-register">
+            <Link to="/register" className="text-[#0B7C8C] font-medium underline-offset-2 hover:underline" data-testid="goto-register">
               Create an account
             </Link>
           </p>

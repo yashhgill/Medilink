@@ -16,13 +16,13 @@ import {
 import { toast } from "sonner";
 
 const STATUS_STYLE = {
-  scheduled: { bg: "#D4A373", fg: "#1C3F39" },
-  checked_in: { bg: "#1C3F39", fg: "#F9F9F6" },
-  in_progress: { bg: "#B55B49", fg: "#F9F9F6" },
-  completed: { bg: "#2D6A4F", fg: "#F9F9F6" },
-  ready_for_pharmacy: { bg: "#0A0F0D", fg: "#F9F9F6" },
-  dispensed: { bg: "#5C6661", fg: "#F9F9F6" },
-  cancelled: { bg: "#9B2226", fg: "#F9F9F6" },
+  scheduled: { bg: "#086788", fg: "#0B7C8C" },
+  checked_in: { bg: "#0B7C8C", fg: "#F4F9F9" },
+  in_progress: { bg: "#0A3D62", fg: "#F4F9F9" },
+  completed: { bg: "#2D6A4F", fg: "#F4F9F9" },
+  ready_for_pharmacy: { bg: "#12262B", fg: "#F4F9F9" },
+  dispensed: { bg: "#5A6B70", fg: "#F4F9F9" },
+  cancelled: { bg: "#9B2226", fg: "#F4F9F9" },
 };
 
 const todayYmd = () => new Date().toISOString().slice(0, 10);
@@ -113,12 +113,12 @@ export default function DoctorScheduler({ doctorId }) {
   };
 
   return (
-    <div className="rounded-2xl border border-[#E2DDD7] bg-white p-6">
+    <div className="rounded-2xl border border-[#DCE8E9] bg-white p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <div className="overline">Schedule</div>
           <h3 className="font-display text-xl mt-1 flex items-center gap-2">
-            <CalIcon size={18} weight="duotone" color="#1C3F39" /> Day planner · drag to reschedule
+            <CalIcon size={18} weight="duotone" color="#0B7C8C" /> Day planner · drag to reschedule
           </h3>
         </div>
         <div className="flex items-center gap-1">
@@ -127,7 +127,7 @@ export default function DoctorScheduler({ doctorId }) {
             variant="ghost"
             data-testid="sched-prev"
             onClick={() => setDate(addDays(date, -1))}
-            className="text-[#1C3F39] hover:bg-[#F3EFE9] rounded-full"
+            className="text-[#0B7C8C] hover:bg-[#EAF5F5] rounded-full"
           >
             <CaretLeft size={16} />
           </Button>
@@ -136,14 +136,14 @@ export default function DoctorScheduler({ doctorId }) {
             data-testid="sched-date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="font-mono border-[#E2DDD7] h-9 w-40"
+            className="font-mono border-[#DCE8E9] h-9 w-40"
           />
           <Button
             size="icon"
             variant="ghost"
             data-testid="sched-next"
             onClick={() => setDate(addDays(date, 1))}
-            className="text-[#1C3F39] hover:bg-[#F3EFE9] rounded-full"
+            className="text-[#0B7C8C] hover:bg-[#EAF5F5] rounded-full"
           >
             <CaretRight size={16} />
           </Button>
@@ -151,9 +151,9 @@ export default function DoctorScheduler({ doctorId }) {
       </div>
 
       <div className="grid grid-cols-[80px_1fr] gap-2 max-h-[460px] overflow-y-auto pr-1">
-        {loading && <div className="col-span-2 text-sm text-[#5C6661]">Loading…</div>}
+        {loading && <div className="col-span-2 text-sm text-[#5A6B70]">Loading…</div>}
         {!loading && slots.length === 0 && (
-          <div className="col-span-2 rounded-xl bg-[#F3EFE9] border border-[#E2DDD7] p-5 text-sm text-[#5C6661]">
+          <div className="col-span-2 rounded-xl bg-[#EAF5F5] border border-[#DCE8E9] p-5 text-sm text-[#5A6B70]">
             No working hours configured for this day. Update availability above to start scheduling.
           </div>
         )}
@@ -161,7 +161,7 @@ export default function DoctorScheduler({ doctorId }) {
           const items = apptBySlot[s.time] || [];
           return (
             <React.Fragment key={s.time}>
-              <div className="text-[11px] font-mono text-[#5C6661] pt-2 sticky left-0">
+              <div className="text-[11px] font-mono text-[#5A6B70] pt-2 sticky left-0">
                 {s.time}
               </div>
               <SlotCell
@@ -181,7 +181,7 @@ export default function DoctorScheduler({ doctorId }) {
         })}
       </div>
 
-      <div className="flex items-center gap-3 mt-4 text-[11px] text-[#5C6661] flex-wrap">
+      <div className="flex items-center gap-3 mt-4 text-[11px] text-[#5A6B70] flex-wrap">
         <span className="inline-flex items-center gap-1"><WaveTriangle size={12} weight="duotone" /> Drag a block to move it</span>
         <span className="inline-flex items-center gap-1"><ShieldSlash size={12} /> + on an empty slot blocks the time</span>
         <span className="inline-flex items-center gap-1"><Pulse size={12} /> Status colours match dashboards</span>
@@ -212,7 +212,7 @@ function SlotCell({ slot, items, dragId, onDragStart, onDrop, onBlock, onUnblock
       onDrop={onDropEv}
       data-testid={`sched-slot-${slot.time}`}
       className={`min-h-[44px] rounded-lg border ${
-        hovering ? "border-[#1C3F39] bg-[#F3EFE9]" : "border-dashed border-[#E2DDD7] bg-[#F9F9F6]"
+        hovering ? "border-[#0B7C8C] bg-[#EAF5F5]" : "border-dashed border-[#DCE8E9] bg-[#F4F9F9]"
       } p-1.5 flex flex-wrap gap-1.5 items-center transition-colors`}
     >
       {items.map((a) => (
@@ -223,7 +223,7 @@ function SlotCell({ slot, items, dragId, onDragStart, onDrop, onBlock, onUnblock
           type="button"
           onClick={onBlock}
           data-testid={`sched-block-${slot.time}`}
-          className="ml-auto text-[10px] text-[#5C6661] hover:text-[#1C3F39] flex items-center gap-1 font-mono"
+          className="ml-auto text-[10px] text-[#5A6B70] hover:text-[#0B7C8C] flex items-center gap-1 font-mono"
         >
           <Plus size={11} /> block
         </button>
@@ -247,8 +247,8 @@ function ApptBlock({ a, dragging, onDragStart, onDragEnd, onUnblock }) {
       whileTap={{ scale: 0.97 }}
       data-testid={`sched-appt-${a.id}`}
       style={{
-        backgroundColor: isBlock ? "#5C6661" : st.bg,
-        color: isBlock ? "#F9F9F6" : st.fg,
+        backgroundColor: isBlock ? "#5A6B70" : st.bg,
+        color: isBlock ? "#F4F9F9" : st.fg,
         opacity: dragging ? 0.55 : 1,
       }}
       className="cursor-grab active:cursor-grabbing rounded-md px-2 py-1 text-[11px] font-medium flex items-center gap-1.5 max-w-full"

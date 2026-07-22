@@ -109,10 +109,10 @@ export default function AIChat({ open, onOpenChange }) {
         side="right"
         className="glass !w-full sm:!max-w-[460px] p-0 flex flex-col border-l border-white/40"
       >
-        <SheetHeader className="px-6 pt-6 pb-3 border-b border-[#E2DDD7]/60">
+        <SheetHeader className="px-6 pt-6 pb-3 border-b border-[#DCE8E9]/60">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-[#1C3F39] flex items-center justify-center">
-              <Stethoscope size={18} color="#F9F9F6" weight="duotone" />
+            <div className="w-9 h-9 rounded-full bg-[#0B7C8C] flex items-center justify-center">
+              <Stethoscope size={18} color="#F4F9F9" weight="duotone" />
             </div>
             <div>
               <SheetTitle className="font-display text-lg leading-tight">
@@ -138,12 +138,12 @@ export default function AIChat({ open, onOpenChange }) {
                   data-testid={`chat-msg-${m.role}`}
                   className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
                     m.role === "user"
-                      ? "bg-[#1C3F39] text-[#F9F9F6] rounded-br-md"
-                      : "bg-white border border-[#E2DDD7] text-[#0A0F0D] rounded-bl-md"
+                      ? "bg-[#0B7C8C] text-[#F4F9F9] rounded-br-md"
+                      : "bg-white border border-[#DCE8E9] text-[#12262B] rounded-bl-md"
                   }`}
                 >
                   {m.content || (
-                    <span className="inline-flex items-center gap-1 text-[#5C6661]">
+                    <span className="inline-flex items-center gap-1 text-[#5A6B70]">
                       <Sparkle size={12} weight="fill" className="animate-pulse" />
                       thinking…
                     </span>
@@ -154,7 +154,7 @@ export default function AIChat({ open, onOpenChange }) {
           </AnimatePresence>
         </div>
 
-        <div className="border-t border-[#E2DDD7]/60 p-4 bg-white/40 backdrop-blur-md">
+        <div className="border-t border-[#DCE8E9]/60 p-4 bg-white/40 backdrop-blur-md">
           <div className="flex gap-2 items-end">
             <Textarea
               data-testid="ai-chat-input"
@@ -167,18 +167,18 @@ export default function AIChat({ open, onOpenChange }) {
                 }
               }}
               placeholder="Describe your symptoms…"
-              className="resize-none min-h-[52px] max-h-32 bg-white border-[#E2DDD7] focus-visible:ring-[#1C3F39]"
+              className="resize-none min-h-[52px] max-h-32 bg-white border-[#DCE8E9] focus-visible:ring-[#0B7C8C]"
             />
             <Button
               data-testid="ai-chat-send"
               onClick={send}
               disabled={streaming || !input.trim()}
-              className="h-[52px] bg-[#B55B49] hover:bg-[#9b4a3b] text-[#F9F9F6]"
+              className="h-[52px] bg-[#0A3D62] hover:bg-[#083150] text-[#F4F9F9]"
             >
               <PaperPlaneTilt size={18} weight="fill" />
             </Button>
           </div>
-          <div className="text-[10px] text-[#5C6661] mt-2 font-mono text-center">
+          <div className="text-[10px] text-[#5A6B70] mt-2 font-mono text-center">
             Not a substitute for professional medical advice.
           </div>
         </div>

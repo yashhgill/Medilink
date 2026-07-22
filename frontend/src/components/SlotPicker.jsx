@@ -37,7 +37,7 @@ export default function SlotPicker({ doctorId, value, onChange }) {
 
   return (
     <div className="grid sm:grid-cols-[auto_1fr] gap-4">
-      <div className="rounded-2xl border border-[#E2DDD7] bg-white p-3">
+      <div className="rounded-2xl border border-[#DCE8E9] bg-white p-3">
         <Calendar
           mode="single"
           selected={date}
@@ -47,22 +47,22 @@ export default function SlotPicker({ doctorId, value, onChange }) {
           className="rounded-md"
         />
       </div>
-      <div className="rounded-2xl border border-[#E2DDD7] bg-white p-4">
-        <div className="flex items-center gap-2 mb-3 text-[#1C3F39]">
+      <div className="rounded-2xl border border-[#DCE8E9] bg-white p-4">
+        <div className="flex items-center gap-2 mb-3 text-[#0B7C8C]">
           <CalendarBlank size={16} weight="duotone" />
           <div className="text-sm font-medium">
             {date.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
           </div>
         </div>
-        {!doctorId && <div className="text-sm text-[#5C6661]">Choose a doctor first.</div>}
-        {doctorId && loading && <div className="text-sm text-[#5C6661]">Loading slots…</div>}
+        {!doctorId && <div className="text-sm text-[#5A6B70]">Choose a doctor first.</div>}
+        {doctorId && loading && <div className="text-sm text-[#5A6B70]">Loading slots…</div>}
         {doctorId && !loading && off && (
-          <div className="rounded-xl bg-[#F3EFE9] border border-[#E2DDD7] p-4 text-sm text-[#5C6661]">
+          <div className="rounded-xl bg-[#EAF5F5] border border-[#DCE8E9] p-4 text-sm text-[#5A6B70]">
             Doctor is off this day.
           </div>
         )}
         {doctorId && !loading && !off && slots.length === 0 && (
-          <div className="text-sm text-[#5C6661]">No slots available.</div>
+          <div className="text-sm text-[#5A6B70]">No slots available.</div>
         )}
         {!loading && !off && slots.length > 0 && (
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[280px] overflow-y-auto pr-1">
@@ -77,10 +77,10 @@ export default function SlotPicker({ doctorId, value, onChange }) {
                   onClick={() => onChange(s.iso)}
                   className={`relative flex items-center justify-center gap-1 px-2 h-9 rounded-full border text-xs font-mono transition-colors ${
                     s.booked
-                      ? "opacity-40 cursor-not-allowed border-[#E2DDD7] line-through"
+                      ? "opacity-40 cursor-not-allowed border-[#DCE8E9] line-through"
                       : sel
-                      ? "bg-[#1C3F39] text-[#F9F9F6] border-[#1C3F39]"
-                      : "border-[#E2DDD7] hover:bg-[#F3EFE9]"
+                      ? "bg-[#0B7C8C] text-[#F4F9F9] border-[#0B7C8C]"
+                      : "border-[#DCE8E9] hover:bg-[#EAF5F5]"
                   }`}
                 >
                   <Clock size={11} weight="duotone" /> {s.time}
