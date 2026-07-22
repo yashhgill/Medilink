@@ -9,6 +9,7 @@ import Login, { redirectFor } from "@/pages/Login";
 import Activate from "@/pages/Activate";
 import PharmacyInventory from "@/pages/PharmacyInventory";
 import Facilities from "@/pages/Facilities";
+import InstallPrompt from "@/components/InstallPrompt";
 import Register from "@/pages/Register";
 import PatientDashboard from "@/pages/PatientDashboard";
 import DoctorDashboard from "@/pages/DoctorDashboard";
@@ -86,6 +87,7 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <Toaster position="top-right" richColors />
+          <InstallPrompt />
         </BrowserRouter>
       </AuthProvider>
     </div>
