@@ -1,176 +1,146 @@
 import React from "react";
 import { IS_PUBLIC } from "@/lib/api";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
 import {
-  Heartbeat,
-  WaveTriangle,
-  CloudCheck,
-  HardDrives,
-  Sparkle,
-  ShieldCheck,
-  ArrowRight,
-  Stethoscope,
-  Cardholder,
+  Heartbeat, WaveTriangle, Stethoscope, CloudCheck, ShieldCheck,
+  ArrowRight, Pill, IdentificationCard, Broadcast, Lock,
 } from "@phosphor-icons/react";
 
+/* Malaysian healthcare palette */
+const C = {
+  teal: "#0B7C8C", tealDark: "#075F6C", navy: "#0A3D62",
+  mist: "#EAF5F5", ink: "#12262B", slate: "#5A6B70", red: "#D64550",
+};
+
 const features = [
-  {
-    icon: WaveTriangle,
-    title: "Kiosk IC Check-in",
-    body: "Walk in, type your IC number at the kiosk — registered, triaged and queued in under a minute.",
-  },
-  {
-    icon: Stethoscope,
-    title: "AI Triage",
-    body: "Symptom checker, history summarizer, and drug-interaction safety net for every clinician.",
-  },
-  {
-    icon: HardDrives,
-    title: "SSD + Cloud",
-    body: "Writes hit your local NVMe first, then mirror to cloud. Zero downtime — clinics keep running offline.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Role-aware PHR",
-    body: "Patients, doctors, and reception each see what they need — with token queues and mock payments built-in.",
-  },
+  { icon: IdentificationCard, title: "Kiosk IC Check-in",
+    body: "Patients walk in and enter their IC — registered, AI-triaged and queued in under a minute. No receptionist required." },
+  { icon: Stethoscope, title: "Clinician Workspace",
+    body: "AI pre-consult briefings, live Bluetooth vitals, e-prescriptions and one-tap medical certificates for every doctor." },
+  { icon: Pill, title: "Pharmacy & Inventory",
+    body: "Prescriptions flow straight to the dispensary with a full stock ledger, low-stock and expiry alerts." },
+  { icon: CloudCheck, title: "Local-first, Cloud-mirrored",
+    body: "Records write to the clinic's own storage first, then mirror to the cloud. Care never stops when the internet does." },
+  { icon: ShieldCheck, title: "Encrypted & Auditable",
+    body: "IC numbers are encrypted at rest with a searchable blind index. Every record access is logged — PDPA-ready." },
+  { icon: Broadcast, title: "One Patient, One Record",
+    body: "Records follow the patient across every connected clinic, labelled by facility — a truly national health record." },
 ];
 
 export default function Landing() {
   const nav = useNavigate();
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-[#F9F9F6]">
-      {/* Grid bg */}
-      <div className="absolute inset-0 bg-lines opacity-60 pointer-events-none" />
-
-      {/* Top nav */}
-      <nav className="relative z-10 max-w-[1400px] mx-auto px-6 md:px-8 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2.5" data-testid="brand-home">
-          <div className="w-9 h-9 rounded-xl bg-[#1C3F39] flex items-center justify-center">
-            <Heartbeat size={20} color="#F9F9F6" weight="duotone" />
-          </div>
-          <div>
-            <div className="font-display text-lg leading-none">MediLink</div>
-            <div className="text-[10px] uppercase tracking-[0.18em] text-[#5C6661]">
-              Cloud · AI · IoT
+    <div className="min-h-screen" style={{ background: "#FFFFFF", color: C.ink }}>
+      {/* Nav */}
+      <header className="sticky top-0 z-30 backdrop-blur-md" style={{ background: "rgba(255,255,255,0.9)", borderBottom: `1px solid ${C.mist}` }}>
+        <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: C.teal }}>
+              <Heartbeat size={20} color="#fff" weight="duotone" />
+            </div>
+            <div>
+              <div className="font-display text-lg leading-none" style={{ color: C.navy }}>MediLink</div>
+              <div className="text-[10px] uppercase tracking-[0.2em]" style={{ color: C.slate }}>Health Systems</div>
             </div>
           </div>
-        </Link>
-        <div className="flex items-center gap-2">
-          <Button
-            data-testid="cta-login-nav"
-            variant="ghost"
-            onClick={() => nav("/login")}
-            className="text-[#1C3F39] hover:bg-[#F3EFE9]"
-          >
-            Sign in
-          </Button>
-          <Button
-            data-testid="cta-register-nav"
-            onClick={() => nav(IS_PUBLIC ? "/login" : "/register")}
-            className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full px-5"
-          >
-            Get Started
-          </Button>
-        </div>
-      </nav>
-
-      {/* Hero */}
-      <section className="relative z-10 max-w-[1400px] mx-auto px-6 md:px-8 pt-16 pb-20 grid lg:grid-cols-12 gap-10 items-center">
-        <div className="lg:col-span-12 max-w-3xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#E2DDD7] bg-white text-xs font-mono text-[#5C6661] mb-6">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#2D6A4F] breathe" />
-            Clinic operating system · Local-first · Secure
-          </div>
-
-          <h1 className="font-display font-semibold tracking-tight text-5xl sm:text-6xl lg:text-7xl leading-[0.95] text-[#0A0F0D]">
-            Personal health records that{" "}
-            <span className="text-[#1C3F39]">never go down.</span>
-          </h1>
-
-          <p className="mt-6 text-lg text-[#5C6661] max-w-xl leading-relaxed">
-            MediLink unifies the patient&apos;s journey — from a 30-second kiosk check-in
-            to an AI-assisted prescription — and keeps every record safe across
-            your <span className="text-[#0A0F0D] font-medium">local NVMe SSD</span>{" "}
-            and the <span className="text-[#0A0F0D] font-medium">cloud</span>.
-          </p>
-
-          <div className="mt-9 flex flex-wrap gap-3">
-            <Button
-              data-testid="cta-get-started"
-              onClick={() => nav(IS_PUBLIC ? "/login" : "/register")}
-              className="bg-[#1C3F39] hover:bg-[#2D5A52] text-[#F9F9F6] rounded-full px-6 h-12 lift-on-hover"
-            >
-              Get Started <ArrowRight size={16} className="ml-1.5" />
-            </Button>
-            <Button
-              data-testid="cta-demo-login"
-              variant="outline"
-              onClick={() => nav("/login")}
-              className="rounded-full px-6 h-12 border-[#E2DDD7] hover:bg-[#F3EFE9] text-[#1C3F39]"
-            >
-              <Cardholder size={16} className="mr-1.5" weight="duotone" /> Try a demo login
-            </Button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => nav("/login")} className="px-4 py-2 rounded-full text-sm font-medium hover:bg-[#EAF5F5]" style={{ color: C.navy }}>
+              Sign in
+            </button>
             {!IS_PUBLIC && (
-            <Button
-              data-testid="cta-kiosk"
-              variant="outline"
-              onClick={() => nav("/kiosk")}
-              className="rounded-full px-6 h-12 border-[#1C3F39] text-[#1C3F39] hover:bg-[#1C3F39] hover:text-[#F9F9F6]"
-            >
-              Open Kiosk <ArrowRight size={16} className="ml-1.5" />
-            </Button>
+              <button onClick={() => nav("/kiosk")} className="px-4 py-2 rounded-full text-sm font-semibold text-white" style={{ background: C.teal }}>
+                Open Kiosk
+              </button>
             )}
           </div>
+        </div>
+      </header>
 
-          <div className="mt-10 flex items-center gap-6 text-xs text-[#5C6661] font-mono">
-            <div className="flex items-center gap-1.5">
-              <ShieldCheck size={14} /> Role-aware access
-            </div>
-            <div className="flex items-center gap-1.5">
-              <CloudCheck size={14} /> SSD-first sync
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Sparkle size={14} /> AI-assisted care
-            </div>
+      {/* Hero */}
+      <section className="relative overflow-hidden" style={{ background: `linear-gradient(160deg, ${C.mist} 0%, #FFFFFF 60%)` }}>
+        <div className="max-w-[1200px] mx-auto px-6 pt-20 pb-24 text-center">
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium mb-6"
+            style={{ background: "#fff", color: C.teal, border: `1px solid ${C.mist}` }}>
+            <span className="w-1.5 h-1.5 rounded-full breathe" style={{ background: C.teal }} />
+            The operating system for Malaysian clinics
+          </motion.div>
+          <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
+            className="font-display font-semibold tracking-tight leading-[1.05]"
+            style={{ fontSize: "clamp(2.4rem,6vw,4.4rem)", color: C.navy }}>
+            Run the whole clinic.<br />
+            <span style={{ color: C.teal }}>Check-in to prescription.</span>
+          </motion.h1>
+          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}
+            className="mt-6 max-w-2xl mx-auto text-lg leading-relaxed" style={{ color: C.slate }}>
+            MediLink runs the front desk, the doctor's room, the pharmacy and the patient app as one system —
+            local-first so it keeps working when the internet doesn't, and mirrored to a national cloud record.
+          </motion.p>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
+            className="mt-9 flex flex-wrap gap-3 justify-center">
+            <button onClick={() => nav("/login")} className="px-7 h-12 rounded-full text-white font-semibold inline-flex items-center gap-2"
+              style={{ background: C.teal }}>
+              Get started <ArrowRight size={18} />
+            </button>
+            <button onClick={() => nav("/activate")} className="px-7 h-12 rounded-full font-semibold"
+              style={{ background: "#fff", color: C.navy, border: `1px solid ${C.mist}` }}>
+              Activate patient account
+            </button>
+          </motion.div>
+          <div className="mt-10 flex items-center gap-6 justify-center text-xs font-medium flex-wrap" style={{ color: C.slate }}>
+            <span className="flex items-center gap-1.5"><ShieldCheck size={14} weight="duotone" /> PDPA-ready</span>
+            <span className="flex items-center gap-1.5"><Lock size={14} weight="duotone" /> Encrypted records</span>
+            <span className="flex items-center gap-1.5"><CloudCheck size={14} weight="duotone" /> Works offline</span>
           </div>
         </div>
-
       </section>
 
       {/* Features */}
-      <section className="relative z-10 max-w-[1400px] mx-auto px-6 md:px-8 pb-24">
-        <div className="overline mb-3">What&apos;s inside</div>
-        <h2 className="font-display text-3xl sm:text-4xl mb-10 max-w-2xl tracking-tight">
-          Everything a modern clinic needs, in one system.
-        </h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <section className="max-w-[1200px] mx-auto px-6 py-20">
+        <div className="text-center mb-12">
+          <div className="text-xs uppercase tracking-[0.2em] mb-3" style={{ color: C.teal }}>What's inside</div>
+          <h2 className="font-display text-3xl sm:text-4xl tracking-tight" style={{ color: C.navy }}>Everything a modern clinic needs</h2>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {features.map((f, i) => (
-            <motion.div
-              key={f.title}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.07 }}
-              className="rounded-2xl border border-[#E2DDD7] bg-white p-6 hover:shadow-md transition-shadow"
-            >
-              <div className="w-10 h-10 rounded-xl bg-[#F3EFE9] flex items-center justify-center mb-4">
-                <f.icon size={20} weight="duotone" color="#1C3F39" />
+            <motion.div key={f.title} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.06 }}
+              className="rounded-2xl p-6" style={{ background: "#fff", border: `1px solid ${C.mist}` }}>
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style={{ background: C.mist }}>
+                <f.icon size={22} weight="duotone" color={C.teal} />
               </div>
-              <div className="font-display text-lg mb-1.5">{f.title}</div>
-              <p className="text-sm text-[#5C6661] leading-relaxed">{f.body}</p>
+              <div className="font-display text-lg mb-1.5" style={{ color: C.navy }}>{f.title}</div>
+              <p className="text-sm leading-relaxed" style={{ color: C.slate }}>{f.body}</p>
             </motion.div>
           ))}
         </div>
       </section>
 
-      <footer className="relative z-10 border-t border-[#E2DDD7]">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-8 py-6 flex items-center justify-between text-xs text-[#5C6661] font-mono">
-          <div>© 2026 MediLink Health Systems</div>
-          <div>Local-first · Encrypted · Built for Malaysian clinics</div>
+      {/* CTA band */}
+      <section style={{ background: C.navy }}>
+        <div className="max-w-[1200px] mx-auto px-6 py-16 text-center">
+          <h2 className="font-display text-3xl sm:text-4xl text-white tracking-tight">Ready when your clinic is.</h2>
+          <p className="mt-3 max-w-xl mx-auto" style={{ color: "#B9CDD8" }}>
+            One system for check-in, consultation, dispensing and patient records — deployable on a single machine.
+          </p>
+          <button onClick={() => nav("/login")} className="mt-8 px-8 h-12 rounded-full font-semibold inline-flex items-center gap-2"
+            style={{ background: C.teal, color: "#fff" }}>
+            Sign in <ArrowRight size={18} />
+          </button>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer style={{ background: "#fff", borderTop: `1px solid ${C.mist}` }}>
+        <div className="max-w-[1200px] mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style={{ color: C.slate }}>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: C.teal }}>
+              <Heartbeat size={13} color="#fff" weight="duotone" />
+            </div>
+            <span className="font-medium" style={{ color: C.navy }}>MediLink Health Systems</span>
+          </div>
+          <div>© {new Date().getFullYear()} MediLink · All rights reserved to <a href="https://harnova.my" style={{ color: C.teal }}>harnova.my</a></div>
         </div>
       </footer>
     </div>
