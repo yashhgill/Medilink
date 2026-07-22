@@ -205,9 +205,7 @@ export default function PatientDashboard() {
                   </div>
                 )}
                 {r.attachments?.length > 0 && <AttachmentList files={r.attachments} />}
-                <div className="mt-2 text-[10px] font-mono text-[#5A6B70] flex items-center gap-1.5">
-                  <span className={`w-1.5 h-1.5 rounded-full ${r.sync_status === "cloud" ? "bg-[#2D6A4F]" : "bg-[#086788]"} breathe`} />{r.sync_status}
-                </div>
+
               </div>
             ))}
           </div>

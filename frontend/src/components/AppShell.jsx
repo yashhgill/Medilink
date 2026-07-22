@@ -88,13 +88,17 @@ export default function AppShell({ children, title, subtitle, navItems = [], sec
             </Link>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
-            <div data-testid="ws-status"
-              className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-white text-xs font-mono ${live ? "text-[#2D6A4F]" : "text-[#5A6B70]"}`}
-              style={{ borderColor: "var(--ml-border)" }}>
-              <Broadcast size={12} weight={live ? "fill" : "regular"} className={live ? "breathe" : ""} />
-              {live ? "Live" : "Sync"}
-            </div>
-            <SyncIndicator compact />
+            {user?.role !== "patient" && (
+              <>
+                <div data-testid="ws-status"
+                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-white text-xs font-mono ${live ? "text-[#2D6A4F]" : "text-[#5A6B70]"}`}
+                  style={{ borderColor: "var(--ml-border)" }}>
+                  <Broadcast size={12} weight={live ? "fill" : "regular"} className={live ? "breathe" : ""} />
+                  {live ? "Live" : "Sync"}
+                </div>
+                <SyncIndicator compact />
+              </>
+            )}
             {user?.role === "patient" && (
               <Button data-testid="open-ai-chat" onClick={() => setAiOpen(true)} size="sm"
                 className="bg-[#0A3D62] hover:bg-[#083150] text-[#F4F9F9] rounded-full">
