@@ -35,7 +35,7 @@ function App() {
             <Route path="/register" element={IS_PUBLIC ? <Navigate to="/login" replace /> : <Register />} />
             <Route path="/activate" element={<Activate />} />
             <Route
-              path="/patient"
+              path="/patient/*"
               element={
                 <ProtectedRoute roles={["patient"]}>
                   <PatientDashboard />
