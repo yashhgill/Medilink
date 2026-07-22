@@ -10,7 +10,7 @@ import api from "@/lib/api";
 import SyncIndicator from "@/components/SyncIndicator";
 import AIChat from "@/components/AIChat";
 import useQueueSocket from "@/hooks/useQueueSocket";
-import { Heartbeat, SignOut, Sparkle, Broadcast, List, X, Lock, House } from "@phosphor-icons/react";
+import { Heartbeat, SignOut, Sparkle, Broadcast, List, X, Lock, House, User } from "@phosphor-icons/react";
 
 const roleAccent = {
   patient: "#0B7C8C",      // teal
@@ -34,6 +34,29 @@ export default function AppShell({ children, title, subtitle, navItems = [], sec
   const [pwForm, setPwForm] = useState({ old_password: "", new_password: "" });
   const [live, setLive] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [pf, setPf] = useState({ name: "", email: "", phone: "", address: "" });
+  const openProfile = () => {
+    setMenuOpen(false);
+    setPf({
+      name: user?.name || "",
+      email: (user?.email || "").includes("@patient.medilink") ? "" : (user?.email || ""),
+      phone: user?.phone || "",
+      address: user?.address || "",
+    });
+    setProfileOpen(true);
+  };
+  const saveProfile = async () => {
+    try {
+      await api.patch("/auth/me/profile", pf);
+      toast.success("Profile updated");
+      setProfileOpen(false);
+      setTimeout(() => window.location.reload(), 600);
+    } catch (e) {
+      const d = e?.response?.data?.detail;
+      toast.error(typeof d === "string" ? d : "Could not update profile");
+    }
+  };
 
   useQueueSocket((ev) => { if (ev?.type === "hello") setLive(true); });
 
@@ -142,6 +165,24 @@ export default function AppShell({ children, title, subtitle, navItems = [], sec
         <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl tracking-tight font-semibold text-[#12262B]">{title}</h1>
       </div>
       <main className="max-w-[1400px] mx-auto px-4 md:px-8 pb-16 fade-in">{children}</main>
+
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+        <DialogContent className="bg-[#F4F9F9] border-[#DCE8E9]">
+          <DialogHeader><DialogTitle className="font-display text-xl">My profile</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5"><Label>Full name</Label>
+              <Input value={pf.name} onChange={(e) => setPf({ ...pf, name: e.target.value })} className="border-[#DCE8E9]" /></div>
+            <div className="space-y-1.5"><Label>Email</Label>
+              <Input type="email" value={pf.email} onChange={(e) => setPf({ ...pf, email: e.target.value })} placeholder="you@email.com" className="border-[#DCE8E9]" /></div>
+            <div className="space-y-1.5"><Label>Phone</Label>
+              <Input value={pf.phone} onChange={(e) => setPf({ ...pf, phone: e.target.value })} placeholder="012-345 6789" className="border-[#DCE8E9]" /></div>
+            <div className="space-y-1.5"><Label>Home address</Label>
+              <Input value={pf.address} onChange={(e) => setPf({ ...pf, address: e.target.value })} placeholder="No. 1, Jalan Sehat, 47500 Subang Jaya" className="border-[#DCE8E9]" /></div>
+          </div>
+          {user?.ic_number && <p className="text-[11px] text-[#5A6B70] mt-1">You sign in with your IC ({user.ic_number}). Your IC cannot be changed here.</p>}
+          <DialogFooter><Button onClick={saveProfile} className="bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9]">Save</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={pwOpen} onOpenChange={setPwOpen}>
         <DialogContent className="bg-[#F4F9F9] border-[#DCE8E9]">

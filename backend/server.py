@@ -102,6 +102,7 @@ users_t = Table("users", metadata,
     Column("phone", String),
     Column("dob", String),
     Column("gender", String),
+    Column("address", String),
     Column("specialty", String),
     Column("license_no", String),
     Column("availability", JSON),
@@ -593,6 +594,7 @@ class KioskRegisterIn(BaseModel):
     name: str
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
+    address: Optional[str] = None
 
 class KioskCheckinIn(BaseModel):
     ic_number: str
@@ -842,6 +844,33 @@ async def change_password(body: dict, u=Depends(current_user)):
         .values(password_hash=hash_pw(new), updated_at=now_iso()))
     return {"ok": True}
 
+@api.patch("/auth/me/profile")
+async def update_my_profile(body: dict, u=Depends(current_user)):
+    """Any signed-in user updates their own contact details.
+    Email must stay unique; IC and role can never be changed here."""
+    updates = {}
+    if "email" in body:
+        email = (body.get("email") or "").strip().lower()
+        if email:
+            clash = await database.fetch_one(users_t.select().where(
+                (users_t.c.email == email) & (users_t.c.id != u["id"])))
+            if clash:
+                raise HTTPException(400, "That email is already in use")
+            updates["email"] = email
+    for f in ("name", "phone", "address", "dob", "gender"):
+        if f in body:
+            updates[f] = (body.get(f) or None)
+    if not updates:
+        return await database.fetch_one(users_t.select().where(users_t.c.id == u["id"])) and clean(u)
+    updates["updated_at"] = now_iso()
+    updates["sync_status"] = "local"
+    await database.execute(users_t.update().where(users_t.c.id == u["id"]).values(**updates))
+    await enqueue_sync("users", u["id"], "UPDATE",
+                       clean(dict(await database.fetch_one(users_t.select().where(users_t.c.id == u["id"])))))
+    await audit_log(u["id"], u["role"], "UPDATE_PROFILE", "users", u["id"])
+    row = await database.fetch_one(users_t.select().where(users_t.c.id == u["id"]))
+    return clean(dict(row))
+
 # ── Users / Patients ──────────────────────────────────────────────────────────
 @api.get("/patients")
 async def list_patients(search: Optional[str] = None, u=Depends(current_user)):
@@ -919,6 +948,7 @@ async def kiosk_register(body: KioskRegisterIn, _=Depends(kiosk_auth)):
         activation_code=code, activation_expires=expires, activated=False,
         name=body.name, role="patient",
         ic_number=ic_store(parsed["formatted"]), ic_hash=ic_index(parsed["formatted"]), phone=body.phone,
+        address=getattr(body, "address", None),
         dob=parsed.get("dob"), gender=parsed.get("gender_hint"),
         facility_id=FACILITY_ID, source="kiosk",
         created_at=now, updated_at=now, sync_status="local",
@@ -2520,7 +2550,8 @@ async def startup():
             for ddl in ("ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_code VARCHAR",
                         "ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_expires VARCHAR",
                         "ALTER TABLE users ADD COLUMN IF NOT EXISTS activated BOOLEAN",
-                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS ic_hash VARCHAR"):
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS ic_hash VARCHAR",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS address VARCHAR"):
                 try:
                     conn.execute(text(ddl)); conn.commit()
                 except Exception:
@@ -2571,7 +2602,8 @@ async def startup():
                 for ddl in ("ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_code VARCHAR",
                             "ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_expires VARCHAR",
                             "ALTER TABLE users ADD COLUMN IF NOT EXISTS activated BOOLEAN",
-                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS ic_hash VARCHAR"):
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS ic_hash VARCHAR",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS address VARCHAR"):
                     try:
                         conn.execute(text(ddl)); conn.commit()
                     except Exception:
