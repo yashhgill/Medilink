@@ -45,7 +45,7 @@ function App() {
               }
             />
             <Route
-              path="/doctor"
+              path="/doctor/*"
               element={
                 <ProtectedRoute roles={["doctor"]}>
                   <DoctorDashboard />
@@ -53,7 +53,7 @@ function App() {
               }
             />
             <Route
-              path="/reception"
+              path="/reception/*"
               element={
                 <ProtectedRoute roles={["admin"]}>
                   <ReceptionDashboard />

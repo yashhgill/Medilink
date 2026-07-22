@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { useLocation } from "react-router-dom";
 import api from "@/lib/api";
 import SyncIndicator from "@/components/SyncIndicator";
 import ICScanner from "@/components/ICScanner";
@@ -29,6 +30,8 @@ const statusColors = {
 export default function ReceptionDashboard() {
   const [queue, setQueue] = useState([]);
   const [stats, setStats] = useState(null);
+  const _loc = useLocation();
+  const view = _loc.pathname.split("/")[2] || "operations";
   const [patients, setPatients] = useState([]);
   const [doctors, setDoctors] = useState([]);
   const [scanOpen, setScanOpen] = useState(false);
@@ -96,8 +99,8 @@ export default function ReceptionDashboard() {
   const next = queue.find((q) => ["checked_in", "scheduled"].includes(q.status));
 
   return (
-    <AppShell title="Reception · Live Queue" subtitle="Admin · Operations" navItems={[{ label: "Operations", to: "/reception" }, { label: "Facilities", to: "/facilities" }]} sections={[{ id: "sec-analytics", label: "Analytics & Reports" }, { id: "sec-patients", label: "Registered Patients" }]}>
-      <div id="sec-analytics" />
+    <AppShell title="Reception · Live Queue" subtitle="Admin · Operations" navItems={[{ label: "Operations", to: "/reception" }, { label: "Registered Patients", to: "/reception/patients" }, { label: "Facilities", to: "/facilities" }]}>
+      {view === "operations" && (<>
       {stats && (
         <div className="mb-5 grid grid-cols-2 lg:grid-cols-5 gap-3">
           {[
@@ -251,10 +254,12 @@ export default function ReceptionDashboard() {
             </table>
           </div>
         </div>
+      </div>
+      </>
+      )}
 
-        <div id="sec-patients" />
-        {/* Patients table */}
-        <div className="lg:col-span-3 rounded-2xl border border-[#DCE8E9] bg-white p-6">
+      {view === "patients" && (
+        <div className="rounded-2xl border border-[#DCE8E9] bg-white p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="overline">Registered Patients</div>
@@ -272,7 +277,7 @@ export default function ReceptionDashboard() {
             ))}
           </div>
         </div>
-      </div>
+      )}
 
       <ICScanner open={scanOpen} onOpenChange={setScanOpen} onMatch={onPatientFound} />
 

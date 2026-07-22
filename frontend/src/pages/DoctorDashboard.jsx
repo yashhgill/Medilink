@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import SyncIndicator from "@/components/SyncIndicator";
 import { AttachmentUploader, AttachmentList } from "@/components/Attachments";
 import AvailabilityCard from "@/components/AvailabilityCard";
+import { useLocation } from "react-router-dom";
 import DoctorScheduler from "@/components/DoctorScheduler";
 import useQueueSocket from "@/hooks/useQueueSocket";
 import {
@@ -39,6 +40,8 @@ const statusColors = {
 
 export default function DoctorDashboard() {
   const { user } = useAuth();
+  const _loc = useLocation();
+  const view = _loc.pathname.split("/")[2] || "consult";
   const [appts, setAppts] = useState([]);
   const [activePatientId, setActivePatientId] = useState(null);
   const [activeApptId, setActiveApptId] = useState(null);
@@ -200,7 +203,8 @@ export default function DoctorDashboard() {
   );
 
   return (
-    <AppShell title={`Dr. ${user.name.split(" ").slice(-1)[0]}`} subtitle={`${user.specialty || "General"} · Doctor`} sections={[{ id: "sec-queue", label: "Today\u2019s Queue" }, { id: "sec-patient", label: "Patient Record" }]}>
+    <AppShell title={`Dr. ${user.name.split(" ").slice(-1)[0]}`} subtitle={`${user.specialty || "General"} · Doctor`} navItems={[{ label: "Consultation", to: "/doctor" }, { label: "My Availability", to: "/doctor/availability" }]}>
+      {view === "consult" && (
       <div className="grid lg:grid-cols-3 gap-5">
         {/* Queue */}
         <div id="sec-queue" className="rounded-2xl border border-[#DCE8E9] bg-white p-6">
@@ -384,13 +388,15 @@ export default function DoctorDashboard() {
           )}
         </div>
 
-        <SyncIndicator />
-        <AvailabilityCard doctorId={user.id} />
-
-        <div className="lg:col-span-3">
-          <DoctorScheduler doctorId={user.id} />
-        </div>
       </div>
+    )}
+
+    {view === "availability" && (
+      <div className="space-y-5">
+        <AvailabilityCard doctorId={user.id} />
+        <DoctorScheduler doctorId={user.id} />
+      </div>
+    )}
 
       <ICScanner open={icScanOpen} onOpenChange={setIcScanOpen} onMatch={onPatientFound} />
 
