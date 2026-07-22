@@ -25,6 +25,20 @@ import { Toaster } from "@/components/ui/sonner";
 import PrintChit from "@/components/PrintChit";
 import { API } from "@/lib/api";
 
+// Derive DOB, gender and birth-state from a Malaysian IC (YYMMDD-SS-NNNN).
+function deriveFromIC(ic) {
+  const d = (ic || "").replace(/\D/g, "");
+  if (d.length !== 12) return null;
+  const yy = +d.slice(0, 2), mm = +d.slice(2, 4), dd = +d.slice(4, 6);
+  const cur = new Date().getFullYear() % 100;
+  const year = yy > cur ? 1900 + yy : 2000 + yy;
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+  const dob = `${year}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+  const gender = +d[11] % 2 === 1 ? "Male" : "Female";
+  return { dob, gender };
+}
+
+
 const kioskAxios = axios.create({
   baseURL: API,
   headers: process.env.REACT_APP_KIOSK_TOKEN
@@ -193,6 +207,9 @@ function CheckinFlow({ onPrint }) {
   const [data, setData] = useState(null); // lookup or checkin response
   const [tapping, setTapping] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const scannedNameRef = useRef("");
+  const canvasRef = useRef(null);
   const [registering, setRegistering] = useState(false);
   const [regForm, setRegForm] = useState({ name: "", phone: "", gender: "", dob: "" });
   const [symptoms, setSymptoms] = useState("");
@@ -209,8 +226,9 @@ function CheckinFlow({ onPrint }) {
     } catch (e) {
       // No patient → offer registration
       if (e?.response?.status === 404) {
+        const derived = deriveFromIC(ic) || {};
         setStep("register");
-        setRegForm({ name: "", phone: "", gender: "", dob: "" });
+        setRegForm({ name: scannedNameRef.current || "", phone: "", gender: derived.gender || "", dob: derived.dob || "" });
       } else {
         toast.error(errMsg(e, "Lookup failed"));
       }
@@ -260,23 +278,56 @@ function CheckinFlow({ onPrint }) {
     }
   };
 
+  const loadTesseract = () => new Promise((resolve, reject) => {
+    if (window.Tesseract) return resolve(window.Tesseract);
+    const el = document.createElement("script");
+    el.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+    el.onload = () => resolve(window.Tesseract);
+    el.onerror = reject;
+    document.head.appendChild(el);
+  });
+
   const startCam = async () => {
     try {
-      const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-      });
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
       streamRef.current = s;
       if (videoRef.current) videoRef.current.srcObject = s;
       setScanning(true);
-      setTimeout(() => {
-        const decoded = "880421-14-5567";
-        toast.info(`QR decoded → ${decoded}`);
-        stopCam();
-        setIc(decoded);
-        lookup(decoded);
-      }, 2800);
     } catch (e) {
-      toast.error("Camera blocked — use Manual mode");
+      toast.error("Camera blocked — enter your IC manually");
+    }
+  };
+
+  // Capture a frame and OCR the MyKad: pull the IC number + name.
+  const captureAndRead = async () => {
+    const v = videoRef.current;
+    if (!v || !v.videoWidth) { toast.error("Camera not ready yet"); return; }
+    setOcrBusy(true);
+    try {
+      const cvs = canvasRef.current || document.createElement("canvas");
+      cvs.width = v.videoWidth; cvs.height = v.videoHeight;
+      cvs.getContext("2d").drawImage(v, 0, 0);
+      const T = await loadTesseract();
+      const { data } = await T.recognize(cvs, "eng");
+      const text = (data.text || "").toUpperCase();
+      // IC: 6-2-4 digits with optional separators
+      const m = text.match(/(\d{6})[\s-]?(\d{2})[\s-]?(\d{4})/);
+      if (!m) { toast.error("Couldn't read the IC — try again or type it"); return; }
+      const icNum = `${m[1]}-${m[2]}-${m[3]}`;
+      // Name: longest all-letters line that isn't a label
+      const nameLine = (data.text || "").split("\n")
+        .map((l) => l.trim())
+        .filter((l) => /^[A-Za-z@/'.\s-]{6,}$/.test(l) && !/MYKAD|KAD|PENGENALAN|WARGANEGARA|LELAKI|PEREMPUAN|MALAYSIA|ISLAM/i.test(l))
+        .sort((a, b) => b.length - a.length)[0] || "";
+      scannedNameRef.current = nameLine;
+      toast.success(`Read IC ${icNum}${nameLine ? " · " + nameLine : ""}`);
+      stopCam();
+      setIc(icNum);
+      lookup(icNum);
+    } catch (e) {
+      toast.error("Scan failed — please type your IC");
+    } finally {
+      setOcrBusy(false);
     }
   };
   const stopCam = () => {
@@ -325,13 +376,13 @@ function CheckinFlow({ onPrint }) {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Date of birth</Label>
+            <Label>Date of birth <span className="text-[#5A6B70] font-normal">(from IC)</span></Label>
             <Input
               type="date"
               data-testid="kiosk-reg-dob"
               value={regForm.dob}
-              onChange={(e) => setRegForm({ ...regForm, dob: e.target.value })}
-              className="border-[#DCE8E9]"
+              readOnly
+              className="border-[#DCE8E9] bg-[#EAF5F5] text-[#5A6B70]"
             />
           </div>
           <div className="space-y-1.5">
@@ -535,7 +586,7 @@ function CheckinFlow({ onPrint }) {
     <div>
       <div className="overline">Step 1</div>
       <h2 className="font-display text-2xl mt-1">Identify yourself</h2>
-      <p className="text-sm text-[#5A6B70] mt-1 mb-6">Key in your IC number — or use the camera to scan the QR code on your appointment slip.</p>
+      <p className="text-sm text-[#5A6B70] mt-1 mb-6">Key in your IC number — or scan your MyKad with the camera to auto-fill your details.</p>
 
       <div className="grid md:grid-cols-2 gap-4">
         {/* Manual IC entry — primary */}
@@ -571,12 +622,12 @@ function CheckinFlow({ onPrint }) {
 
         {/* QR camera */}
         <div className="rounded-2xl border border-[#DCE8E9] bg-white p-4 flex flex-col">
-          <div className="overline mb-2 flex items-center gap-1.5"><QrCode size={12} weight="duotone" /> QR scan</div>
+          <div className="overline mb-2 flex items-center gap-1.5"><QrCode size={12} weight="duotone" /> Scan IC card</div>
           <div className="relative rounded-2xl overflow-hidden border border-[#DCE8E9] bg-black aspect-[4/3] flex-1">
             <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             {!scanning && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/55 text-white text-sm">
-                Camera ready — tap Start
+                Point your MyKad at the camera
               </div>
             )}
             {scanning && (
@@ -586,15 +637,31 @@ function CheckinFlow({ onPrint }) {
               </>
             )}
           </div>
-          <Button
-            data-testid="kiosk-qr-start"
-            disabled={scanning}
-            onClick={startCam}
-            variant="outline"
-            className="mt-3 border-[#DCE8E9] text-[#0B7C8C] hover:bg-[#EAF5F5]"
-          >
-            {scanning ? "Scanning…" : "Start QR scan"}
-          </Button>
+          <div className="flex gap-2 mt-3">
+            {!scanning ? (
+              <Button
+                data-testid="kiosk-qr-start"
+                onClick={startCam}
+                variant="outline"
+                className="flex-1 border-[#DCE8E9] text-[#0B7C8C] hover:bg-[#EAF5F5]"
+              >
+                Open camera
+              </Button>
+            ) : (
+              <>
+                <Button
+                  data-testid="kiosk-ic-read"
+                  onClick={captureAndRead}
+                  disabled={ocrBusy}
+                  className="flex-1 bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9]"
+                >
+                  {ocrBusy ? "Reading…" : "Read IC"}
+                </Button>
+                <Button onClick={stopCam} variant="outline" className="border-[#DCE8E9] text-[#5A6B70]">Cancel</Button>
+              </>
+            )}
+          </div>
+          <canvas ref={canvasRef} className="hidden" />
         </div>
       </div>
     </div>
