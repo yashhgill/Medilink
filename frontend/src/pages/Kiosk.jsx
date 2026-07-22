@@ -194,7 +194,7 @@ function CheckinFlow({ onPrint }) {
   const [tapping, setTapping] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [registering, setRegistering] = useState(false);
-  const [regForm, setRegForm] = useState({ name: "", phone: "", email: "", address: "", gender: "", dob: "" });
+  const [regForm, setRegForm] = useState({ name: "", phone: "", gender: "", dob: "" });
   const [symptoms, setSymptoms] = useState("");
   const [painScore, setPainScore] = useState(null);
   const videoRef = useRef(null);
@@ -230,8 +230,6 @@ function CheckinFlow({ onPrint }) {
         ic_number: ic,
         name: regForm.name,
         phone: regForm.phone || null,
-        email: regForm.email || null,
-        address: regForm.address || null,
         gender: regForm.gender || null,
         dob: regForm.dob || null,
       });
@@ -325,27 +323,7 @@ function CheckinFlow({ onPrint }) {
               className="border-[#DCE8E9]"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label>Email</Label>
-            <Input
-              data-testid="kiosk-reg-email"
-              type="email"
-              value={regForm.email}
-              onChange={(e) => setRegForm({ ...regForm, email: e.target.value })}
-              placeholder="you@email.com"
-              className="border-[#DCE8E9]"
-            />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label>Home address</Label>
-            <Input
-              data-testid="kiosk-reg-address"
-              value={regForm.address}
-              onChange={(e) => setRegForm({ ...regForm, address: e.target.value })}
-              placeholder="No. 1, Jalan Sehat, 47500 Subang Jaya"
-              className="border-[#DCE8E9]"
-            />
-          </div>
+
           <div className="space-y-1.5">
             <Label>Date of birth</Label>
             <Input
