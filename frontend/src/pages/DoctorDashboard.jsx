@@ -53,6 +53,7 @@ export default function DoctorDashboard() {
   const [aiDrugLoading, setAiDrugLoading] = useState(false);
   const [icScanOpen, setIcScanOpen] = useState(false);
   const [recOpen, setRecOpen] = useState(false);
+  const [inventory, setInventory] = useState([]);
 
   const [form, setForm] = useState({
     diagnosis: "",
@@ -70,6 +71,7 @@ export default function DoctorDashboard() {
   const load = async () => {
     const r = await api.get("/appointments");
     setAppts(r.data);
+    api.get("/inventory").then((iv) => setInventory((iv.data || []).filter((m) => m.active && (m.stock_qty || 0) > 0))).catch(() => {});
   };
 
   useEffect(() => {
@@ -193,7 +195,8 @@ export default function DoctorDashboard() {
       });
       openPatient(activePatientId);
     } catch (e) {
-      toast.error("Failed to save record");
+      const d = e?.response?.data?.detail;
+      toast.error(typeof d === "string" ? d : "Failed to save record");
     }
   };
 
@@ -465,11 +468,16 @@ export default function DoctorDashboard() {
               </div>
             )}
             <div className="space-y-2">
+              <datalist id="rx-meds">
+                {inventory.map((m) => (
+                  <option key={m.id} value={m.name}>{m.stock_qty} in stock · RM{Number(m.unit_price || 0).toFixed(2)}</option>
+                ))}
+              </datalist>
               {form.prescriptions.map((p, i) => (
                 <div key={i} className="grid grid-cols-12 gap-2 items-end">
                   <div className="col-span-4">
                     <Label className="text-[10px] overline">Medicine</Label>
-                    <Input data-testid={`rx-med-${i}`} value={p.medicine} onChange={(e) => setRx(i, "medicine", e.target.value)} className="border-[#DCE8E9]" />
+                    <Input list="rx-meds" data-testid={`rx-med-${i}`} value={p.medicine} onChange={(e) => setRx(i, "medicine", e.target.value)} placeholder="Pick from pharmacy stock" className="border-[#DCE8E9]" />
                   </div>
                   <div className="col-span-2">
                     <Label className="text-[10px] overline">Dosage</Label>

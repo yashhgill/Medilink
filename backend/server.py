@@ -1107,7 +1107,12 @@ async def kiosk_pay(body: KioskPayIn, _=Depends(kiosk_auth)):
         receipt_data=payment_info, facility_id=FACILITY_ID,
         source="kiosk", sync_status="local",
     ))
-    new_appt_status = "ready_for_pharmacy" if is_instant else appt["status"]
+    rec_for_flow = await record_for_visit(p["id"], appt["id"])
+    has_meds = _visit_has_meds(rec_for_flow)
+    if is_instant:
+        new_appt_status = "ready_for_pharmacy" if has_meds else "completed"
+    else:
+        new_appt_status = appt["status"]
     await database.execute(
         appointments_t.update().where(appointments_t.c.id == appt["id"]).values(
             payment_status="paid" if is_instant else "pending",
@@ -1126,13 +1131,15 @@ async def kiosk_pay(body: KioskPayIn, _=Depends(kiosk_auth)):
         "consultation_fee":consult_fee,"medication_total":med_total,"medication_lines":med_lines,
         "amount":amount,"method":body.method,"txn_ref":txn_ref,"paid_at":now,"appointment_id":appt["id"],
     }
-    medicine_chit = {
-        "type":"MEDICINE","clinic_name":f"{CLINIC_NAME} — Pharmacy",
-        "patient_name":p["name"],"patient_ic":ic_show(p["ic_number"]),
-        "queue_number":appt["queue_number"],
-        "doctor_name":doc_row["name"] if doc_row else "-",
-        "prescriptions":prescriptions,"appointment_id":appt["id"],"issued_at":now,
-    }
+    medicine_chit = None
+    if prescriptions:
+        medicine_chit = {
+            "type":"MEDICINE","clinic_name":f"{CLINIC_NAME} — Pharmacy",
+            "patient_name":p["name"],"patient_ic":ic_show(p["ic_number"]),
+            "queue_number":appt["queue_number"],
+            "doctor_name":doc_row["name"] if doc_row else "-",
+            "prescriptions":prescriptions,"appointment_id":appt["id"],"issued_at":now,
+        }
     return {"appointment":appt,"payment":payment_info,"receipt":receipt,"medicine_chit":medicine_chit}
 
 @api.post("/kiosk/payment-confirm/{txn_ref}")
@@ -1146,12 +1153,15 @@ async def confirm_payment(txn_ref: str, _=Depends(kiosk_auth)):
     now = now_iso()
     await database.execute(payments_t.update().where(payments_t.c.txn_ref == txn_ref)
         .values(status="succeeded"))
+    _appt = await database.fetch_one(appointments_t.select().where(appointments_t.c.id == pay_row["appointment_id"]))
+    _rec = await record_for_visit(dict(_appt)["patient_id"], pay_row["appointment_id"]) if _appt else None
+    _next = "ready_for_pharmacy" if _visit_has_meds(_rec) else "completed"
     await database.execute(
         appointments_t.update().where(appointments_t.c.id == pay_row["appointment_id"])
-        .values(payment_status="paid", status="ready_for_pharmacy", updated_at=now)
+        .values(payment_status="paid", status=_next, updated_at=now)
     )
     broadcast({"type":"appointment.updated","appointment_id":pay_row["appointment_id"]})
-    return {"ok":True,"txn_ref":txn_ref}
+    return {"ok":True,"txn_ref":txn_ref,"next":_next}
 
 # ── Appointments ──────────────────────────────────────────────────────────────
 @api.post("/appointments", status_code=201)
@@ -1239,6 +1249,26 @@ async def block_time(body: BlockTimeIn, u=Depends(role_required("doctor","admin"
 @api.post("/records", status_code=201)
 async def create_record(body: MedicalRecordIn, u=Depends(role_required("doctor","admin")),
                         request: Request = None):
+    # Doctors may only prescribe medicines the clinic actually stocks.
+    unavailable = []
+    for m in (body.prescriptions or []):
+        name = (m.medicine or "").strip()
+        if not name:
+            continue
+        inv = await database.fetch_one(inventory_t.select().where(
+            (inventory_t.c.name.ilike(f"%{name}%")) & (inventory_t.c.active == True)))
+        if not inv:
+            tok = name.split()[0]
+            if len(tok) >= 4:
+                inv = await database.fetch_one(inventory_t.select().where(
+                    (inventory_t.c.name.ilike(f"%{tok}%")) & (inventory_t.c.active == True)))
+        if not inv:
+            unavailable.append(f"{name} (not in pharmacy)")
+        elif (dict(inv).get("stock_qty") or 0) <= 0:
+            unavailable.append(f"{name} (out of stock)")
+    if unavailable:
+        raise HTTPException(400, "Cannot prescribe: " + "; ".join(unavailable) +
+                            ". Only medicines available in the pharmacy can be prescribed.")
     rec_id = uid(); now = now_iso()
     vitals = body.vitals.model_dump() if body.vitals else None
     await database.execute(records_t.insert().values(
@@ -1651,6 +1681,11 @@ async def price_prescriptions(prescriptions):
         lines.append({"medicine": name, "unit_price": unit, "line_total": round(unit, 2)})
     return round(total, 2), lines
 
+def _visit_has_meds(rec) -> bool:
+    if not rec:
+        return False
+    return bool(dict(rec).get("prescriptions"))
+
 async def record_for_visit(patient_id: str, appointment_id: str):
     """Prescription lookup for chits/pharmacy: prefer the record linked to this
     appointment; fall back to the patient's latest record from today (covers
@@ -1891,9 +1926,12 @@ async def patient_confirm(txn_ref: str, u=Depends(role_required("patient", "admi
     now = now_iso()
     await database.execute(payments_t.update().where(payments_t.c.txn_ref == txn_ref)
                            .values(status="succeeded"))
+    _appt = await database.fetch_one(appointments_t.select().where(appointments_t.c.id == pay_row["appointment_id"]))
+    _rec = await record_for_visit(dict(_appt)["patient_id"], pay_row["appointment_id"]) if _appt else None
+    _next = "ready_for_pharmacy" if _visit_has_meds(_rec) else "completed"
     await database.execute(
         appointments_t.update().where(appointments_t.c.id == pay_row["appointment_id"])
-        .values(payment_status="paid", status="ready_for_pharmacy", updated_at=now))
+        .values(payment_status="paid", status=_next, updated_at=now))
     await audit_log(u["id"], u["role"], "PAYMENT_CONFIRMED_APP", "payments", txn_ref)
     broadcast({"type": "appointment.updated", "appointment_id": pay_row["appointment_id"]})
     return {"ok": True, "txn_ref": txn_ref}
