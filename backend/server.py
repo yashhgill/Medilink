@@ -7,7 +7,7 @@ from fastapi import (
     FastAPI, APIRouter, HTTPException, Depends, Header,
     Query, WebSocket, WebSocketDisconnect, Request, BackgroundTasks, UploadFile, File
 )
-from fastapi.responses import StreamingResponse, FileResponse, Response
+from fastapi.responses import StreamingResponse, FileResponse, Response, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from databases import Database
 from sqlalchemy import (
@@ -42,6 +42,23 @@ KIOSK_TOKEN     = os.environ.get("KIOSK_TOKEN", "")          # shared secret for
 ALLOW_SEED      = os.environ.get("ALLOW_SEED", "false").lower() == "true"
 STAFF_JWT_EXP_HOURS = int(os.environ.get("STAFF_JWT_EXP_HOURS", "12"))
 UPLOAD_DIR      = os.environ.get("UPLOAD_DIR", "/app/uploads")
+S3_BUCKET       = os.environ.get("S3_BUCKET", "")
+AWS_REGION      = os.environ.get("AWS_REGION", "us-east-1")
+_s3_client = None
+def s3():
+    """Lazy boto3 S3 client. Uses the instance role (LabRole) on EC2, or env keys.
+    Returns None if boto3/bucket unavailable so uploads fall back to local disk."""
+    global _s3_client
+    if not S3_BUCKET:
+        return None
+    if _s3_client is None:
+        try:
+            import boto3
+            _s3_client = boto3.client("s3", region_name=AWS_REGION)
+        except Exception as e:
+            log.warning(f"S3 disabled: {e}")
+            return None
+    return _s3_client
 PUBLIC_APP_URL  = os.environ.get("PUBLIC_APP_URL", "https://medilink.harnova.my")
 SYNC_INTERVAL   = int(os.environ.get("SYNC_INTERVAL_SECONDS", "30"))
 IC_ENCRYPTION_KEY = os.environ.get("IC_ENCRYPTION_KEY", "")
@@ -284,6 +301,26 @@ vaccinations_t = Table("vaccinations", metadata,
     Column("administered_at", String),
     Column("facility_id", String),
     Column("sync_status", String),
+)
+
+lab_orders_t = Table("lab_orders", metadata,
+    Column("id", String, primary_key=True),
+    Column("patient_id", String),
+    Column("doctor_id", String),
+    Column("record_id", String),
+    Column("test_name", String),
+    Column("test_code", String),
+    Column("status", String, default="ordered"),   # ordered | collected | resulted
+    Column("result_value", String),
+    Column("result_unit", String),
+    Column("ref_range", String),
+    Column("abnormal", Boolean, default=False),
+    Column("notes", Text),
+    Column("ordered_at", String),
+    Column("resulted_at", String),
+    Column("facility_id", String),
+    Column("sync_status", String, default="local"),
+    Column("synced_at", String),
 )
 
 sync_queue_t = Table("sync_queue", metadata,
@@ -1226,15 +1263,23 @@ async def create_appointment(body: AppointmentIn, u=Depends(current_user)):
     return appt
 
 @api.get("/appointments")
-async def list_appointments(date: Optional[str] = None, u=Depends(current_user)):
+async def list_appointments(date: Optional[str] = None,
+                            from_date: Optional[str] = None, to_date: Optional[str] = None,
+                            doctor_id: Optional[str] = None, u=Depends(current_user)):
     q = appointments_t.select()
     if u["role"] == "patient":
         q = q.where(appointments_t.c.patient_id == u["id"])
     elif u["role"] == "doctor":
         q = q.where(appointments_t.c.doctor_id == u["id"])
+    elif doctor_id:
+        q = q.where(appointments_t.c.doctor_id == doctor_id)
     if date:
         q = q.where(appointments_t.c.scheduled_at.like(f"{date}%"))
-    rows = await database.fetch_all(q.order_by(appointments_t.c.scheduled_at.desc()))
+    if from_date:
+        q = q.where(appointments_t.c.scheduled_at >= from_date)
+    if to_date:
+        q = q.where(appointments_t.c.scheduled_at <= to_date + "T23:59:59")
+    rows = await database.fetch_all(q.order_by(appointments_t.c.scheduled_at.asc()))
     return await enrich_appointments(rows)
 
 @api.get("/queue/today")
@@ -2017,9 +2062,21 @@ async def upload_attachment(record_id: str, file: UploadFile = File(...),
     content = await file.read()
     with open(path, "wb") as f:
         f.write(content)
+    # Mirror to S3 when configured (X-rays/scans live in the cloud bucket too).
+    s3_key = None
+    cli = s3()
+    if cli:
+        try:
+            s3_key = f"{FACILITY_ID}/{rec['patient_id']}/{att_id}_{safe_name}"
+            cli.put_object(Bucket=S3_BUCKET, Key=s3_key, Body=content,
+                           ContentType=file.content_type or "application/octet-stream")
+        except Exception as e:
+            log.warning(f"S3 upload failed (kept local copy): {e}")
+            s3_key = None
     row = dict(id=att_id, record_id=record_id, patient_id=rec["patient_id"],
                filename=safe_name, content_type=file.content_type or "application/octet-stream",
-               size_bytes=len(content), path=path, uploaded_by=u["id"],
+               size_bytes=len(content), path=(f"s3://{S3_BUCKET}/{s3_key}" if s3_key else path),
+               uploaded_by=u["id"],
                created_at=now_iso(), facility_id=FACILITY_ID, sync_status="local")
     await database.execute(attachments_t.insert().values(**row))
     await audit_log(u["id"], u["role"], "UPLOAD_ATTACHMENT", "attachments", att_id)
@@ -2062,9 +2119,18 @@ async def download_attachment(att_id: str, u=Depends(current_user), request: Req
         raise HTTPException(403, "Forbidden")
     await audit_log(u["id"], u["role"], "DOWNLOAD_ATTACHMENT", "attachments", att_id,
                     ip=request.client.host if request and request.client else "")
-    if not os.path.exists(d["path"]):
+    p = d["path"] or ""
+    if p.startswith("s3://"):
+        cli = s3()
+        if cli:
+            key = p.split("/", 3)[3]
+            url = cli.generate_presigned_url("get_object",
+                    Params={"Bucket": S3_BUCKET, "Key": key}, ExpiresIn=300)
+            return RedirectResponse(url)
+        raise HTTPException(503, "Cloud storage unavailable on this node")
+    if not os.path.exists(p):
         raise HTTPException(410, "File no longer on this node")
-    return FileResponse(d["path"], media_type=d["content_type"], filename=d["filename"])
+    return FileResponse(p, media_type=d["content_type"], filename=d["filename"])
 
 # ── Generic file upload (frontend contract: /files/*) ───────────────────────
 @api.post("/files/upload", status_code=201)
@@ -2474,6 +2540,107 @@ async def vaccination_cert_pdf(patient_id: str, u=Depends(current_user)):
     return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
                     headers={"Content-Disposition": 'attachment; filename="vaccination-certificate.pdf"'})
 
+# ── Lab orders + results ─────────────────────────────────────────────────────
+# Common Malaysian primary-care panel with reference ranges (adult).
+LAB_CATALOG = [
+    {"code": "FBC",   "name": "Full Blood Count",          "unit": "",       "ref": "see differential"},
+    {"code": "FBS",   "name": "Fasting Blood Sugar",       "unit": "mmol/L", "ref": "3.9-5.5"},
+    {"code": "RBS",   "name": "Random Blood Sugar",        "unit": "mmol/L", "ref": "< 7.8"},
+    {"code": "HBA1C", "name": "HbA1c",                     "unit": "%",      "ref": "4.0-5.6"},
+    {"code": "LIPID", "name": "Lipid Profile (Total Chol)","unit": "mmol/L", "ref": "< 5.2"},
+    {"code": "RP",    "name": "Renal Profile (Creatinine)","unit": "umol/L", "ref": "60-110"},
+    {"code": "LFT",   "name": "Liver Function (ALT)",      "unit": "U/L",    "ref": "7-56"},
+    {"code": "TFT",   "name": "Thyroid (TSH)",             "unit": "mIU/L",  "ref": "0.4-4.0"},
+    {"code": "UFEME", "name": "Urine FEME",                "unit": "",       "ref": "normal"},
+    {"code": "TROP",  "name": "Troponin I",               "unit": "ng/mL",  "ref": "< 0.04"},
+]
+
+class LabOrderIn(BaseModel):
+    patient_id: str
+    record_id: Optional[str] = None
+    test_code: str
+    notes: Optional[str] = None
+
+class LabResultIn(BaseModel):
+    result_value: str
+    result_unit: Optional[str] = None
+    ref_range: Optional[str] = None
+    abnormal: Optional[bool] = None
+    notes: Optional[str] = None
+
+@api.get("/lab/catalog")
+async def lab_catalog(u=Depends(current_user)):
+    return LAB_CATALOG
+
+@api.post("/lab/orders", status_code=201)
+async def order_lab(body: LabOrderIn, u=Depends(role_required("doctor", "admin"))):
+    entry = next((c for c in LAB_CATALOG if c["code"] == body.test_code.upper()), None)
+    if not entry:
+        raise HTTPException(400, "Unknown test code")
+    oid = uid(); now = now_iso()
+    row = dict(id=oid, patient_id=body.patient_id, doctor_id=u["id"], record_id=body.record_id,
+               test_name=entry["name"], test_code=entry["code"], status="ordered",
+               ref_range=entry["ref"], result_unit=entry["unit"], abnormal=False,
+               notes=body.notes, ordered_at=now, facility_id=FACILITY_ID, sync_status="local")
+    await database.execute(lab_orders_t.insert().values(**row))
+    await enqueue_sync("lab_orders", oid, "INSERT", row)
+    await audit_log(u["id"], u["role"], "ORDER_LAB", "lab_orders", oid)
+    return row
+
+@api.get("/lab/orders")
+async def list_lab_orders(patient_id: Optional[str] = None, pending: bool = False,
+                          u=Depends(current_user)):
+    q = lab_orders_t.select().order_by(lab_orders_t.c.ordered_at.desc())
+    if u["role"] == "patient":
+        q = q.where(lab_orders_t.c.patient_id == u["id"])
+    elif patient_id:
+        q = q.where(lab_orders_t.c.patient_id == patient_id)
+    if pending:
+        q = q.where(lab_orders_t.c.status != "resulted")
+    if not is_super(u) and u["role"] != "patient":
+        q = q.where(lab_orders_t.c.facility_id == u.get("facility_id"))
+    rows = await database.fetch_all(q)
+    return [dict(r) for r in rows]
+
+@api.patch("/lab/orders/{oid}/result")
+async def result_lab(oid: str, body: LabResultIn, u=Depends(role_required("doctor", "admin"))):
+    row = await database.fetch_one(lab_orders_t.select().where(lab_orders_t.c.id == oid))
+    if not row:
+        raise HTTPException(404, "Lab order not found")
+    d = dict(row)
+    # Auto-flag abnormal against a numeric reference range when possible.
+    abnormal = body.abnormal
+    if abnormal is None:
+        abnormal = _lab_is_abnormal(body.result_value, d.get("ref_range") or "")
+    upd = dict(result_value=body.result_value,
+               result_unit=body.result_unit or d.get("result_unit"),
+               ref_range=body.ref_range or d.get("ref_range"),
+               abnormal=bool(abnormal), notes=body.notes or d.get("notes"),
+               status="resulted", resulted_at=now_iso(), sync_status="local")
+    await database.execute(lab_orders_t.update().where(lab_orders_t.c.id == oid).values(**upd))
+    await enqueue_sync("lab_orders", oid, "UPDATE", {**d, **upd})
+    await audit_log(u["id"], u["role"], "RESULT_LAB", "lab_orders", oid)
+    return {**d, **upd}
+
+def _lab_is_abnormal(value: str, ref: str) -> bool:
+    """Best-effort numeric abnormal flag. Handles '3.9-5.5', '< 7.8', '> 0.04'."""
+    try:
+        v = float(re.findall(r"-?\d+\.?\d*", str(value))[0])
+    except Exception:
+        return False
+    ref = (ref or "").strip()
+    try:
+        m = re.match(r"^([\d.]+)\s*-\s*([\d.]+)$", ref)
+        if m:
+            return not (float(m.group(1)) <= v <= float(m.group(2)))
+        if ref.startswith("<"):
+            return v >= float(re.findall(r"[\d.]+", ref)[0])
+        if ref.startswith(">"):
+            return v <= float(re.findall(r"[\d.]+", ref)[0])
+    except Exception:
+        return False
+    return False
+
 # ── Medical Certificate (MC) ─────────────────────────────────────────────────
 @api.get("/records/{record_id}/mc/pdf")
 async def mc_pdf(record_id: str, days: int = Query(1, ge=1, le=30), u=Depends(current_user)):
@@ -2505,6 +2672,80 @@ async def mc_pdf(record_id: str, days: int = Query(1, ge=1, le=30), u=Depends(cu
     await audit_log(u["id"], u["role"], "DOWNLOAD_MC", "medical_records", record_id)
     return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="mc-{start}.pdf"'})
+
+# ── Referral letter ──────────────────────────────────────────────────────────
+class ReferralIn(BaseModel):
+    patient_id: str
+    record_id: Optional[str] = None
+    refer_to: str                      # specialist / department / hospital
+    reason: str
+    clinical_summary: Optional[str] = None
+
+@api.post("/referrals/pdf")
+async def referral_pdf(body: ReferralIn, u=Depends(role_required("doctor", "admin"))):
+    p_row = await database.fetch_one(users_t.select().where(users_t.c.id == body.patient_id))
+    if not p_row:
+        raise HTTPException(404, "Patient not found")
+    pd_ = dict(p_row); dd = u
+    rec = None
+    if body.record_id:
+        rec = await database.fetch_one(records_t.select().where(records_t.c.id == body.record_id))
+    rd = dict(rec) if rec else {}
+    pdf = _pdf_doc("Surat Rujukan / Referral Letter")
+    _pdf_kv(pdf, "Date", now_iso()[:10])
+    _pdf_kv(pdf, "Referred to", body.refer_to)
+    pdf.ln(3)
+    _pdf_kv(pdf, "Patient", pd_.get("name"))
+    _pdf_kv(pdf, "IC", ic_show(pd_.get("ic_number")))
+    _pdf_kv(pdf, "Age / Gender", f"{pd_.get('dob') or '-'}  /  {pd_.get('gender') or '-'}")
+    pdf.ln(3)
+    _pdf_kv(pdf, "Reason for referral", body.reason)
+    if rd.get("diagnosis"):
+        _pdf_kv(pdf, "Working diagnosis", rd.get("diagnosis"))
+    v = rd.get("vitals") or {}
+    if isinstance(v, dict) and any(v.values()):
+        _pdf_kv(pdf, "Vitals", ", ".join(f"{k.upper()}: {val}" for k, val in v.items() if val))
+    rx = rd.get("prescriptions") or []
+    if rx:
+        _pdf_kv(pdf, "Current medications",
+                "; ".join(f"{m.get('medicine')} {m.get('dosage','')}".strip() for m in rx))
+    if body.clinical_summary:
+        _pdf_kv(pdf, "Clinical summary", body.clinical_summary)
+    pdf.ln(10)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 6, "_______________________", ln=1)
+    pdf.cell(0, 6, _latin(f"{dd.get('name','-')}  ({dd.get('license_no') or 'MMC'})"), ln=1)
+    pdf.cell(0, 6, _latin(CLINIC_NAME), ln=1)
+    await audit_log(u["id"], u["role"], "REFERRAL_LETTER", "users", body.patient_id)
+    return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
+                    headers={"Content-Disposition": 'attachment; filename="referral-letter.pdf"'})
+
+# ── Lab report PDF ───────────────────────────────────────────────────────────
+@api.get("/lab/patient/{patient_id}/report/pdf")
+async def lab_report_pdf(patient_id: str, u=Depends(current_user)):
+    if u["role"] == "patient" and u["id"] != patient_id:
+        raise HTTPException(403, "Forbidden")
+    p_row = await database.fetch_one(users_t.select().where(users_t.c.id == patient_id))
+    pd_ = dict(p_row or {})
+    rows = await database.fetch_all(
+        lab_orders_t.select().where((lab_orders_t.c.patient_id == patient_id) &
+                                    (lab_orders_t.c.status == "resulted"))
+        .order_by(lab_orders_t.c.resulted_at.desc()))
+    pdf = _pdf_doc("Laboratory Report")
+    _pdf_kv(pdf, "Patient", pd_.get("name"))
+    _pdf_kv(pdf, "IC", ic_show(pd_.get("ic_number")))
+    pdf.ln(3)
+    for r in rows:
+        d = dict(r)
+        flag = "  [ABNORMAL]" if d.get("abnormal") else ""
+        _pdf_kv(pdf, d.get("test_name"),
+                f"{d.get('result_value')} {d.get('result_unit') or ''}  (ref {d.get('ref_range') or '-'}){flag}")
+    if not rows:
+        pdf.set_font("Helvetica", "I", 10)
+        pdf.cell(0, 6, "No results available.", ln=1)
+    await audit_log(u["id"], u["role"], "LAB_REPORT_PDF", "lab_orders", patient_id)
+    return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
+                    headers={"Content-Disposition": 'attachment; filename="lab-report.pdf"'})
 
 # ── Pharmacy: expiry alerts ──────────────────────────────────────────────────
 @api.get("/pharmacy/expiry-alerts")
