@@ -3,6 +3,8 @@ FROM node:20-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install --legacy-peer-deps
+# Fix CRA/craco build break: ajv-keywords needs ajv@8 but a transitive dep pulls ajv@6.
+RUN npm install --legacy-peer-deps ajv@8 ajv-keywords@5
 COPY . .
 ARG REACT_APP_BACKEND_URL
 ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL
