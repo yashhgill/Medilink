@@ -8,7 +8,8 @@ import { motion } from "framer-motion";
 // only mount when the user is an admin, so hook order never changes.
 export default function SyncIndicator(props) {
   const { user } = useAuth();
-  if (!user || user.role !== "admin") return null;
+  const adminTiers = ["super_admin", "clinic_admin", "admin"];
+  if (!user || !adminTiers.includes(user.role)) return null;
   return <SyncIndicatorInner {...props} />;
 }
 

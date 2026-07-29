@@ -13,6 +13,11 @@ export default function ProtectedRoute({ roles, children }) {
     );
   }
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
-  if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;
+  // Any admin tier (super_admin / clinic_admin / legacy admin) satisfies an "admin" gate.
+  const ADMIN_TIERS = ["super_admin", "clinic_admin", "admin"];
+  const allowed = roles
+    ? roles.flatMap((r) => (r === "admin" ? ADMIN_TIERS : [r]))
+    : null;
+  if (allowed && !allowed.includes(user.role)) return <Navigate to="/" replace />;
   return children;
 }

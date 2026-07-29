@@ -189,7 +189,7 @@ export default function Login() {
 
 export function redirectFor(role) {
   if (role === "doctor") return "/doctor";
-  if (role === "admin") return "/reception";
+  if (role === "admin" || role === "super_admin" || role === "clinic_admin" || role === "receptionist") return "/reception";
   if (role === "pharmacist") return "/pharmacy";
   return "/patient";
 }

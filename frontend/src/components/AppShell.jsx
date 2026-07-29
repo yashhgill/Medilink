@@ -16,12 +16,15 @@ const roleAccent = {
   patient: "#0B7C8C",      // teal
   doctor: "#086788",       // medical blue
   admin: "#0A3D62",        // navy
+  super_admin: "#0A3D62",
+  clinic_admin: "#086788",
   receptionist: "#0A3D62",
   pharmacist: "#2D6A4F",   // green
 };
 
 const roleLabel = {
-  patient: "Patient", doctor: "Doctor", admin: "Reception · Admin",
+  patient: "Patient", doctor: "Doctor",
+  admin: "Super-Admin", super_admin: "Super-Admin", clinic_admin: "Clinic-Admin",
   pharmacist: "Pharmacy", receptionist: "Reception",
 };
 

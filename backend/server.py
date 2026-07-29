@@ -381,11 +381,49 @@ async def current_user(authorization: Optional[str] = Header(None)) -> dict:
     return clean(dict(row))
 
 def role_required(*roles: str):
+    # Any admin tier (super_admin / clinic_admin / legacy admin) satisfies an
+    # "admin" requirement, so existing endpoints keep working under the new model.
+    allowed = set(roles)
+    if "admin" in allowed:
+        allowed |= {"super_admin", "clinic_admin"}
     async def dep(u=Depends(current_user)):
-        if u["role"] not in roles:
+        if u["role"] not in allowed:
             raise HTTPException(403, f"Requires: {roles}")
         return u
     return dep
+
+# ── Two-tier admin model ─────────────────────────────────────────────────────
+# super_admin : network operator. Sees & manages ALL facilities, can create
+#               facilities and clinic admins, runs cross-clinic sync/analytics.
+# clinic_admin: scoped to a single facility_id. Manages only their own clinic's
+#               staff, patients, analytics, cash. Cannot create facilities.
+# admin       : legacy alias, treated as super_admin for backward compatibility.
+SUPER_ADMIN_ROLES  = ("super_admin", "admin")
+CLINIC_ADMIN_ROLES = ("clinic_admin",)
+ANY_ADMIN_ROLES    = SUPER_ADMIN_ROLES + CLINIC_ADMIN_ROLES
+
+def is_super(u: dict) -> bool:
+    return u.get("role") in SUPER_ADMIN_ROLES
+
+def is_any_admin(u: dict) -> bool:
+    return u.get("role") in ANY_ADMIN_ROLES
+
+def super_admin_required(u=Depends(current_user)):
+    if not is_super(u):
+        raise HTTPException(403, "Requires super-admin (network operator)")
+    return u
+
+def any_admin_required(u=Depends(current_user)):
+    if not is_any_admin(u):
+        raise HTTPException(403, "Requires admin")
+    return u
+
+def scope_facility(query, column, u: dict):
+    """Restrict a query to the caller's facility unless they are super-admin.
+    `column` is the SQLAlchemy facility_id column of the table being queried."""
+    if is_super(u):
+        return query
+    return query.where(column == u.get("facility_id"))
 
 # ── Kiosk device auth ────────────────────────────────────────────────────────
 # Kiosk endpoints are unauthenticated for patients but must come from a trusted
@@ -554,7 +592,7 @@ async def groq_stream(system: str, messages: list):
         yield f"data: [ERROR] {str(e)}\n\n"
 
 # ── Pydantic models ───────────────────────────────────────────────────────────
-Role = Literal["patient","doctor","admin","pharmacist","receptionist"]
+Role = Literal["patient","doctor","admin","super_admin","clinic_admin","pharmacist","receptionist"]
 
 class RegisterIn(BaseModel):
     email: EmailStr
@@ -795,6 +833,9 @@ async def login(body: LoginIn, request: Request):
         await audit_log(row["id"] if row else "unknown", row["role"] if row else "unknown",
                         "LOGIN_FAILED", "auth", ip=ip)
         raise HTTPException(401, "Invalid credentials")
+    if dict(row).get("activated") is False:
+        await audit_log(row["id"], row["role"], "LOGIN_DEACTIVATED", "auth", ip=ip)
+        raise HTTPException(403, "This account has been deactivated")
     if row["role"] != "patient" and is_public_request(request):
         await audit_log(row["id"], row["role"], "LOGIN_BLOCKED_PUBLIC", "auth", ip=ip)
         raise HTTPException(403, "Staff sign-in is only available inside the clinic")
@@ -876,6 +917,11 @@ async def update_my_profile(body: dict, u=Depends(current_user)):
 async def list_patients(search: Optional[str] = None, u=Depends(current_user)):
     if u["role"] == "patient": raise HTTPException(403, "Forbidden")
     q = users_t.select().where(users_t.c.role == "patient").order_by(users_t.c.name)
+    # Clinic-scoped staff (incl. clinic_admin) list only patients registered at
+    # their own facility. Super-admin & cross-facility record lookup by IC/ID are
+    # unaffected — that is how "one patient, one record" still works network-wide.
+    if not is_super(u):
+        q = q.where(users_t.c.facility_id == u.get("facility_id"))
     rows = await database.fetch_all(q)
     patients = [clean(dict(r)) for r in rows]
     if search:
@@ -1797,7 +1843,7 @@ async def sync_status(u=Depends(current_user)):
     }
 
 @api.post("/sync/full")
-async def sync_full(u=Depends(role_required("admin"))):
+async def sync_full(u=Depends(super_admin_required)):
     """Push EVERY local row to the cloud mirror (upsert). Covers data created
     outside the live app (e.g. seed scripts) that never entered the sync queue."""
     if not cloud_db or IS_CLOUD:
@@ -1833,12 +1879,12 @@ async def sync_full(u=Depends(role_required("admin"))):
     return {"ok": True, "pushed": result}
 
 @api.post("/sync/trigger")
-async def trigger_sync(bg: BackgroundTasks, u=Depends(role_required("admin"))):
+async def trigger_sync(bg: BackgroundTasks, u=Depends(super_admin_required)):
     bg.add_task(run_sync_job)
     return {"ok":True,"message":"Sync job triggered"}
 
 @api.get("/sync/queue")
-async def view_sync_queue(limit: int = Query(50, le=200), u=Depends(role_required("admin"))):
+async def view_sync_queue(limit: int = Query(50, le=200), u=Depends(any_admin_required)):
     rows = await database.fetch_all(
         sync_queue_t.select()
         .where(sync_queue_t.c.synced == False)
@@ -1849,7 +1895,7 @@ async def view_sync_queue(limit: int = Query(50, le=200), u=Depends(role_require
 
 # ── Audit logs ────────────────────────────────────────────────────────────────
 @api.get("/audit/logs")
-async def audit_logs(limit: int = Query(100, le=500), u=Depends(role_required("admin"))):
+async def audit_logs(limit: int = Query(100, le=500), u=Depends(any_admin_required)):
     rows = await database.fetch_all(
         audit_t.select().order_by(audit_t.c.timestamp.desc()).limit(limit)
     )
@@ -1857,7 +1903,7 @@ async def audit_logs(limit: int = Query(100, le=500), u=Depends(role_required("a
 
 # ── Admin stats ───────────────────────────────────────────────────────────────
 @api.get("/admin/stats")
-async def admin_stats(u=Depends(role_required("admin"))):
+async def admin_stats(u=Depends(any_admin_required)):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return {
         "patients": await database.fetch_val(text("SELECT COUNT(*) FROM users WHERE role='patient'")) or 0,
@@ -2194,11 +2240,15 @@ class FacilityIn(BaseModel):
 
 @api.get("/facilities")
 async def list_facilities(u=Depends(current_user)):
-    rows = await database.fetch_all(facilities_t.select().order_by(facilities_t.c.name))
+    q = facilities_t.select().order_by(facilities_t.c.name)
+    # Clinic-admin & clinic staff only see their own facility; super-admin sees all.
+    if not is_super(u):
+        q = q.where(facilities_t.c.code == u.get("facility_id"))
+    rows = await database.fetch_all(q)
     return [dict(r) for r in rows]
 
 @api.post("/facilities", status_code=201)
-async def add_facility(body: FacilityIn, u=Depends(role_required("admin"))):
+async def add_facility(body: FacilityIn, u=Depends(super_admin_required)):
     code = re.sub(r"[^a-z0-9-]", "", body.code.strip().lower())
     if not code:
         raise HTTPException(400, "Facility code required (letters, numbers, hyphens)")
@@ -2214,7 +2264,7 @@ async def add_facility(body: FacilityIn, u=Depends(role_required("admin"))):
     return row
 
 @api.patch("/facilities/{fid}")
-async def update_facility(fid: str, body: dict, u=Depends(role_required("admin"))):
+async def update_facility(fid: str, body: dict, u=Depends(super_admin_required)):
     allowed = {"name", "type", "address", "phone", "active"}
     upd = {k: v for k, v in body.items() if k in allowed}
     if upd:
@@ -2222,20 +2272,97 @@ async def update_facility(fid: str, body: dict, u=Depends(role_required("admin")
     row = await database.fetch_one(facilities_t.select().where(facilities_t.c.id == fid))
     return dict(row) if row else {}
 
+# ── Staff management (two-tier) ──────────────────────────────────────────────
+# super_admin: create any staff (incl. clinic_admin) in any facility.
+# clinic_admin: create staff (doctor / receptionist / pharmacist) in OWN facility
+#               only; may not mint another admin.
+class StaffIn(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    role: str                       # doctor | receptionist | pharmacist | clinic_admin
+    facility_id: Optional[str] = None
+    phone: Optional[str] = None
+    specialty: Optional[str] = None
+    license_no: Optional[str] = None
+
+STAFF_ROLES = ("doctor", "receptionist", "pharmacist", "clinic_admin")
+
+@api.get("/admin/staff")
+async def list_staff(u=Depends(any_admin_required)):
+    q = users_t.select().where(users_t.c.role.in_(list(STAFF_ROLES) + ["super_admin", "admin"]))        .order_by(users_t.c.role, users_t.c.name)
+    if not is_super(u):
+        q = q.where(users_t.c.facility_id == u.get("facility_id"))
+    rows = await database.fetch_all(q)
+    return [clean(dict(r)) for r in rows]
+
+@api.post("/admin/staff", status_code=201)
+async def create_staff(body: StaffIn, u=Depends(any_admin_required)):
+    role = body.role.strip().lower()
+    if role not in STAFF_ROLES:
+        raise HTTPException(400, f"Role must be one of {STAFF_ROLES}")
+    # Determine target facility.
+    if is_super(u):
+        target_facility = body.facility_id or FACILITY_ID
+        # super-admin may create clinic_admins
+    else:
+        # clinic_admin is locked to their own facility and cannot create admins
+        if role == "clinic_admin":
+            raise HTTPException(403, "Only a super-admin can create clinic admins")
+        target_facility = u.get("facility_id")
+    # Validate the facility exists
+    fac = await database.fetch_one(facilities_t.select().where(facilities_t.c.code == target_facility))
+    if not fac:
+        raise HTTPException(400, f"Facility '{target_facility}' not found — create it first")
+    if await database.fetch_one(users_t.select().where(users_t.c.email == body.email.lower())):
+        raise HTTPException(400, "Email already registered")
+    uid_ = uid(); now = now_iso()
+    await database.execute(users_t.insert().values(
+        id=uid_, email=body.email.lower(), password_hash=hash_pw(body.password), activated=True,
+        name=body.name.strip(), role=role, phone=body.phone,
+        specialty=body.specialty, license_no=body.license_no,
+        availability=DEFAULT_AVAIL if role == "doctor" else None,
+        slot_minutes=30, facility_id=target_facility, source="admin",
+        created_at=now, updated_at=now, sync_status="local"))
+    row = clean(dict(await database.fetch_one(users_t.select().where(users_t.c.id == uid_))))
+    await enqueue_sync("users", uid_, "INSERT", row)
+    await audit_log(u["id"], u["role"], "CREATE_STAFF", "users", uid_)
+    return row
+
+@api.delete("/admin/staff/{sid}")
+async def deactivate_staff(sid: str, u=Depends(any_admin_required)):
+    row = await database.fetch_one(users_t.select().where(users_t.c.id == sid))
+    if not row:
+        raise HTTPException(404, "Staff not found")
+    d = dict(row)
+    if d.get("role") in ("patient",):
+        raise HTTPException(400, "Not a staff account")
+    if not is_super(u):
+        if d.get("facility_id") != u.get("facility_id"):
+            raise HTTPException(403, "Cannot manage staff of another facility")
+        if d.get("role") in ("clinic_admin", "super_admin", "admin"):
+            raise HTTPException(403, "Only a super-admin can remove admins")
+    if d.get("id") == u.get("id"):
+        raise HTTPException(400, "You cannot remove your own account")
+    await database.execute(users_t.update().where(users_t.c.id == sid)
+        .values(activated=False, updated_at=now_iso(), sync_status="local"))
+    await audit_log(u["id"], u["role"], "DEACTIVATE_STAFF", "users", sid)
+    return {"ok": True, "id": sid}
+
 # ── Admin: analytics + daily cash report ────────────────────────────────────
 @api.get("/admin/analytics")
-async def admin_analytics(u=Depends(role_required("admin"))):
+async def admin_analytics(u=Depends(any_admin_required)):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
     appts = await database.fetch_all(
-        appointments_t.select().where(
+        scope_facility(appointments_t.select().where(
             (appointments_t.c.created_at >= week_ago) &
-            (appointments_t.c.is_block.isnot(True))))
+            (appointments_t.c.is_block.isnot(True))), appointments_t.c.facility_id, u))
     pays = await database.fetch_all(
-        payments_t.select().where(
-            (payments_t.c.status == "succeeded") & (payments_t.c.paid_at >= week_ago)))
+        scope_facility(payments_t.select().where(
+            (payments_t.c.status == "succeeded") & (payments_t.c.paid_at >= week_ago)), payments_t.c.facility_id, u))
     recs = await database.fetch_all(
-        records_t.select().where(records_t.c.created_at >= week_ago))
+        scope_facility(records_t.select().where(records_t.c.created_at >= week_ago), records_t.c.facility_id, u))
     triage = {"Red": 0, "Orange": 0, "Yellow": 0, "Green": 0, "Blue": 0, "None": 0}
     visits_today = 0
     for a in appts:
@@ -2256,11 +2383,12 @@ async def admin_analytics(u=Depends(role_required("admin"))):
             "triage_mix": triage, "top_diagnoses": top_diag}
 
 @api.get("/admin/cash-report/pdf")
-async def cash_report_pdf(u=Depends(role_required("admin"))):
+async def cash_report_pdf(u=Depends(any_admin_required)):
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     pays = await database.fetch_all(
-        payments_t.select().where(
-            (payments_t.c.status == "succeeded") & (payments_t.c.paid_at.like(f"{today}%")))
+        scope_facility(payments_t.select().where(
+            (payments_t.c.status == "succeeded") & (payments_t.c.paid_at.like(f"{today}%"))),
+            payments_t.c.facility_id, u)
         .order_by(payments_t.c.paid_at))
     pdf = _pdf_doc(f"Daily Collection Report - {today}")
     total = 0.0
@@ -2401,6 +2529,33 @@ async def expiry_alerts(u=Depends(role_required("pharmacist", "admin"))):
             expiring.append(d)
     return {"expired": sorted(expired, key=lambda x: x["days_to_expiry"]),
             "expiring_soon": sorted(expiring, key=lambda x: x["days_to_expiry"])}
+
+# ── Danger zone: wipe everything ─────────────────────────────────────────────
+class WipeIn(BaseModel):
+    confirm: str                       # must equal "WIPE"
+    keep_me: bool = True               # keep the calling super-admin account
+
+@api.post("/admin/wipe")
+async def wipe_database(body: WipeIn, u=Depends(super_admin_required)):
+    """Delete ALL data in this node. Optionally keep the calling super-admin so
+    you are not locked out. Also clears the cloud mirror queue for these rows."""
+    if body.confirm != "WIPE":
+        raise HTTPException(400, 'Send {"confirm":"WIPE"} to proceed')
+    tables = ["dispense_records", "stock_movements", "attachments", "vaccinations",
+              "medical_records", "payments", "appointments", "pharmacy_inventory",
+              "audit_logs", "counters", "sync_queue"]
+    for t in tables:
+        try:
+            await database.execute(text(f"DELETE FROM {t}"))
+        except Exception as e:
+            log.warning(f"wipe {t}: {e}")
+    if body.keep_me:
+        await database.execute(users_t.delete().where(users_t.c.id != u["id"]))
+    else:
+        await database.execute(users_t.delete())
+    log.warning(f"DATABASE WIPED by {u.get('email')} (keep_me={body.keep_me})")
+    return {"ok": True, "kept_user": u["email"] if body.keep_me else None,
+            "message": "All clinical & staff data cleared."}
 
 # ── Seed ──────────────────────────────────────────────────────────────────────
 @api.post("/seed")
@@ -2678,10 +2833,21 @@ async def startup():
             log.info("Starter pharmacy inventory seeded (8 items)")
     count = await database.fetch_val(text("SELECT COUNT(*) FROM users"))
     if not count:
-        if ALLOW_SEED:
-            await seed(); log.info("Demo data seeded")
+        # Clean bootstrap: create exactly ONE super-admin from env, no demo flood.
+        sa_email = os.environ.get("SUPER_ADMIN_EMAIL") or os.environ.get("ADMIN_EMAIL")
+        sa_pw    = os.environ.get("SUPER_ADMIN_PASSWORD") or os.environ.get("ADMIN_PASSWORD")
+        if sa_email and sa_pw:
+            await database.execute(users_t.insert().values(
+                id=uid(), email=sa_email.lower(), password_hash=hash_pw(sa_pw), activated=True,
+                name=os.environ.get("SUPER_ADMIN_NAME", "Super Admin"),
+                role="super_admin", phone=os.environ.get("SUPER_ADMIN_PHONE") or None,
+                slot_minutes=30, facility_id=FACILITY_ID, source="bootstrap",
+                created_at=now_iso(), updated_at=now_iso(), sync_status="local"))
+            log.info(f"Bootstrapped super-admin: {sa_email}")
+        elif ALLOW_SEED:
+            await seed(); log.info("Demo data seeded (ALLOW_SEED=true)")
         else:
-            log.warning("users table empty and ALLOW_SEED=false — create an admin via /api/auth/register or enable ALLOW_SEED once")
+            log.warning("users table empty — set SUPER_ADMIN_EMAIL & SUPER_ADMIN_PASSWORD in .env to bootstrap a super-admin")
     # Start background sync loop
     if not IS_CLOUD and cloud_db:
         asyncio.create_task(sync_loop())

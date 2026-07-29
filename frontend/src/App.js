@@ -55,7 +55,7 @@ function App() {
             <Route
               path="/reception/*"
               element={
-                <ProtectedRoute roles={["admin"]}>
+                <ProtectedRoute roles={["admin", "receptionist"]}>
                   <ReceptionDashboard />
                 </ProtectedRoute>
               }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { useLocation } from "react-router-dom";
 import api from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 import SyncIndicator from "@/components/SyncIndicator";
 import ICScanner from "@/components/ICScanner";
 import SlotPicker from "@/components/SlotPicker";
@@ -28,6 +29,7 @@ const statusColors = {
 };
 
 export default function ReceptionDashboard() {
+  const { isAdmin, isSuperAdmin } = useAuth();
   const [queue, setQueue] = useState([]);
   const [stats, setStats] = useState(null);
   const _loc = useLocation();
@@ -37,8 +39,8 @@ export default function ReceptionDashboard() {
   const [scanOpen, setScanOpen] = useState(false);
   const [scannedPatient, setScannedPatient] = useState(null);
   useEffect(() => {
-    api.get("/admin/analytics").then((r) => setStats(r.data)).catch(() => {});
-  }, []);
+    if (isAdmin) api.get("/admin/analytics").then((r) => setStats(r.data)).catch(() => {});
+  }, [isAdmin]);
   const [bookOpen, setBookOpen] = useState(false);
   const [booking, setBooking] = useState({ patient_id: "", doctor_id: "", scheduled_at: "", reason: "" });
 
@@ -99,9 +101,16 @@ export default function ReceptionDashboard() {
   const next = queue.find((q) => ["checked_in", "scheduled"].includes(q.status));
 
   return (
-    <AppShell title="Reception · Live Queue" subtitle="Admin · Operations" navItems={[{ label: "Operations", to: "/reception" }, { label: "Registered Patients", to: "/reception/patients" }, { label: "Facilities", to: "/facilities" }]}>
+    <AppShell
+      title={isAdmin ? "Clinic · Live Queue" : "Reception · Live Queue"}
+      subtitle={isSuperAdmin ? "Super-Admin · Operations" : isAdmin ? "Clinic-Admin · Operations" : "Reception · Front desk"}
+      navItems={[
+        { label: "Operations", to: "/reception" },
+        { label: "Registered Patients", to: "/reception/patients" },
+        ...(isAdmin ? [{ label: isSuperAdmin ? "Network" : "My clinic", to: "/facilities" }] : []),
+      ]}>
       {view === "operations" && (<>
-      {stats && (
+      {isAdmin && stats && (
         <div className="mb-5 grid grid-cols-2 lg:grid-cols-5 gap-3">
           {[
             { label: "Visits today", value: stats.visits_today },
@@ -141,6 +150,7 @@ export default function ReceptionDashboard() {
             >
               Cash report PDF
             </button>
+            {isSuperAdmin && (
             <button
               onClick={async () => {
                 toast.message("Pushing all records to cloud…");
@@ -154,6 +164,7 @@ export default function ReceptionDashboard() {
             >
               Sync all to cloud
             </button>
+            )}
           </div>
         </div>
       )}

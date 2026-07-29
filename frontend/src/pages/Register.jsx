@@ -64,8 +64,6 @@ export default function Register() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="patient">Patient</SelectItem>
-                <SelectItem value="doctor">Doctor</SelectItem>
-                <SelectItem value="admin">Reception / Admin</SelectItem>
               </SelectContent>
             </Select>
           </div>
