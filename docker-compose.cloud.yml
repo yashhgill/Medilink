@@ -1,0 +1,13 @@
+# Cloud-node overrides. Use with:
+#   docker compose -f docker-compose.yml -f docker-compose.cloud.yml up -d --build backend frontend
+# Serves a production React build over plain HTTP (fixes ERR_EMPTY_RESPONSE from the dev server's HTTPS),
+# with the backend URL baked in. The Cloudflare tunnel service is not started here.
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        REACT_APP_BACKEND_URL: "http://44.209.64.89:8000"
+    environment: {}
+    command: ["serve", "-s", "build", "-l", "3000"]
