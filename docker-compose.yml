@@ -28,10 +28,10 @@ services:
     env_file: ./backend/.env
     volumes:
       - uploads:/app/uploads
-    environment:
-      DATABASE_URL: postgresql://medilink:${DB_PASSWORD:-changeme}@db:5432/medilink
-      IS_CLOUD_NODE: "false"
-      FACILITY_ID: "main"
+    # Node identity (DATABASE_URL, IS_CLOUD_NODE, FACILITY_ID, CLINIC_NAME,
+    # CLOUD_DATABASE_URL, secrets) all come from backend/.env so a clinic node
+    # and the cloud node are configured purely by their .env. Nothing hardcoded
+    # here — otherwise it overrides the .env.
     ports:
       - "8000:8000"
     depends_on:
