@@ -8,13 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Heartbeat, ArrowRight } from "@phosphor-icons/react";
 import { toast } from "sonner";
 
-const demoAccounts = [
-  { role: "Patient", email: "patient1@medilink.io", pwd: "Patient@123" },
-  { role: "Doctor", email: "dr.tan@medilink.io", pwd: "Doctor@123" },
-  { role: "Reception", email: "admin@medilink.io", pwd: "Admin@123" },
-  { role: "Pharmacy", email: "pharmacy@medilink.io", pwd: "Pharm@123" },
-];
-
 export default function Login() {
   const { login } = useAuth();
   const nav = useNavigate();
@@ -32,21 +25,6 @@ export default function Login() {
       nav(redirectFor(u.role));
     } catch (e) {
       toast.error(e?.response?.data?.detail || "Login failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const quick = async (acc) => {
-    setEmail(acc.email);
-    setPassword(acc.pwd);
-    setLoading(true);
-    try {
-      const u = await login(acc.email, acc.pwd);
-      toast.success(`Signed in as ${u.name}`);
-      nav(redirectFor(u.role));
-    } catch (err) {
-      toast.error("Demo login failed");
     } finally {
       setLoading(false);
     }
@@ -140,30 +118,6 @@ export default function Login() {
               {loading ? "Signing in…" : (<>Sign in <ArrowRight size={16} className="ml-1.5" /></>)}
             </Button>
           </form>
-
-          {!IS_PUBLIC && (
-          <div className="flex items-center gap-3 my-8 text-[10px] uppercase tracking-[0.2em] text-[#5A6B70]">
-            <div className="h-px flex-1 bg-[#DCE8E9]" /> Demo accounts <div className="h-px flex-1 bg-[#DCE8E9]" />
-          </div>
-          )}
-
-          <div className="grid gap-2">
-            {!IS_PUBLIC && demoAccounts.map((d) => (
-              <button
-                key={d.email}
-                data-testid={`demo-login-${d.role.toLowerCase()}`}
-                onClick={() => quick(d)}
-                disabled={loading}
-                className="text-left p-3 rounded-xl border border-[#DCE8E9] bg-white hover:bg-[#EAF5F5] transition-colors flex items-center justify-between"
-              >
-                <div>
-                  <div className="text-sm font-medium">{d.role}</div>
-                  <div className="text-xs font-mono text-[#5A6B70]">{d.email}</div>
-                </div>
-                <ArrowRight size={16} className="text-[#0B7C8C]" />
-              </button>
-            ))}
-          </div>
 
           <p className="text-sm text-[#5A6B70] mt-6 text-center">
             Forgot your password? Get a reset code at the clinic kiosk, then use{" "}
