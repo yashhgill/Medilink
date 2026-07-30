@@ -244,19 +244,18 @@ function CheckinFlow({ onPrint }) {
     }
     setRegistering(true);
     try {
-      await kioskAxios.post("/kiosk/register", {
+      const reg = await kioskAxios.post("/kiosk/register", {
         ic_number: ic,
         name: regForm.name,
         phone: regForm.phone || null,
         gender: regForm.gender || null,
         dob: regForm.dob || null,
       });
-      toast.success("Registered · proceeding to check-in");
-      // immediately lookup + checkin
-      const r = await kioskAxios.post("/kiosk/checkin", { ic_number: ic, symptoms: symptoms || null, pain_score: painScore });
-      setData(r.data);
-      setStep("booked");
-      onPrint(r.data.chit);
+      toast.success("Registered · tell us how you're feeling");
+      // Show the symptom / triage screen next (same as an existing patient),
+      // so new patients also get triaged before the ticket is printed.
+      setData(reg.data || { patient: { name: regForm.name, ic_number: ic } });
+      setStep("found");
     } catch (e) {
       toast.error(errMsg(e, "Registration failed"));
     } finally {
@@ -416,7 +415,7 @@ function CheckinFlow({ onPrint }) {
             disabled={!regForm.name || registering}
             className="bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9] rounded-full flex-1 btn-shimmer"
           >
-            <Ticket size={14} className="mr-1.5" /> {registering ? "Setting up…" : "Register & get my ticket"}
+            <Ticket size={14} className="mr-1.5" /> {registering ? "Setting up…" : "Register & continue"}
           </Button>
         </div>
       </motion.div>
