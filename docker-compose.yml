@@ -45,8 +45,10 @@ services:
     container_name: medilink_web
     restart: unless-stopped
     environment:
-      HTTPS: "true"
-      DANGEROUSLY_DISABLE_HOST_CHECK: "true"   # allow medilink.harnova.my via tunnel
+      # Plain HTTP on the clinic LAN. HTTPS on the dev server broke access via
+      # real hostnames (e.g. mymac.local) with ERR_EMPTY_RESPONSE — the tunnel
+      # terminates TLS for the public URL, so the node itself serves HTTP.
+      DANGEROUSLY_DISABLE_HOST_CHECK: "true"
     ports:
       - "3000:3000"
     depends_on:
