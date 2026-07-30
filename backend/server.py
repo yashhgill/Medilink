@@ -855,6 +855,9 @@ async def register(body: RegisterIn, request: Request):
             ic = p["formatted"]
             dob = dob or p.get("dob")
             gender = gender or p.get("gender_hint")
+        # One patient, one record: reject an IC that is already registered.
+        if await patient_by_ic(ic):
+            raise HTTPException(400, "A patient with this IC is already registered.")
     uid_ = uid()
     now = now_iso()
     await database.execute(users_t.insert().values(
