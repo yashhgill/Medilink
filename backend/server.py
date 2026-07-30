@@ -508,12 +508,30 @@ async def audit_log(user_id: str, role: str, action: str, resource: str,
         log.warning(f"Audit log failed: {e}")
 
 # ── Sync queue helper ─────────────────────────────────────────────────────────
+# Map sync table names -> SQLAlchemy tables, so we can always enqueue the COMPLETE
+# raw row (incl. password_hash / ic_hash). Callers often pass a clean()'d dict for
+# the browser; syncing that would drop NOT NULL columns and fail on the cloud.
+_SYNC_TABLES = {
+    "users": users_t, "appointments": appointments_t, "medical_records": records_t,
+    "payments": payments_t, "pharmacy_inventory": inventory_t, "dispense_records": dispense_t,
+    "attachments": attachments_t, "vaccinations": vaccinations_t, "facilities": facilities_t,
+    "lab_orders": lab_orders_t, "stock_movements": stock_movements_t,
+}
+
 async def enqueue_sync(table: str, record_id: str, operation: str, payload: dict):
-    """Add a record to the sync queue for cloud replication."""
+    """Add a record to the sync queue for cloud replication.
+    Always re-fetch the full raw row for INSERT/UPDATE so the payload has every
+    column (password_hash, ic_hash, ...); the passed-in payload may be clean()'d."""
     try:
+        full = payload
+        t = _SYNC_TABLES.get(table)
+        if t is not None and operation in ("INSERT", "UPDATE"):
+            row = await database.fetch_one(t.select().where(t.c.id == record_id))
+            if row is not None:
+                full = dict(row)
         await database.execute(sync_queue_t.insert().values(
             id=uid(), table_name=table, record_id=record_id,
-            operation=operation, payload=payload,
+            operation=operation, payload=full,
             created_at=now_iso(), attempts=0, synced=False,
         ))
     except Exception as e:
@@ -1921,10 +1939,11 @@ async def sync_full(u=Depends(super_admin_required)):
     outside the live app (e.g. seed scripts) that never entered the sync queue."""
     if not cloud_db or IS_CLOUD:
         raise HTTPException(400, "No cloud mirror configured on this node")
-    tables = {"users": users_t, "appointments": appointments_t,
-              "medical_records": records_t, "payments": payments_t,
-              "dispense_records": dispense_t, "vaccinations": vaccinations_t,
-              "pharmacy_inventory": inventory_t}
+    tables = {"users": users_t, "facilities": facilities_t,
+              "appointments": appointments_t, "medical_records": records_t,
+              "payments": payments_t, "dispense_records": dispense_t,
+              "vaccinations": vaccinations_t, "pharmacy_inventory": inventory_t,
+              "attachments": attachments_t, "lab_orders": lab_orders_t}
     result = {}
     for name, tbl in tables.items():
         pushed = 0
