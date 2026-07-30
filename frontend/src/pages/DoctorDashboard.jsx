@@ -15,6 +15,7 @@ import { AttachmentUploader, AttachmentList } from "@/components/Attachments";
 import AvailabilityCard from "@/components/AvailabilityCard";
 import { useLocation } from "react-router-dom";
 import DoctorScheduler from "@/components/DoctorScheduler";
+import ClinicalActions from "@/components/ClinicalActions";
 import useQueueSocket from "@/hooks/useQueueSocket";
 import {
   WaveTriangle,
@@ -387,6 +388,11 @@ export default function DoctorDashboard() {
                   </div>
                 ))}
               </div>
+              {activePatientId && (
+                <div className="mt-4">
+                  <ClinicalActions patientId={activePatientId} recordId={null} />
+                </div>
+              )}
             </>
           )}
         </div>
