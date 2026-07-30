@@ -65,6 +65,13 @@ export default function Facilities() {
 
   const addStaff = async () => {
     if (!sf.name || !sf.email || !sf.password) return toast.error("Name, email and password are required");
+    // Staff log in with a real email (used for receipts/reminders too).
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sf.email))
+      return toast.error("Enter a valid email, e.g. dr.raju@medilink.io");
+    if (sf.password.length < 6)
+      return toast.error("Password must be at least 6 characters");
+    if (isSuperAdmin && !sf.facility_id)
+      return toast.error("Choose a facility for this staff member");
     setSavingStaff(true);
     try {
       const payload = { name: sf.name, email: sf.email, password: sf.password, role: sf.role };
@@ -187,7 +194,7 @@ export default function Facilities() {
             <div className="space-y-1.5"><Label>Full name</Label>
               <Input value={sf.name} onChange={(e) => setSf({ ...sf, name: e.target.value })} placeholder="Dr. Wei Tan" className="border-[#DCE8E9]" /></div>
             <div className="space-y-1.5"><Label>Login email</Label>
-              <Input value={sf.email} onChange={(e) => setSf({ ...sf, email: e.target.value })} placeholder="dr.tan@medilink.io" className="border-[#DCE8E9]" /></div>
+              <Input value={sf.email} onChange={(e) => setSf({ ...sf, email: e.target.value })} placeholder="dr.raju@medilink.io" className="border-[#DCE8E9]" /></div>
             <div className="space-y-1.5"><Label>Temporary password</Label>
               <Input value={sf.password} onChange={(e) => setSf({ ...sf, password: e.target.value })} placeholder="Set a strong password" className="border-[#DCE8E9]" /></div>
             <div className="space-y-1.5"><Label>Role</Label>

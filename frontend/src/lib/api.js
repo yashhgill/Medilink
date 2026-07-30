@@ -39,5 +39,14 @@ export const IS_PUBLIC = !(
 // Safe error message: FastAPI validation errors return arrays, which crash toasts.
 export const errMsg = (e, fallback) => {
   const d = e?.response?.data?.detail;
-  return typeof d === "string" ? d : fallback;
+  if (typeof d === "string") return d;
+  // FastAPI/Pydantic validation errors arrive as an array of {loc, msg}.
+  if (Array.isArray(d) && d.length) {
+    const first = d[0];
+    const field = Array.isArray(first?.loc) ? first.loc[first.loc.length - 1] : "";
+    const msg = first?.msg || "Invalid input";
+    return field ? `${field}: ${msg}` : msg;
+  }
+  if (e?.response?.status === 422) return "Please check the form — some fields are invalid.";
+  return fallback;
 };
