@@ -1054,27 +1054,55 @@ async def kiosk_reset_code(body: KioskCheckinIn, _=Depends(kiosk_auth)):
     await audit_log(p["id"], "patient", "PASSWORD_RESET_CODE_ISSUED", "auth", p["id"])
     return {"reset_code": code, "valid_minutes": 60, "name": p["name"]}
 
+def _extract_json(raw: str) -> dict:
+    """Parse a JSON object out of an LLM response robustly: strip code fences,
+    then fall back to the first {...} block. Raises ValueError if none found."""
+    t = (raw or "").strip()
+    if t.startswith("```"):
+        t = t.split("```", 2)[1] if t.count("```") >= 2 else t.strip("`")
+        if t.lstrip().startswith("json"):
+            t = t.lstrip()[4:]
+    t = t.strip()
+    try:
+        return json.loads(t)
+    except Exception:
+        m = re.search(r"\{.*\}", t, re.DOTALL)
+        if m:
+            return json.loads(m.group(0))
+        raise ValueError("no JSON object in response")
+
 async def kiosk_triage(symptoms: str, pain_score, patient: dict) -> dict:
-    """Run MTS triage on kiosk-reported symptoms. Fail-safe: Green on any error."""
-    fallback = {"colour": "Green", "category": "Non-critical", "target_wait_minutes": 120}
+    """Run MTS triage on kiosk-reported symptoms.
+    Fail-safe: if triage can't be assessed, escalate to Very Urgent (Orange) so a
+    real emergency is NEVER silently sent to the low-priority Green queue. Only a
+    genuinely empty complaint or a disabled AI returns Green."""
+    # No symptoms described / AI off: nothing to assess -> Green is appropriate.
+    green = {"colour": "Green", "category": "Standard", "target_wait_minutes": 120}
+    # Parsing/AI failure with symptoms present: err UP, not down.
+    safe = {"colour": "Orange", "category": "Very Urgent", "target_wait_minutes": 10,
+            "reasoning": "Could not auto-assess — routed for urgent clinician review."}
     if not symptoms or not GROQ_API_KEY:
-        return fallback
+        return green
     try:
         prompt = f"""PATIENT: DOB {patient.get('dob','Unknown')}, Gender: {patient.get('gender','Unknown')}
 CHIEF COMPLAINT (self-reported at kiosk): {symptoms}
 PAIN SCORE: {pain_score if pain_score is not None else 'Not assessed'}/10
 VITAL SIGNS: Not recorded (kiosk self check-in)
 
-Apply MTS strictly. This is self-reported — if red-flag symptoms are described (chest pain, breathlessness, severe bleeding, stroke signs, unconsciousness), escalate. Output JSON only."""
+Apply MTS strictly. This is self-reported — if ANY red-flag symptoms are described
+(chest pain, breathlessness/short of breath, severe bleeding, stroke signs, loss of
+consciousness, severe pain), escalate accordingly. Keep 'reasoning' to ONE short
+sentence. Output the JSON object only."""
         raw = await groq(MTS_SYSTEM, [{"role": "user", "content": prompt}],
-                         max_tokens=400, temperature=0.1, response_format="json")
-        r = json.loads(raw.strip().lstrip("```json").rstrip("```").strip())
-        if r.get("colour") in ("Red", "Yellow", "Green"):
+                         max_tokens=700, temperature=0.1, response_format="json")
+        r = _extract_json(raw)
+        if r.get("colour") in ("Red", "Orange", "Yellow", "Green", "Blue"):
             return r
-        return fallback
+        log.warning(f"Kiosk triage: unexpected colour {r.get('colour')!r}; escalating")
+        return safe
     except Exception as e:
-        log.warning(f"Kiosk triage failed, defaulting Green: {e}")
-        return fallback
+        log.warning(f"Kiosk triage parse/AI failed, escalating to Orange: {e}")
+        return safe
 
 @api.post("/kiosk/checkin")
 async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
@@ -1515,9 +1543,9 @@ HISTORY: {body.history or "None provided"}
 Apply MTS strictly. Output JSON only."""
 
     raw = await groq(MTS_SYSTEM, [{"role":"user","content":prompt}],
-                     max_tokens=600, temperature=0.1, response_format="json")
+                     max_tokens=800, temperature=0.1, response_format="json")
     try:
-        result = json.loads(raw.strip().lstrip("```json").rstrip("```").strip())
+        result = _extract_json(raw)
     except Exception:
         result = {"raw":raw,"parse_error":True,"category":"Urgent","colour":"Yellow",
                   "target_wait_minutes":60,"reasoning":"Parse error — review manually"}
