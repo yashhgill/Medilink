@@ -45,6 +45,15 @@ export default function PatientDashboard() {
   const { user } = useAuth();
   const loc = useLocation();
   const view = loc.pathname.split("/")[2] || "overview";
+  const [approveCode, setApproveCode] = React.useState("");
+  const approveAccess = async () => {
+    if (!approveCode.trim()) return;
+    try {
+      const r = await api.post("/consent/approve", { code: approveCode.trim() });
+      toast.success("Access approved for " + (r.data.facility || "the clinic"));
+      setApproveCode("");
+    } catch (e) { toast.error("Invalid or expired code"); }
+  };
 
   const [appts, setAppts] = useState([]);
   const [doctors, setDoctors] = useState([]);
@@ -120,6 +129,15 @@ export default function PatientDashboard() {
     >
       {view === "overview" && (
         <div className="space-y-6">
+          <Card>
+            <div className="overline mb-1">Share my records with a clinic</div>
+            <div className="text-sm text-[#5A6B70] mb-3">If a doctor at another clinic asks to see your history, enter the 6-digit code they give you.</div>
+            <div className="flex items-center gap-2">
+              <input value={approveCode} onChange={(e) => setApproveCode(e.target.value)} inputMode="numeric" maxLength={6}
+                placeholder="6-digit code" className="flex-1 rounded-xl border border-[#DCE8E9] bg-[#F4F9F9] px-3 py-2.5 text-sm font-mono outline-none focus:border-[#0B7C8C]" />
+              <button onClick={approveAccess} className="px-4 py-2.5 rounded-xl bg-[#0B7C8C] text-white text-sm hover:bg-[#075F6C]">Approve</button>
+            </div>
+          </Card>
           <div className="grid lg:grid-cols-2 gap-6">
             <Card>
               <div className="flex items-center justify-between mb-3">

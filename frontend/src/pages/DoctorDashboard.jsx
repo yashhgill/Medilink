@@ -48,6 +48,24 @@ export default function DoctorDashboard() {
   const [activeApptId, setActiveApptId] = useState(null);
   const [patient, setPatient] = useState(null);
   const [records, setRecords] = useState([]);
+  const [consentCode, setConsentCode] = useState(null);
+  const requestAccess = async () => {
+    try {
+      const r = await api.post("/records/request-access", { patient_id: activePatientId });
+      setConsentCode(r.data.code);
+      toast.success("Ask the patient to approve code " + r.data.code + " in their app");
+    } catch (e) { toast.error("Could not request access"); }
+  };
+  const breakGlass = async () => {
+    const reason = window.prompt("Emergency access — reason (required, logged):");
+    if (!reason || reason.trim().length < 4) return;
+    try {
+      await api.post("/records/break-glass", { patient_id: activePatientId, reason });
+      toast.warning("Emergency access granted — logged");
+      setConsentCode(null);
+      openPatient(activePatientId);
+    } catch (e) { toast.error("Break-glass failed"); }
+  };
   const [aiSummary, setAiSummary] = useState("");
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [aiDrug, setAiDrug] = useState("");
@@ -324,6 +342,17 @@ export default function DoctorDashboard() {
                 </button>
               </div>
               <div className="overline mb-3">Visit History · {records.length}</div>
+              {records.some((r) => r.locked) && (
+                <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <div className="text-sm font-medium text-amber-800">🔒 This patient has records from other clinics</div>
+                  <div className="text-xs text-amber-700 mt-0.5">Their history is private. Ask the patient to approve access, or use emergency override.</div>
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <button onClick={requestAccess} className="text-xs px-3 py-1.5 rounded-full bg-[#0B7C8C] text-white hover:bg-[#075F6C]">Request patient consent</button>
+                    <button onClick={breakGlass} className="text-xs px-3 py-1.5 rounded-full border border-[#B55B49] text-[#B55B49] hover:bg-[#B55B49]/10">Emergency access</button>
+                    {consentCode && <span className="text-xs font-mono text-amber-800">Code for patient: <b>{consentCode}</b> — then reload</span>}
+                  </div>
+                </div>
+              )}
               {records.length === 0 && <div className="text-sm text-[#5A6B70]">No prior records.</div>}
               <div className="space-y-3 max-h-[360px] overflow-y-auto">
                 {records.map((r) => (
