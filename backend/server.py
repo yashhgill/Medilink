@@ -303,6 +303,22 @@ vaccinations_t = Table("vaccinations", metadata,
     Column("sync_status", String),
 )
 
+record_consents_t = Table("record_consents", metadata,
+    Column("id", String, primary_key=True),
+    Column("patient_id", String),
+    Column("patient_ic_hash", String),           # match across facilities by IC
+    Column("requesting_facility", String),        # facility that wants access
+    Column("requested_by", String),               # doctor user id
+    Column("code", String),                       # 6-digit consent code
+    Column("mode", String, default="consent"),    # consent | break_glass
+    Column("reason", Text),                        # break-glass reason
+    Column("granted", Boolean, default=False),
+    Column("expires_at", String),
+    Column("created_at", String),
+    Column("granted_at", String),
+    Column("sync_status", String, default="local"),
+)
+
 lab_orders_t = Table("lab_orders", metadata,
     Column("id", String, primary_key=True),
     Column("patient_id", String),
@@ -1447,6 +1463,92 @@ async def create_record(body: MedicalRecordIn, u=Depends(role_required("doctor",
     return rec
 
 @api.get("/records/patient/{patient_id}")
+async def _active_consent(ic_hash: str) -> Optional[dict]:
+    """Return an active (granted, unexpired) consent for THIS facility, or None."""
+    if not ic_hash:
+        return None
+    now = now_iso()
+    row = await database.fetch_one(
+        record_consents_t.select().where(
+            (record_consents_t.c.patient_ic_hash == ic_hash) &
+            (record_consents_t.c.requesting_facility == FACILITY_ID) &
+            (record_consents_t.c.granted == True) &
+            (record_consents_t.c.expires_at > now)
+        ).order_by(record_consents_t.c.granted_at.desc()))
+    return dict(row) if row else None
+
+class AccessRequestIn(BaseModel):
+    patient_id: str
+
+@api.post("/records/request-access", status_code=201)
+async def request_record_access(body: AccessRequestIn, u=Depends(role_required("doctor","admin"))):
+    """A doctor requests consent to view a patient's records from OTHER clinics.
+    Generates a 6-digit code the patient approves in their app (or reads aloud)."""
+    p = await database.fetch_one(users_t.select().where(users_t.c.id == body.patient_id))
+    if not p:
+        raise HTTPException(404, "Patient not found")
+    pd = dict(p)
+    code = f"{secrets.randbelow(1000000):06d}"
+    cid = uid(); now = now_iso()
+    await database.execute(record_consents_t.insert().values(
+        id=cid, patient_id=body.patient_id, patient_ic_hash=pd.get("ic_hash"),
+        requesting_facility=FACILITY_ID, requested_by=u["id"], code=code,
+        mode="consent", granted=False,
+        expires_at=(datetime.now(timezone.utc)+timedelta(hours=2)).isoformat(),
+        created_at=now, sync_status="local"))
+    await enqueue_sync("record_consents", cid, "INSERT", {})
+    await audit_log(u["id"], u["role"], "REQUEST_RECORD_ACCESS", "record_consents", cid)
+    return {"consent_id": cid, "code": code,
+            "message": "Ask the patient to approve this code in their MediLink app."}
+
+class ConsentApproveIn(BaseModel):
+    code: str
+
+@api.post("/consent/approve")
+async def approve_consent(body: ConsentApproveIn, u=Depends(current_user)):
+    """Patient approves a pending cross-clinic access request by its 6-digit code."""
+    row = await database.fetch_one(
+        record_consents_t.select().where(record_consents_t.c.code == body.code.strip()))
+    if not row:
+        raise HTTPException(404, "Invalid code")
+    d = dict(row)
+    # A patient may only approve access to their OWN records.
+    if u["role"] == "patient" and d["patient_id"] != u["id"]:
+        raise HTTPException(403, "You can only approve access to your own records")
+    now = now_iso()
+    await database.execute(record_consents_t.update().where(record_consents_t.c.id == d["id"])
+        .values(granted=True, granted_at=now,
+                expires_at=(datetime.now(timezone.utc)+timedelta(hours=2)).isoformat(),
+                sync_status="local"))
+    await enqueue_sync("record_consents", d["id"], "UPDATE", {})
+    await audit_log(u["id"], u["role"], "GRANT_RECORD_CONSENT", "record_consents", d["id"])
+    return {"ok": True, "facility": d["requesting_facility"]}
+
+class BreakGlassIn(BaseModel):
+    patient_id: str
+    reason: str
+
+@api.post("/records/break-glass", status_code=201)
+async def break_glass(body: BreakGlassIn, u=Depends(role_required("doctor","admin"))):
+    """Emergency override: grant external-record access WITHOUT patient consent,
+    with a mandatory reason. Logged loudly for later review."""
+    if not body.reason or len(body.reason.strip()) < 4:
+        raise HTTPException(400, "A reason is required for emergency access")
+    p = await database.fetch_one(users_t.select().where(users_t.c.id == body.patient_id))
+    if not p:
+        raise HTTPException(404, "Patient not found")
+    pd = dict(p); cid = uid(); now = now_iso()
+    await database.execute(record_consents_t.insert().values(
+        id=cid, patient_id=body.patient_id, patient_ic_hash=pd.get("ic_hash"),
+        requesting_facility=FACILITY_ID, requested_by=u["id"], code="",
+        mode="break_glass", reason=body.reason.strip(), granted=True,
+        expires_at=(datetime.now(timezone.utc)+timedelta(hours=2)).isoformat(),
+        created_at=now, granted_at=now, sync_status="local"))
+    await enqueue_sync("record_consents", cid, "INSERT", {})
+    log.warning(f"BREAK-GLASS access by {u.get('email')} to patient {body.patient_id}: {body.reason}")
+    await audit_log(u["id"], u["role"], "BREAK_GLASS_ACCESS", "record_consents", cid)
+    return {"ok": True, "mode": "break_glass"}
+
 async def patient_records(patient_id: str, u=Depends(current_user), request: Request = None):
     if u["role"] == "patient" and u["id"] != patient_id:
         raise HTTPException(403, "Forbidden")
@@ -1475,6 +1577,12 @@ async def patient_records(patient_id: str, u=Depends(current_user), request: Req
             log.warning(f"Cross-facility fetch unavailable (offline?): {e}")
     await audit_log(u["id"], u["role"], "READ_RECORD", "medical_records", patient_id,
                     ip=request.client.host if request and request.client else "")
+    # Cross-clinic privacy gate: the patient (viewing their own) always sees
+    # everything; a staff member sees FULL external records only with consent.
+    _p = await database.fetch_one(users_t.select().where(users_t.c.id == patient_id))
+    _ic_hash = dict(_p).get("ic_hash") if _p else None
+    _consent = None if (u["role"] == "patient") else await _active_consent(_ic_hash)
+    _consented = (u["role"] == "patient") or (_consent is not None)
     result = []
     for r in rows:
         rec = dict(r)
@@ -1493,15 +1601,25 @@ async def patient_records(patient_id: str, u=Depends(current_user), request: Req
         result.append(rec)
     for r in external_rows:
         rec = dict(r)
-        doc_name = "-"
-        try:
-            cd = await cloud_db.fetch_one(users_t.select().where(users_t.c.id == rec.get("doctor_id")))
-            if cd: doc_name = dict(cd).get("name", "-")
-        except Exception:
-            pass
-        rec["doctor"] = {"name": doc_name}
         rec["external"] = True
         rec["attachments"] = []   # files stay at their origin facility (local-first)
+        if _consented:
+            doc_name = "-"
+            try:
+                cd = await cloud_db.fetch_one(users_t.select().where(users_t.c.id == rec.get("doctor_id")))
+                if cd: doc_name = dict(cd).get("name", "-")
+            except Exception:
+                pass
+            rec["doctor"] = {"name": doc_name}
+            rec["consent_mode"] = (_consent or {}).get("mode") if _consent else "self"
+        else:
+            # Locked: show only that a record exists + safe metadata. No clinical detail.
+            rec["locked"] = True
+            rec["doctor"] = {"name": "—"}
+            for k in ("diagnosis", "notes", "prescriptions", "vitals", "allergies",
+                      "triage_red_flags", "triage_category"):
+                rec[k] = None
+            rec["diagnosis"] = "🔒 Locked — patient consent required to view"
         result.append(rec)
     result.sort(key=lambda x: x.get("created_at") or "", reverse=True)
     return result
