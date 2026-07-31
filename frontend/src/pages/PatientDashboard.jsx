@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import AppShell from "@/components/AppShell";
+import PatientBottomNav from "@/components/PatientBottomNav";
 import api, { errMsg, BACKEND_URL } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -331,6 +332,8 @@ export default function PatientDashboard() {
           <DialogFooter><Button onClick={saveProfile} className="bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9]">Save</Button></DialogFooter>
         </DialogContent>
       </Dialog>
+      <div className="h-20 lg:hidden" aria-hidden="true" />
+      <PatientBottomNav onProfile={() => setProfileOpen(true)} />
     </AppShell>
   );
 }

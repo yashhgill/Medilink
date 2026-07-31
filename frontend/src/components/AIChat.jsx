@@ -155,6 +155,18 @@ export default function AIChat({ open, onOpenChange }) {
         </div>
 
         <div className="border-t border-[#DCE8E9]/60 p-4 bg-white/40 backdrop-blur-md">
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {["Fever","Cough","Headache","Sore throat","Stomach pain","Body aches","Runny nose","Dizziness","2 days","1 week"].map((chip) => (
+              <button
+                key={chip}
+                type="button"
+                onClick={() => setInput((v) => (v ? v + ", " + chip.toLowerCase() : chip))}
+                className="text-xs px-3 py-1.5 rounded-full border border-[#DCE8E9] bg-white text-[#0B7C8C] hover:bg-[#EAF5F5] active:scale-95 transition-transform"
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
           <div className="flex gap-2 items-end">
             <Textarea
               data-testid="ai-chat-input"
