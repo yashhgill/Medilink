@@ -1767,6 +1767,62 @@ async def add_inventory(body: InventoryItemIn, u=Depends(role_required("pharmaci
     ))
     return dict(await database.fetch_one(inventory_t.select().where(inventory_t.c.id == item_id)))
 
+@api.post("/inventory/seed")
+async def seed_inventory(u=Depends(role_required("pharmacist", "admin"))):
+    """Populate this clinic's pharmacy with a realistic Malaysian primary-care
+    drug list. Idempotent: skips medicines already present (by name)."""
+    from datetime import datetime as _dt, timedelta as _td
+    far = (_dt.now(timezone.utc) + _td(days=540)).strftime("%Y-%m-%d")
+    near = (_dt.now(timezone.utc) + _td(days=25)).strftime("%Y-%m-%d")
+    meds = [
+        ("Paracetamol 500mg","Acetaminophen","Analgesic","tablet",500,100,0.15,far,"PCM-2406"),
+        ("Ibuprofen 400mg","Ibuprofen","NSAID","tablet",300,60,0.30,far,"IBU-1805"),
+        ("Mefenamic Acid 500mg","Mefenamic Acid","NSAID","tablet",200,50,0.35,far,"MEF-3302"),
+        ("Amoxicillin 500mg","Amoxicillin","Antibiotic","capsule",250,60,0.60,far,"AMX-3311"),
+        ("Amoxicillin+Clavulanate 625mg","Co-amoxiclav","Antibiotic","tablet",120,30,1.80,far,"AUG-7781"),
+        ("Azithromycin 250mg","Azithromycin","Antibiotic","tablet",100,40,2.20,far,"AZI-4410"),
+        ("Cetirizine 10mg","Cetirizine","Antihistamine","tablet",300,60,0.25,far,"CTZ-2210"),
+        ("Loratadine 10mg","Loratadine","Antihistamine","tablet",200,50,0.30,far,"LOR-9931"),
+        ("Chlorpheniramine 4mg","Chlorpheniramine","Antihistamine","tablet",180,40,0.10,far,"CPM-4410"),
+        ("Salbutamol Inhaler 100mcg","Salbutamol","Bronchodilator","unit",45,12,12.50,far,"SAL-7781"),
+        ("Prednisolone 5mg","Prednisolone","Corticosteroid","tablet",160,40,0.20,far,"PRED-0455"),
+        ("Dexamethasone 0.5mg","Dexamethasone","Corticosteroid","tablet",180,40,0.15,far,"DEX-0603"),
+        ("Omeprazole 20mg","Omeprazole","PPI","capsule",250,50,0.60,far,"OME-2010"),
+        ("Metoclopramide 10mg","Metoclopramide","Antiemetic","tablet",120,30,0.45,far,"MET-0907"),
+        ("Oral Rehydration Salts","ORS","Rehydration","sachet",150,30,0.80,far,"ORS-1102"),
+        ("Metformin 500mg","Metformin HCl","Antidiabetic","tablet",400,80,0.45,far,"MFN-5011"),
+        ("Gliclazide 80mg","Gliclazide","Antidiabetic","tablet",200,50,0.55,far,"GLZ-8020"),
+        ("Amlodipine 5mg","Amlodipine","Antihypertensive","tablet",350,70,0.55,far,"AML-0503"),
+        ("Perindopril 4mg","Perindopril","Antihypertensive","tablet",200,50,0.70,far,"PER-0442"),
+        ("Atorvastatin 20mg","Atorvastatin","Lipid-lowering","tablet",320,60,0.90,far,"ATV-2099"),
+        ("Simvastatin 20mg","Simvastatin","Lipid-lowering","tablet",240,60,0.50,far,"SIM-2044"),
+        ("Loperamide 2mg","Loperamide","Antidiarrhoeal","tablet",150,40,0.20,far,"LOP-2033"),
+        ("Diphenhydramine Cough Syrup 100ml","Diphenhydramine","Antitussive","bottle",35,15,4.50,near,"DPH-0603"),
+        ("Hyoscine 10mg","Hyoscine Butylbromide","Antispasmodic","tablet",120,30,0.40,far,"HYO-1030"),
+    ]
+    added=0; skipped=0
+    for row in meds:
+        name = row[0]
+        if await database.fetch_one(inventory_t.select().where(inventory_t.c.name == name)):
+            skipped += 1; continue
+        gen,cat,unit,qty,reorder,price,exp,batch = (
+            row[1],row[2],row[3],
+            int(row[4]) if str(row[4]).isdigit() else 100,
+            int(row[5]) if str(row[5]).isdigit() else 30,
+            float(row[6]) if str(row[6]).replace(".","",1).isdigit() else 0.30,
+            row[7] if len(str(row[7]))>4 else far,
+            row[8] if len(str(row[8]))>2 else "GEN-0001")
+        iid=uid(); now=now_iso()
+        await database.execute(inventory_t.insert().values(
+            id=iid, name=name, generic_name=gen, category=cat, unit=unit,
+            stock_qty=qty, reorder_level=reorder, unit_price=price,
+            expiry_date=exp, batch_no=batch, supplier="MediSupply Sdn Bhd",
+            active=True, facility_id=FACILITY_ID,
+            created_at=now, updated_at=now, sync_status="local"))
+        await enqueue_sync("pharmacy_inventory", iid, "INSERT", {})
+        added += 1
+    return {"added": added, "skipped": skipped, "facility": FACILITY_ID}
+
 @api.patch("/inventory/{item_id}")
 async def update_inventory(item_id: str, body: InventoryUpdateIn,
                            u=Depends(role_required("pharmacist","admin"))):
@@ -2017,7 +2073,7 @@ def _appt_owned(appt_row, user):
     return appt_row and appt_row["patient_id"] == user["id"]
 
 @api.get("/patient/bills")
-async def patient_bills(u=Depends(role_required("patient", "admin"))):
+async def patient_bills(u=Depends(current_user)):
     rows = await database.fetch_all(
         appointments_t.select()
         .where((appointments_t.c.patient_id == u["id"]) &
@@ -2028,7 +2084,7 @@ async def patient_bills(u=Depends(role_required("patient", "admin"))):
     return await enrich_appointments(rows)
 
 @api.post("/patient/bills/{appt_id}/pay")
-async def patient_pay(appt_id: str, u=Depends(role_required("patient", "admin"))):
+async def patient_pay(appt_id: str, u=Depends(current_user)):
     appt_row = await database.fetch_one(
         appointments_t.select().where(appointments_t.c.id == appt_id))
     if not _appt_owned(appt_row, u):
@@ -2057,7 +2113,7 @@ async def patient_pay(appt_id: str, u=Depends(role_required("patient", "admin"))
     return {"payment": payment_info, "appointment_id": appt["id"]}
 
 @api.post("/patient/payments/{txn_ref}/confirm")
-async def patient_confirm(txn_ref: str, u=Depends(role_required("patient", "admin"))):
+async def patient_confirm(txn_ref: str, u=Depends(current_user)):
     pay_row = await database.fetch_one(
         payments_t.select().where(payments_t.c.txn_ref == txn_ref))
     if not pay_row or (pay_row["paid_by"] != u["id"] and u["role"] != "admin"):
@@ -2078,7 +2134,7 @@ async def patient_confirm(txn_ref: str, u=Depends(role_required("patient", "admi
     return {"ok": True, "txn_ref": txn_ref}
 
 @api.get("/patient/receipts")
-async def patient_receipts(u=Depends(role_required("patient", "admin"))):
+async def patient_receipts(u=Depends(current_user)):
     rows = await database.fetch_all(
         payments_t.select()
         .where((payments_t.c.paid_by.in_([u["id"], "kiosk"])) &
@@ -2150,7 +2206,7 @@ async def list_attachments(record_id: str, u=Depends(current_user)):
     return out
 
 @api.get("/patient/attachments")
-async def my_attachments(u=Depends(role_required("patient", "admin"))):
+async def my_attachments(u=Depends(current_user)):
     rows = await database.fetch_all(
         attachments_t.select().where(attachments_t.c.patient_id == u["id"])
         .order_by(attachments_t.c.created_at.desc()))

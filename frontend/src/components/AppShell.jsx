@@ -119,7 +119,7 @@ export default function AppShell({ children, title, subtitle, navItems = [], sec
       {menuOpen && (
         <div className="fixed inset-0 z-50" data-testid="nav-drawer">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} />
-          <aside className="absolute left-0 top-0 h-full w-72 max-w-[80vw] bg-[#F4F9F9] shadow-2xl flex flex-col">
+          <aside className="absolute left-0 top-0 h-full w-72 max-w-[80vw] bg-[#F4F9F9] shadow-2xl flex flex-col" style={{ paddingTop: "env(safe-area-inset-top)" }}>
             <div className="p-5 border-b border-[#DCE8E9] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-[#0B7C8C] flex items-center justify-center">
