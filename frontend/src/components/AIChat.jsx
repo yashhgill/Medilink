@@ -109,7 +109,7 @@ export default function AIChat({ open, onOpenChange }) {
         side="right"
         className="glass !w-full sm:!max-w-[460px] p-0 flex flex-col border-l border-white/40"
       >
-        <SheetHeader className="px-6 pt-6 pb-3 border-b border-[#DCE8E9]/60">
+        <SheetHeader className="px-6 pt-6 pb-3 border-b border-[#DCE8E9]/60" style={{ paddingTop: "calc(1.5rem + env(safe-area-inset-top))" }}>
           <div className="flex items-center gap-2">
             <div className="w-9 h-9 rounded-full bg-[#0B7C8C] flex items-center justify-center">
               <Stethoscope size={18} color="#F4F9F9" weight="duotone" />
