@@ -125,7 +125,7 @@ export default function ReceptionDashboard() {
           ))}
           <div className="rounded-2xl border border-[#DCE8E9] bg-white p-4">
             <div className="text-[10px] uppercase tracking-[0.18em] text-[#5A6B70]">Triage · 7d</div>
-            <div className="flex items-center gap-1.5 mt-2">
+            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
               {["Red", "Yellow", "Green"].map((z) => (
                 <span key={z} className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold ${
                   z === "Red" ? "bg-red-100 text-red-700" : z === "Yellow" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
@@ -133,39 +133,44 @@ export default function ReceptionDashboard() {
                 </span>
               ))}
             </div>
-            <button
-              onClick={async () => {
-                try {
-                  const token = localStorage.getItem("ml_token");
-                  const resp = await fetch("/api/admin/cash-report/pdf", { headers: { Authorization: `Bearer ${token}` } });
-                  if (!resp.ok) throw new Error();
-                  const blob = await resp.blob();
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url; a.download = "cash-report.pdf"; a.click();
-                  URL.revokeObjectURL(url);
-                } catch (e) { toast.error("Report failed"); }
-              }}
-              className="mt-2 text-[10px] px-2 py-0.5 rounded-full border border-[#DCE8E9] hover:bg-[#EAF5F5] text-[#0B7C8C]"
-            >
-              Cash report PDF
-            </button>
-            {isSuperAdmin && (
-            <button
-              onClick={async () => {
-                toast.message("Pushing all records to cloud…");
-                try {
-                  const r = await api.post("/sync/full");
-                  const total = Object.values(r.data.pushed).reduce((a, b) => a + b, 0);
-                  toast.success(`Synced ${total} records to cloud`);
-                } catch (e) { toast.error("Sync failed"); }
-              }}
-              className="mt-1 ml-1 text-[10px] px-2 py-0.5 rounded-full border border-[#2D6A4F] text-[#2D6A4F] hover:bg-[#2D6A4F]/10"
-            >
-              Sync all to cloud
-            </button>
-            )}
           </div>
+        </div>
+      )}
+
+      {view === "operations" && isAdmin && (
+        <div className="mb-5 flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={async () => {
+              try {
+                const token = localStorage.getItem("ml_token");
+                const resp = await fetch("/api/admin/cash-report/pdf", { headers: { Authorization: `Bearer ${token}` } });
+                if (!resp.ok) throw new Error();
+                const blob = await resp.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url; a.download = "cash-report.pdf"; a.click();
+                URL.revokeObjectURL(url);
+              } catch (e) { toast.error("Report failed"); }
+            }}
+            className="flex-1 flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl border border-[#DCE8E9] bg-white text-[#0B7C8C] font-medium hover:bg-[#EAF5F5] active:scale-[0.99] transition"
+          >
+            <ListChecks size={18} weight="duotone" /> Daily cash report (PDF)
+          </button>
+          {isSuperAdmin && (
+          <button
+            onClick={async () => {
+              toast.message("Pushing all records to cloud…");
+              try {
+                const r = await api.post("/sync/full");
+                const total = Object.values(r.data.pushed).reduce((a, b) => a + b, 0);
+                toast.success(`Synced ${total} records to cloud`);
+              } catch (e) { toast.error("Sync failed"); }
+            }}
+            className="flex-1 flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-[#2D6A4F] text-white font-medium hover:bg-[#245640] active:scale-[0.99] transition"
+          >
+            <WaveTriangle size={18} weight="duotone" /> Sync all to cloud
+          </button>
+          )}
         </div>
       )}
       <div className="grid lg:grid-cols-3 gap-5">

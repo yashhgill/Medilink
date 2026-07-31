@@ -258,3 +258,11 @@ body {
   padding-right: env(safe-area-inset-right);
 }
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+
+/* Push top-anchored toasts below the notch/status bar */
+[data-sonner-toaster][data-y-position="top"] {
+  top: calc(1rem + env(safe-area-inset-top)) !important;
+}
+.pt-safe { padding-top: env(safe-area-inset-top); }
+/* Any element that opts in clears the notch */
+.safe-top { padding-top: calc(0.5rem + env(safe-area-inset-top)); }
