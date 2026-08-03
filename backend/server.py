@@ -550,6 +550,14 @@ async def enqueue_sync(table: str, record_id: str, operation: str, payload: dict
             operation=operation, payload=full,
             created_at=now_iso(), attempts=0, synced=False,
         ))
+        # Live sync: kick an immediate push in the background so a walk-in shows
+        # up at other clinics in ~1-2s. Fire-and-forget — never blocks the write.
+        # If it fails (offline), the 30s loop remains the safety net.
+        if cloud_db and not IS_CLOUD:
+            try:
+                asyncio.create_task(run_sync_job())
+            except RuntimeError:
+                pass  # no running loop (e.g. during tests) — queue handles it
     except Exception as e:
         log.warning(f"Sync enqueue failed: {e}")
 
@@ -3103,10 +3111,16 @@ async def ws_queue(ws: WebSocket, token: str = Query(...)):
     except Exception: ws_mgr.disconnect(ws)
 
 # ── Background sync engine ────────────────────────────────────────────────────
+_sync_running = False
 async def run_sync_job():
-    """Push local-only records to cloud DB."""
+    """Push local-only records to cloud DB. Single-flight guard: overlapping
+    live-sync kicks coalesce so we never run duplicate concurrent pushes."""
+    global _sync_running
     if not cloud_db or IS_CLOUD:
         return
+    if _sync_running:
+        return  # a push is already in progress; queued rows will still be caught
+    _sync_running = True
     try:
         pending = await database.fetch_all(
             sync_queue_t.select()
@@ -3165,6 +3179,8 @@ async def run_sync_job():
                 log.warning(f"Sync failed for {item_d['record_id']}: {e}")
     except Exception as e:
         log.exception(f"Sync job error: {e}")
+    finally:
+        _sync_running = False
 
 # ── Startup / shutdown ────────────────────────────────────────────────────────
 app.include_router(api)
