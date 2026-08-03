@@ -2219,7 +2219,8 @@ async def admin_monitoring(u=Depends(super_admin_required)):
     - per-facility record counts (from cloud, the shared source of truth)
     """
     import time as _time
-    out = {"generated_at": now_iso(), "this_facility": FACILITY_ID}
+    out = {"generated_at": now_iso(), "this_facility": FACILITY_ID,
+           "is_cloud_node": bool(IS_CLOUD)}
 
     # Cloud reachability + round-trip latency
     cloud = {"configured": bool(CLOUD_DB_URL and not IS_CLOUD), "online": False, "latency_ms": None}
@@ -2250,10 +2251,13 @@ async def admin_monitoring(u=Depends(super_admin_required)):
                 cc = await cloud_db.fetch_val(text(f"SELECT COUNT(*) FROM {t}"))
             except Exception:
                 cc = None
-        match.append({"table": t, "local": lc, "cloud": cc,
-                      "in_sync": (cc is not None and cc >= lc)})
+        # On the cloud node itself there is no downstream cloud; it IS the source
+        # of truth, so a row here is authoritative, not "drift".
+        in_sync = True if IS_CLOUD else (cc is not None and cc >= lc)
+        match.append({"table": t, "local": lc, "cloud": (lc if IS_CLOUD else cc),
+                      "in_sync": in_sync})
     out["data_match"] = match
-    out["all_in_sync"] = all(m["in_sync"] for m in match) if cloud["online"] else None
+    out["all_in_sync"] = True if IS_CLOUD else (all(m["in_sync"] for m in match) if cloud["online"] else None)
 
     # Per-facility record counts from the cloud (network-wide view)
     facilities = []

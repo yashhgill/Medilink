@@ -61,15 +61,22 @@ export default function Monitoring() {
         </Button>
       </div>
 
+      {data && data.is_cloud_node && (
+        <div className="mb-4 rounded-2xl border border-[#0B7C8C]/30 bg-[#EAF5F5] px-5 py-3 text-sm text-[#0A3D62]">
+          You are viewing the <b>cloud node</b> — this is the shared source of truth (Amazon RDS).
+          Local-vs-cloud comparison applies on a <b>clinic</b> node. Here, the counts below are authoritative.
+        </div>
+      )}
       {loading && !data ? (
         <div className="text-sm text-[#5A6B70]">Loading network status…</div>
       ) : (
         <>
           {/* Top status strip */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-            <Stat label="Cloud (RDS)" value={cloud.online ? "Online" : "Offline"}
-                  tone={cloud.online ? "green" : "red"}
-                  sub={cloud.online ? `${cloud.latency_ms} ms round-trip` : (cloud.configured ? "unreachable" : "not configured")} />
+            <Stat label="Cloud (RDS)"
+                  value={data.is_cloud_node ? "This node" : (cloud.online ? "Online" : "Offline")}
+                  tone={data.is_cloud_node || cloud.online ? "green" : "red"}
+                  sub={data.is_cloud_node ? "source of truth" : (cloud.online ? `${cloud.latency_ms} ms round-trip` : (cloud.configured ? "unreachable" : "not configured"))} />
             <Stat label="Branches" value={`${(data.facilities || []).filter(f => f.active).length}`}
                   sub={`${(data.facilities || []).length} total`} />
             <Stat label="Pending sync" value={sync.pending ?? "—"} tone={sync.pending ? "amber" : "green"}
@@ -87,7 +94,9 @@ export default function Monitoring() {
                 <div key={m.table} className="flex items-center justify-between py-2 text-sm">
                   <span className="font-mono text-[#0A3D62]">{m.table}</span>
                   <span className="text-[#5A6B70]">local <b className="text-[#0A3D62]">{m.local}</b> · cloud <b className="text-[#0A3D62]">{m.cloud ?? "—"}</b></span>
-                  {m.in_sync
+                  {data.is_cloud_node
+                    ? <span className="flex items-center gap-1 text-[#0B7C8C] text-xs"><CheckCircle size={14} weight="fill" /> source of truth</span>
+                    : m.in_sync
                     ? <span className="flex items-center gap-1 text-[#2D6A4F] text-xs"><CheckCircle size={14} weight="fill" /> in sync</span>
                     : <span className="flex items-center gap-1 text-[#B55B49] text-xs"><WarningCircle size={14} weight="fill" /> drift</span>}
                 </div>
