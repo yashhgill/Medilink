@@ -46,6 +46,7 @@ S3_BUCKET       = os.environ.get("S3_BUCKET", "")
 AWS_REGION      = os.environ.get("AWS_REGION", "us-east-1")
 RDS_INSTANCE_ID = os.environ.get("RDS_INSTANCE_ID", "medilink-cloud")
 EC2_INSTANCE_ID = os.environ.get("EC2_INSTANCE_ID", "")
+CLOUD_NODE_URL  = os.environ.get("CLOUD_NODE_URL", "")   # e.g. http://44.209.64.89:8000 (clinics proxy CloudWatch to here)
 _cw_client = None
 def cloudwatch():
     """Lazy boto3 CloudWatch client (uses instance role on EC2). None if unavailable."""
@@ -2277,11 +2278,9 @@ async def admin_monitoring(u=Depends(super_admin_required)):
     out["facilities"] = facilities
     return out
 
-@api.get("/admin/monitoring/cloudwatch")
-async def admin_cloudwatch(u=Depends(super_admin_required)):
-    """AWS CloudWatch metrics for the RDS (and optionally EC2) node. Best-effort:
-    returns available=false if boto3/creds/metrics are unavailable, so the UI
-    degrades gracefully rather than erroring."""
+def _fetch_cloudwatch():
+    """Fetch CloudWatch metrics locally (requires AWS creds on this node). Returns
+    a dict or {'available': False}."""
     cw = cloudwatch()
     if cw is None:
         return {"available": False, "reason": "CloudWatch client unavailable on this node"}
@@ -2317,6 +2316,34 @@ async def admin_cloudwatch(u=Depends(super_admin_required)):
                "cpu_percent": _latest("AWS/EC2", "CPUUtilization", ec2_dims)}
     got_any = any(v is not None for v in rds.values() if not isinstance(v, str))
     return {"available": got_any, "window_minutes": 30, "rds": rds, "ec2": ec2}
+
+@api.get("/internal/cloudwatch")
+async def internal_cloudwatch(x_metrics_token: Optional[str] = Header(None)):
+    """Server-to-server: a clinic node fetches CloudWatch from the cloud node
+    (which holds the AWS creds). Guarded by the shared KIOSK_TOKEN secret so it
+    is not publicly readable. No user login — keeps the zero-trust boundary."""
+    if not KIOSK_TOKEN or x_metrics_token != KIOSK_TOKEN:
+        raise HTTPException(403, "Forbidden")
+    return _fetch_cloudwatch()
+
+@api.get("/admin/monitoring/cloudwatch")
+async def admin_cloudwatch(u=Depends(super_admin_required)):
+    """CloudWatch infra metrics. If this node has AWS creds, read directly;
+    otherwise (a clinic) proxy to the cloud node's internal endpoint."""
+    local = _fetch_cloudwatch()
+    if local.get("available"):
+        return local
+    if CLOUD_NODE_URL and KIOSK_TOKEN:
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=8) as c:
+                r = await c.get(f"{CLOUD_NODE_URL}/api/internal/cloudwatch",
+                                headers={"X-Metrics-Token": KIOSK_TOKEN})
+                if r.status_code == 200:
+                    d = r.json(); d["source"] = "cloud-node"; return d
+        except Exception as e:
+            log.warning(f"CloudWatch proxy failed: {e}")
+    return {"available": False, "reason": "No AWS creds locally and cloud proxy unavailable"}
 
 @api.post("/admin/monitoring/reconcile")
 async def admin_reconcile(u=Depends(super_admin_required)):

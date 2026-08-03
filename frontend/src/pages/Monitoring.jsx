@@ -119,7 +119,7 @@ export default function Monitoring() {
 
           {/* CloudWatch (AWS infra metrics) */}
           <div className="rounded-2xl border border-[#DCE8E9] bg-white p-5 mt-5">
-            <div className="flex items-center gap-2 mb-3"><Cloud size={16} weight="duotone" color="#0B7C8C" /><div className="overline">AWS CloudWatch — infrastructure (last 30 min)</div></div>
+            <div className="flex items-center gap-2 mb-3"><Cloud size={16} weight="duotone" color="#0B7C8C" /><div className="overline">AWS CloudWatch — infrastructure (last 30 min)</div>{cw && cw.source === "cloud-node" && <span className="text-[10px] text-[#5A6B70] ml-auto">via cloud node</span>}</div>
             {!cw ? <div className="text-sm text-[#5A6B70]">Loading CloudWatch…</div>
              : !cw.available ? <div className="text-sm text-[#5A6B70]">CloudWatch metrics not available on this node.</div>
              : (
