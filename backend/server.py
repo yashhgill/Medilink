@@ -2194,6 +2194,96 @@ async def admin_stats(u=Depends(any_admin_required)):
         "pending_sync": await database.fetch_val(text("SELECT COUNT(*) FROM sync_queue WHERE synced=false")) or 0,
     }
 
+# ── Super-Admin: network monitoring ──────────────────────────────────────────
+@api.get("/admin/monitoring")
+async def admin_monitoring(u=Depends(super_admin_required)):
+    """Network operations snapshot for the Super-Admin console:
+    - cloud reachability + latency
+    - pending sync queue + errors on THIS node
+    - local vs cloud row counts per table (data-match / integrity)
+    - per-facility record counts (from cloud, the shared source of truth)
+    """
+    import time as _time
+    out = {"generated_at": now_iso(), "this_facility": FACILITY_ID}
+
+    # Cloud reachability + round-trip latency
+    cloud = {"configured": bool(CLOUD_DB_URL and not IS_CLOUD), "online": False, "latency_ms": None}
+    if cloud_db and not IS_CLOUD:
+        try:
+            t0 = _time.perf_counter()
+            await cloud_db.fetch_val("SELECT 1")
+            cloud["latency_ms"] = round((_time.perf_counter() - t0) * 1000, 1)
+            cloud["online"] = True
+        except Exception as e:
+            cloud["error"] = str(e)[:120]
+    out["cloud"] = cloud
+
+    # Sync queue health (local node)
+    pending = await database.fetch_val(text("SELECT COUNT(*) FROM sync_queue WHERE synced=false")) or 0
+    errors  = await database.fetch_val(text("SELECT COUNT(*) FROM sync_queue WHERE synced=false AND attempts>=3")) or 0
+    last_synced = await database.fetch_val(text("SELECT MAX(synced_at) FROM medical_records WHERE sync_status='cloud'"))
+    out["sync"] = {"pending": pending, "errors": errors, "last_synced_at": last_synced}
+
+    # Data-match: local vs cloud counts per key table (integrity check)
+    tables = ["users", "medical_records", "appointments", "payments", "lab_orders", "vaccinations"]
+    match = []
+    for t in tables:
+        lc = await database.fetch_val(text(f"SELECT COUNT(*) FROM {t}")) or 0
+        cc = None
+        if cloud["online"]:
+            try:
+                cc = await cloud_db.fetch_val(text(f"SELECT COUNT(*) FROM {t}"))
+            except Exception:
+                cc = None
+        match.append({"table": t, "local": lc, "cloud": cc,
+                      "in_sync": (cc is not None and cc >= lc)})
+    out["data_match"] = match
+    out["all_in_sync"] = all(m["in_sync"] for m in match) if cloud["online"] else None
+
+    # Per-facility record counts from the cloud (network-wide view)
+    facilities = []
+    try:
+        fac_rows = await database.fetch_all(facilities_t.select().order_by(facilities_t.c.name))
+        for f in fac_rows:
+            fd = dict(f); code = fd.get("code")
+            recs_cloud = None
+            if cloud["online"]:
+                try:
+                    recs_cloud = await cloud_db.fetch_val(
+                        text("SELECT COUNT(*) FROM medical_records WHERE facility_id=:c"), {"c": code})
+                except Exception:
+                    recs_cloud = None
+            recs_local = await database.fetch_val(
+                text("SELECT COUNT(*) FROM medical_records WHERE facility_id=:c"), {"c": code}) or 0
+            facilities.append({"code": code, "name": fd.get("name"), "type": fd.get("type"),
+                               "active": fd.get("active"),
+                               "records_local": recs_local, "records_cloud": recs_cloud})
+    except Exception as e:
+        log.warning(f"monitoring facilities: {e}")
+    out["facilities"] = facilities
+    return out
+
+@api.post("/admin/monitoring/reconcile")
+async def admin_reconcile(u=Depends(super_admin_required)):
+    """Fast recovery: force-push any pending/drifted local rows to the cloud now."""
+    await run_sync_job()
+    # also reconcile drifted patient names/facilities (local is source of truth)
+    fixed = 0
+    if cloud_db and not IS_CLOUD:
+        try:
+            for p in await database.fetch_all(users_t.select().where(users_t.c.role == "patient")):
+                d = dict(p); h = d.get("ic_hash")
+                if not h: continue
+                c = await cloud_db.fetch_one(users_t.select().where(users_t.c.ic_hash == h))
+                if c and (dict(c).get("name") != d.get("name") or dict(c).get("facility_id") != d.get("facility_id")):
+                    await cloud_db.execute(users_t.update().where(users_t.c.id == dict(c)["id"])
+                        .values(name=d.get("name"), facility_id=d.get("facility_id")))
+                    fixed += 1
+        except Exception as e:
+            log.warning(f"reconcile drift: {e}")
+    await audit_log(u["id"], u["role"], "FORCE_RECONCILE", "sync", "all")
+    return {"ok": True, "reconciled_patients": fixed}
+
 # ── Patient self-service: bills, payments, receipts ──────────────────────────
 def _appt_owned(appt_row, user):
     return appt_row and appt_row["patient_id"] == user["id"]

@@ -108,6 +108,7 @@ export default function ReceptionDashboard() {
         { label: "Operations", to: "/reception" },
         { label: "Registered Patients", to: "/reception/patients" },
         ...(isAdmin ? [{ label: isSuperAdmin ? "Network" : "My clinic", to: "/facilities" }] : []),
+        ...(isSuperAdmin ? [{ label: "Monitoring", to: "/monitoring" }] : []),
       ]}>
       {view === "operations" && (<>
       {isAdmin && stats && (

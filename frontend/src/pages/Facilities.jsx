@@ -95,7 +95,7 @@ export default function Facilities() {
   };
 
   const facCode = (code) => facilities.find((f) => f.code === code);
-  const navItems = [{ label: "Operations", to: "/reception" }, { label: isSuperAdmin ? "Network" : "My clinic", to: "/facilities" }];
+  const navItems = [{ label: "Operations", to: "/reception" }, { label: isSuperAdmin ? "Network" : "My clinic", to: "/facilities" }, ...(isSuperAdmin ? [{ label: "Monitoring", to: "/monitoring" }] : [])];
 
   return (
     <AppShell
