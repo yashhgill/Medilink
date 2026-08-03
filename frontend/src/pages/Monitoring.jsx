@@ -3,7 +3,8 @@ import AppShell from "@/components/AppShell";
 import api, { errMsg } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Cloud, CheckCircle, WarningCircle, ArrowsClockwise, Buildings, Pulse } from "@phosphor-icons/react";
+import { Cloud, CheckCircle, WarningCircle, ArrowsClockwise, Buildings, Pulse, ChartBar } from "@phosphor-icons/react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid, Cell } from "recharts";
 import { toast } from "sonner";
 
 const Stat = ({ label, value, tone = "teal", sub }) => {
@@ -101,6 +102,42 @@ export default function Monitoring() {
                     : <span className="flex items-center gap-1 text-[#B55B49] text-xs"><WarningCircle size={14} weight="fill" /> drift</span>}
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Charts */}
+          <div className="grid lg:grid-cols-2 gap-5 mb-5">
+            <div className="rounded-2xl border border-[#DCE8E9] bg-white p-5">
+              <div className="flex items-center gap-2 mb-3"><ChartBar size={16} weight="duotone" color="#0B7C8C" /><div className="overline">Rows: local vs cloud</div></div>
+              <div style={{ width: "100%", height: 240 }}>
+                <ResponsiveContainer>
+                  <BarChart data={(data.data_match || []).map(m => ({ name: m.table.replace("_"," "), local: m.local, cloud: m.cloud ?? 0 }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#EAF5F5" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#5A6B70" }} interval={0} angle={-20} textAnchor="end" height={50} />
+                    <YAxis tick={{ fontSize: 10, fill: "#5A6B70" }} allowDecimals={false} />
+                    <Tooltip />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Bar dataKey="local" fill="#0B7C8C" radius={[4,4,0,0]} />
+                    <Bar dataKey="cloud" fill="#2D6A4F" radius={[4,4,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[#DCE8E9] bg-white p-5">
+              <div className="flex items-center gap-2 mb-3"><Buildings size={16} weight="duotone" color="#0B7C8C" /><div className="overline">Records per branch</div></div>
+              <div style={{ width: "100%", height: 240 }}>
+                <ResponsiveContainer>
+                  <BarChart data={(data.facilities || []).map(f => ({ name: f.name?.replace("Klinik MediLink ","") || f.code, records: f.records_cloud ?? f.records_local ?? 0 }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#EAF5F5" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#5A6B70" }} interval={0} height={40} />
+                    <YAxis tick={{ fontSize: 10, fill: "#5A6B70" }} allowDecimals={false} />
+                    <Tooltip />
+                    <Bar dataKey="records" radius={[4,4,0,0]}>
+                      {(data.facilities || []).map((f, i) => <Cell key={i} fill={["#0B7C8C","#086788","#0A3D62","#2D6A4F"][i % 4]} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
 
