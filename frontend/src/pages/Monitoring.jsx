@@ -21,9 +21,13 @@ export default function Monitoring() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [reconciling, setReconciling] = useState(false);
+  const [cw, setCw] = useState(null);
 
   const load = useCallback(async () => {
-    try { const r = await api.get("/admin/monitoring"); setData(r.data); }
+    try {
+      const r = await api.get("/admin/monitoring"); setData(r.data);
+      api.get("/admin/monitoring/cloudwatch").then((c) => setCw(c.data)).catch(() => setCw({ available: false }));
+    }
     catch (e) { toast.error(errMsg(e, "Could not load monitoring")); }
     finally { setLoading(false); }
   }, []);
@@ -111,6 +115,36 @@ export default function Monitoring() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* CloudWatch (AWS infra metrics) */}
+          <div className="rounded-2xl border border-[#DCE8E9] bg-white p-5 mt-5">
+            <div className="flex items-center gap-2 mb-3"><Cloud size={16} weight="duotone" color="#0B7C8C" /><div className="overline">AWS CloudWatch — infrastructure (last 30 min)</div></div>
+            {!cw ? <div className="text-sm text-[#5A6B70]">Loading CloudWatch…</div>
+             : !cw.available ? <div className="text-sm text-[#5A6B70]">CloudWatch metrics not available on this node.</div>
+             : (
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+                {[
+                  ["RDS CPU", cw.rds.cpu_percent != null ? cw.rds.cpu_percent + " %" : "—"],
+                  ["DB connections", cw.rds.connections ?? "—"],
+                  ["Free storage", cw.rds.free_storage_mb != null ? (cw.rds.free_storage_mb/1024).toFixed(1) + " GB" : "—"],
+                  ["Freeable memory", cw.rds.freeable_mem_mb != null ? cw.rds.freeable_mem_mb + " MB" : "—"],
+                  ["Read latency", cw.rds.read_latency_ms != null ? cw.rds.read_latency_ms + " ms" : "—"],
+                  ["Write latency", cw.rds.write_latency_ms != null ? cw.rds.write_latency_ms + " ms" : "—"],
+                ].map(([l, v]) => (
+                  <div key={l} className="rounded-xl border border-[#DCE8E9] p-3">
+                    <div className="text-[10px] uppercase tracking-[0.15em] text-[#5A6B70]">{l}</div>
+                    <div className="font-display text-xl mt-0.5 text-[#0B7C8C]">{v}</div>
+                  </div>
+                ))}
+                {cw.ec2 && (
+                  <div className="rounded-xl border border-[#DCE8E9] p-3">
+                    <div className="text-[10px] uppercase tracking-[0.15em] text-[#5A6B70]">EC2 CPU</div>
+                    <div className="font-display text-xl mt-0.5 text-[#0B7C8C]">{cw.ec2.cpu_percent != null ? cw.ec2.cpu_percent + " %" : "—"}</div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <p className="text-xs text-[#5A6B70] mt-5 leading-relaxed">

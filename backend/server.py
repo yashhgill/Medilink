@@ -44,6 +44,20 @@ STAFF_JWT_EXP_HOURS = int(os.environ.get("STAFF_JWT_EXP_HOURS", "12"))
 UPLOAD_DIR      = os.environ.get("UPLOAD_DIR", "/app/uploads")
 S3_BUCKET       = os.environ.get("S3_BUCKET", "")
 AWS_REGION      = os.environ.get("AWS_REGION", "us-east-1")
+RDS_INSTANCE_ID = os.environ.get("RDS_INSTANCE_ID", "medilink-cloud")
+EC2_INSTANCE_ID = os.environ.get("EC2_INSTANCE_ID", "")
+_cw_client = None
+def cloudwatch():
+    """Lazy boto3 CloudWatch client (uses instance role on EC2). None if unavailable."""
+    global _cw_client
+    if _cw_client is None:
+        try:
+            import boto3
+            _cw_client = boto3.client("cloudwatch", region_name=AWS_REGION)
+        except Exception as e:
+            log.warning(f"CloudWatch disabled: {e}")
+            return None
+    return _cw_client
 _s3_client = None
 def s3():
     """Lazy boto3 S3 client. Uses the instance role (LabRole) on EC2, or env keys.
@@ -2262,6 +2276,47 @@ async def admin_monitoring(u=Depends(super_admin_required)):
         log.warning(f"monitoring facilities: {e}")
     out["facilities"] = facilities
     return out
+
+@api.get("/admin/monitoring/cloudwatch")
+async def admin_cloudwatch(u=Depends(super_admin_required)):
+    """AWS CloudWatch metrics for the RDS (and optionally EC2) node. Best-effort:
+    returns available=false if boto3/creds/metrics are unavailable, so the UI
+    degrades gracefully rather than erroring."""
+    cw = cloudwatch()
+    if cw is None:
+        return {"available": False, "reason": "CloudWatch client unavailable on this node"}
+    from datetime import datetime as _dt, timedelta as _td
+    end = _dt.utcnow(); start = end - _td(minutes=30)
+
+    def _latest(namespace, metric, dims, stat="Average", unit=None):
+        try:
+            kw = dict(Namespace=namespace, MetricName=metric, Dimensions=dims,
+                      StartTime=start, EndTime=end, Period=300, Statistics=[stat])
+            if unit: kw["Unit"] = unit
+            r = cw.get_metric_statistics(**kw)
+            pts = sorted(r.get("Datapoints", []), key=lambda p: p["Timestamp"])
+            return round(pts[-1][stat], 2) if pts else None
+        except Exception as e:
+            log.warning(f"CW {metric}: {e}")
+            return None
+
+    rds_dims = [{"Name": "DBInstanceIdentifier", "Value": RDS_INSTANCE_ID}]
+    rds = {
+        "instance": RDS_INSTANCE_ID,
+        "cpu_percent":      _latest("AWS/RDS", "CPUUtilization", rds_dims),
+        "connections":      _latest("AWS/RDS", "DatabaseConnections", rds_dims),
+        "free_storage_mb":  (lambda b: round(b/1048576, 1) if b is not None else None)(_latest("AWS/RDS", "FreeStorageSpace", rds_dims)),
+        "freeable_mem_mb":  (lambda b: round(b/1048576, 1) if b is not None else None)(_latest("AWS/RDS", "FreeableMemory", rds_dims)),
+        "read_latency_ms":  (lambda s_: round(s_*1000, 2) if s_ is not None else None)(_latest("AWS/RDS", "ReadLatency", rds_dims)),
+        "write_latency_ms": (lambda s_: round(s_*1000, 2) if s_ is not None else None)(_latest("AWS/RDS", "WriteLatency", rds_dims)),
+    }
+    ec2 = None
+    if EC2_INSTANCE_ID:
+        ec2_dims = [{"Name": "InstanceId", "Value": EC2_INSTANCE_ID}]
+        ec2 = {"instance": EC2_INSTANCE_ID,
+               "cpu_percent": _latest("AWS/EC2", "CPUUtilization", ec2_dims)}
+    got_any = any(v is not None for v in rds.values() if not isinstance(v, str))
+    return {"available": got_any, "window_minutes": 30, "rds": rds, "ec2": ec2}
 
 @api.post("/admin/monitoring/reconcile")
 async def admin_reconcile(u=Depends(super_admin_required)):
