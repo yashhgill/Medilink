@@ -18,6 +18,7 @@ import ReceptionDashboard from "@/pages/ReceptionDashboard";
 import PharmacyDashboard from "@/pages/PharmacyDashboard";
 import Kiosk from "@/pages/Kiosk";
 import { Toaster } from "@/components/ui/sonner";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 function HomeGate() {
   const { user, loading } = useAuth();
@@ -31,6 +32,7 @@ function App() {
     <div className="App">
       <AuthProvider>
         <BrowserRouter>
+          <ErrorBoundary>
           <Routes>
             <Route path="/" element={<HomeGate />} />
             <Route path="/kiosk" element={IS_PUBLIC ? <Navigate to="/" replace /> : <Kiosk />} />
@@ -95,6 +97,7 @@ function App() {
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </ErrorBoundary>
           <Toaster position="top-right" richColors />
           <InstallPrompt />
         </BrowserRouter>
