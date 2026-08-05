@@ -966,6 +966,9 @@ async def activate_account(body: ActivateIn, request: Request):
     await database.execute(users_t.update().where(users_t.c.id == d["id"]).values(
         password_hash=hash_pw(body.password), activation_code=None,
         activation_expires=None, activated=True, updated_at=now_iso()))
+    # Push the activated account (new password + activated flag) to the cloud so
+    # the patient can log in on the public portal, not just the local clinic.
+    await enqueue_sync("users", d["id"], "UPDATE", {})
     await audit_log(d["id"], d["role"], "ACCOUNT_ACTIVATED", "auth", ip=ip)
     return {"token": make_token(d["id"], d["role"]), "user": clean(d)}
 
@@ -983,6 +986,7 @@ async def change_password(body: dict, u=Depends(current_user)):
         raise HTTPException(400, "New password must be at least 8 characters")
     await database.execute(users_t.update().where(users_t.c.id == u["id"])
         .values(password_hash=hash_pw(new), updated_at=now_iso()))
+    await enqueue_sync("users", u["id"], "UPDATE", {})
     return {"ok": True}
 
 @api.patch("/auth/me/profile")
@@ -1052,6 +1056,7 @@ async def update_patient(patient_id: str, body: dict, u=Depends(current_user)):
     updates = {k: v for k, v in body.items() if k in allowed}
     updates["updated_at"] = now_iso()
     await database.execute(users_t.update().where(users_t.c.id == patient_id).values(**updates))
+    await enqueue_sync("users", patient_id, "UPDATE", {})
     row = await database.fetch_one(users_t.select().where(users_t.c.id == patient_id))
     return clean(dict(row))
 
@@ -1114,6 +1119,9 @@ async def kiosk_reset_code(body: KioskCheckinIn, _=Depends(kiosk_auth)):
     await database.execute(users_t.update().where(users_t.c.id == p["id"]).values(
         activation_code=code,
         activation_expires=(datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()))
+    # Push the fresh code to the cloud so the patient can activate on the public
+    # portal, not only at the clinic that issued the slip.
+    await enqueue_sync("users", p["id"], "UPDATE", {})
     await audit_log(p["id"], "patient", "PASSWORD_RESET_CODE_ISSUED", "auth", p["id"])
     return {"reset_code": code, "valid_minutes": 60, "name": p["name"]}
 
@@ -1227,6 +1235,9 @@ async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
         await database.execute(users_t.update().where(users_t.c.id == p["id"]).values(
             activation_code=activation_code,
             activation_expires=(datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()))
+        # Sync the code to the cloud so the patient can activate on the public
+        # portal with the slip they got here at the kiosk.
+        await enqueue_sync("users", p["id"], "UPDATE", {})
     doc_row = await database.fetch_one(users_t.select().where(users_t.c.id == appt["doctor_id"]))
     doc = clean(dict(doc_row)) if doc_row else {}
     chit = {
