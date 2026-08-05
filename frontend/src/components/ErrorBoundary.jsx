@@ -1,52 +1,56 @@
 import React from "react";
 
 /**
- * Catches any render/runtime error in the tree below it and shows a friendly
- * recovery card instead of a blank white screen — critical for a live demo.
+ * Catches render-time crashes anywhere below it and shows a graceful recovery
+ * screen instead of a blank white page — critical for a live demo. A crash in
+ * one view no longer takes down the whole app; the user can reload or go home.
  */
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, err: null };
+    this.state = { hasError: false, error: null };
   }
-  static getDerivedStateFromError(err) {
-    return { hasError: true, err };
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
   }
-  componentDidCatch(err, info) {
+
+  componentDidCatch(error, info) {
+    // Log for debugging; never throw from here.
     // eslint-disable-next-line no-console
-    console.error("MediLink caught a render error:", err, info);
+    console.error("MediLink caught a render error:", error, info);
   }
-  reset = () => this.setState({ hasError: false, err: null });
+
   render() {
-    if (!this.state.hasError) return this.props.children;
-    return (
-      <div style={{
-        minHeight: "60vh", display: "flex", alignItems: "center",
-        justifyContent: "center", padding: "24px", textAlign: "center",
-      }}>
-        <div style={{
-          maxWidth: 420, background: "#fff", border: "1px solid #E2ECEC",
-          borderRadius: 16, padding: "28px 24px", boxShadow: "0 8px 30px rgba(0,0,0,.06)",
-        }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
-          <div style={{ fontFamily: "inherit", fontWeight: 700, fontSize: 18, color: "#12262B", marginBottom: 6 }}>
-            Something hiccuped
-          </div>
-          <div style={{ fontSize: 14, color: "#5A6B70", marginBottom: 18 }}>
-            This screen ran into an error. Your data is safe — just reload this view.
-          </div>
-          <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
-            <button onClick={this.reset} style={{
-              background: "#0B7C8C", color: "#fff", border: 0, borderRadius: 10,
-              padding: "10px 18px", fontWeight: 600, cursor: "pointer",
-            }}>Try again</button>
-            <button onClick={() => window.location.reload()} style={{
-              background: "#EAF5F5", color: "#0B7C8C", border: 0, borderRadius: 10,
-              padding: "10px 18px", fontWeight: 600, cursor: "pointer",
-            }}>Reload page</button>
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#F4F9F9] p-6">
+          <div className="max-w-md w-full rounded-2xl border border-[#DCE8E9] bg-white p-8 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-[#EAF5F5] flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl">⚠️</span>
+            </div>
+            <h1 className="font-display text-xl text-[#0A3D62] mb-1">Something went wrong</h1>
+            <p className="text-sm text-[#5A6B70] mb-5">
+              The clinic system hit an unexpected error on this screen. Your data is safe.
+            </p>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={() => window.location.reload()}
+                className="px-5 py-2.5 rounded-xl bg-[#0B7C8C] text-white text-sm font-medium hover:bg-[#075F6C]"
+              >
+                Reload
+              </button>
+              <button
+                onClick={() => { window.location.href = "/"; }}
+                className="px-5 py-2.5 rounded-xl border border-[#DCE8E9] text-[#0B7C8C] text-sm font-medium hover:bg-[#EAF5F5]"
+              >
+                Go home
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    );
+      );
+    }
+    return this.props.children;
   }
 }

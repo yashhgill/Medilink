@@ -19,6 +19,7 @@ import ReceptionDashboard from "@/pages/ReceptionDashboard";
 import PharmacyDashboard from "@/pages/PharmacyDashboard";
 import Kiosk from "@/pages/Kiosk";
 import { Toaster } from "@/components/ui/sonner";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 function HomeGate() {
   const { user, loading } = useAuth();

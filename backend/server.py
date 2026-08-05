@@ -651,7 +651,7 @@ async def groq(system: str, messages: list, max_tokens: int = 600,
     system = system + AI_SAFETY_RULES
     try:
         from groq import AsyncGroq
-        client = AsyncGroq(api_key=GROQ_API_KEY)
+        client = AsyncGroq(api_key=GROQ_API_KEY, timeout=15.0, max_retries=1)
         kwargs = dict(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "system", "content": system}, *messages],
@@ -672,7 +672,7 @@ async def groq_stream(system: str, messages: list):
         yield "data: [ERROR] AI not configured\n\n"; return
     try:
         from groq import AsyncGroq
-        client = AsyncGroq(api_key=GROQ_API_KEY)
+        client = AsyncGroq(api_key=GROQ_API_KEY, timeout=20.0, max_retries=1)
         stream = await client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "system", "content": system}, *messages],
