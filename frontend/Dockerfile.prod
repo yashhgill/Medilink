@@ -9,7 +9,10 @@ COPY . .
 ARG REACT_APP_BACKEND_URL
 ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL
 ENV CI=false
-ENV NODE_OPTIONS=--max-old-space-size=1536
+# Small cloud box (t3.small ~2GB): disable sourcemaps (the biggest memory hog in
+# a CRA build) and give Node more heap so `npm run build` doesn't OOM.
+ENV GENERATE_SOURCEMAP=false
+ENV NODE_OPTIONS=--max-old-space-size=2048
 RUN npm run build
 
 FROM node:20-alpine
