@@ -1485,7 +1485,6 @@ async def create_record(body: MedicalRecordIn, u=Depends(role_required("doctor",
     await enqueue_sync("medical_records", rec_id, "INSERT", rec)
     return rec
 
-@api.get("/records/patient/{patient_id}")
 async def _active_consent(ic_hash: str) -> Optional[dict]:
     """Return an active (granted, unexpired) consent for THIS facility, or None."""
     if not ic_hash:
@@ -1572,6 +1571,7 @@ async def break_glass(body: BreakGlassIn, u=Depends(role_required("doctor","admi
     await audit_log(u["id"], u["role"], "BREAK_GLASS_ACCESS", "record_consents", cid)
     return {"ok": True, "mode": "break_glass"}
 
+@api.get("/records/patient/{patient_id}")
 async def patient_records(patient_id: str, u=Depends(current_user), request: Request = None):
     if u["role"] == "patient" and u["id"] != patient_id:
         raise HTTPException(403, "Forbidden")
@@ -1585,10 +1585,13 @@ async def patient_records(patient_id: str, u=Depends(current_user), request: Req
     if cloud_db and not IS_CLOUD:
         try:
             p_row = await database.fetch_one(users_t.select().where(users_t.c.id == patient_id))
-            ic = dict(p_row).get("ic_number") if p_row else None
-            if ic:
+            # Match by the deterministic blind index (ic_hash), NOT the encrypted
+            # ic_number: Fernet ciphertext differs every write, so a ciphertext
+            # equality check can never match the same person across nodes.
+            ic_h = dict(p_row).get("ic_hash") if p_row else None
+            if ic_h:
                 cloud_users = await cloud_db.fetch_all(
-                    users_t.select().where(users_t.c.ic_number == ic))
+                    users_t.select().where(users_t.c.ic_hash == ic_h))
                 cloud_ids = [dict(cu)["id"] for cu in cloud_users]
                 if cloud_ids:
                     ext = await cloud_db.fetch_all(
@@ -2175,6 +2178,21 @@ async def trigger_sync(bg: BackgroundTasks, u=Depends(super_admin_required)):
     bg.add_task(run_sync_job)
     return {"ok":True,"message":"Sync job triggered"}
 
+@api.post("/sync/retry-errors")
+async def retry_sync_errors(u=Depends(super_admin_required)):
+    """Reset previously errored / dead-lettered queue rows (attempts>=5, incl. the
+    999 dead-letters) back to 0 attempts and run the sync now. Use after expanding
+    the sync table map so old 'Unknown table' rows finally drain to the cloud."""
+    reset = await database.execute(
+        sync_queue_t.update().where(
+            (sync_queue_t.c.synced == False) & (sync_queue_t.c.attempts >= 5)
+        ).values(attempts=0, error=None))
+    await run_sync_job()
+    remaining = await database.fetch_val(
+        text("SELECT COUNT(*) FROM sync_queue WHERE synced=false")) or 0
+    await audit_log(u["id"], u["role"], "SYNC_RETRY_ERRORS", "sync", "all")
+    return {"ok": True, "reset": reset, "pending_after": remaining}
+
 @api.get("/sync/queue")
 async def view_sync_queue(limit: int = Query(50, le=200), u=Depends(any_admin_required)):
     rows = await database.fetch_all(
@@ -2259,12 +2277,26 @@ async def admin_monitoring(u=Depends(super_admin_required)):
     out["data_match"] = match
     out["all_in_sync"] = True if IS_CLOUD else (all(m["in_sync"] for m in match) if cloud["online"] else None)
 
-    # Per-facility record counts from the cloud (network-wide view)
+    # Per-facility record counts. Prefer the facilities table, but if it's empty
+    # (no branches registered yet) derive the branch list from the actual
+    # facility_id tags on the records — so the chart is never blank when data exists.
     facilities = []
     try:
         fac_rows = await database.fetch_all(facilities_t.select().order_by(facilities_t.c.name))
-        for f in fac_rows:
-            fd = dict(f); code = fd.get("code")
+        codes = [dict(f) for f in fac_rows]
+        if not codes:
+            # derive from data: distinct facility_id on medical_records (cloud if online, else local)
+            src = cloud_db if (cloud["online"]) else database
+            try:
+                distinct = await src.fetch_all(
+                    text("SELECT DISTINCT facility_id FROM medical_records WHERE facility_id IS NOT NULL"))
+                codes = [{"code": dict(r)["facility_id"],
+                          "name": dict(r)["facility_id"], "type": "Clinic", "active": True}
+                         for r in distinct]
+            except Exception:
+                codes = []
+        for fd in codes:
+            code = fd.get("code")
             recs_cloud = None
             if cloud["online"]:
                 try:
@@ -2274,8 +2306,8 @@ async def admin_monitoring(u=Depends(super_admin_required)):
                     recs_cloud = None
             recs_local = await database.fetch_val(
                 text("SELECT COUNT(*) FROM medical_records WHERE facility_id=:c"), {"c": code}) or 0
-            facilities.append({"code": code, "name": fd.get("name"), "type": fd.get("type"),
-                               "active": fd.get("active"),
+            facilities.append({"code": code, "name": fd.get("name") or code, "type": fd.get("type"),
+                               "active": fd.get("active", True),
                                "records_local": recs_local, "records_cloud": recs_cloud})
     except Exception as e:
         log.warning(f"monitoring facilities: {e}")
@@ -3310,10 +3342,16 @@ async def run_sync_job():
         for item in pending:
             item_d = dict(item)
             try:
+                # Every syncable table — must match _SYNC_TABLES so nothing gets
+                # dead-lettered as "Unknown table" (that was the 27 stuck rows).
                 tbl_map = {
                     "users": users_t, "appointments": appointments_t,
                     "medical_records": records_t, "payments": payments_t,
-                    "dispense_records": dispense_t,
+                    "dispense_records": dispense_t, "vaccinations": vaccinations_t,
+                    "attachments": attachments_t, "lab_orders": lab_orders_t,
+                    "facilities": facilities_t, "stock_movements": stock_movements_t,
+                    "inventory": inventory_t, "pharmacy_inventory": inventory_t,
+                    "record_consents": record_consents_t,
                 }
                 tbl = tbl_map.get(item_d["table_name"])
                 if tbl is None:

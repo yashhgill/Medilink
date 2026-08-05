@@ -72,14 +72,14 @@ export default function PatientDashboard() {
 
   const load = async () => {
     const [a, d, r, rc, vx] = await Promise.all([
-      api.get("/appointments"),
-      api.get("/doctors"),
-      api.get(`/records/patient/${user.id}`),
+      api.get("/appointments").catch(() => ({ data: [] })),
+      api.get("/doctors").catch(() => ({ data: [] })),
+      api.get(`/records/patient/${user.id}`).catch(() => ({ data: [] })),
       api.get("/patient/receipts").catch(() => ({ data: [] })),
       api.get(`/patients/${user.id}/vaccinations`).catch(() => ({ data: [] })),
     ]);
-    setAppts(a.data); setDoctors(d.data); setRecords(r.data);
-    setReceipts(rc.data); setVax(vx.data);
+    setAppts(a.data || []); setDoctors(d.data || []); setRecords(r.data || []);
+    setReceipts(rc.data || []); setVax(vx.data || []);
   };
   useEffect(() => { load(); }, []);
   useQueueSocket((ev) => { if (ev?.type?.startsWith("appointment.")) load(); });

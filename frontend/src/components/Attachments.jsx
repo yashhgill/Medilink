@@ -86,8 +86,8 @@ function FilePill({ f, onRemove }) {
         <Icon size={16} weight="duotone" color="#0B7C8C" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-xs font-medium truncate">{f.original_filename}</div>
-        <div className="text-[10px] text-[#5A6B70] font-mono">{(f.size / 1024).toFixed(1)} KB</div>
+        <div className="text-xs font-medium truncate">{f.original_filename || f.filename}</div>
+        <div className="text-[10px] text-[#5A6B70] font-mono">{(((f.size_bytes ?? f.size) || 0) / 1024).toFixed(1)} KB</div>
       </div>
       {onRemove && (
         <button type="button" onClick={onRemove} className="text-[#5A6B70] hover:text-[#9B2226]" data-testid={`attach-remove-${f.id}`}>
@@ -138,8 +138,8 @@ export function AttachmentList({ files = [] }) {
               <Icon size={16} weight="duotone" color="#0B7C8C" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium truncate">{f.original_filename}</div>
-              <div className="text-[10px] text-[#5A6B70] font-mono">{(f.size / 1024).toFixed(1)} KB</div>
+              <div className="text-xs font-medium truncate">{f.original_filename || f.filename}</div>
+              <div className="text-[10px] text-[#5A6B70] font-mono">{(((f.size_bytes ?? f.size) || 0) / 1024).toFixed(1)} KB</div>
             </div>
             <Download size={14} className="text-[#0B7C8C] shrink-0" />
           </button>

@@ -11,6 +11,7 @@ import PharmacyInventory from "@/pages/PharmacyInventory";
 import Facilities from "@/pages/Facilities";
 import Monitoring from "@/pages/Monitoring";
 import InstallPrompt from "@/components/InstallPrompt";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import Register from "@/pages/Register";
 import PatientDashboard from "@/pages/PatientDashboard";
 import DoctorDashboard from "@/pages/DoctorDashboard";
@@ -31,6 +32,7 @@ function App() {
     <div className="App">
       <AuthProvider>
         <BrowserRouter>
+          <ErrorBoundary>
           <Routes>
             <Route path="/" element={<HomeGate />} />
             <Route path="/kiosk" element={IS_PUBLIC ? <Navigate to="/" replace /> : <Kiosk />} />
@@ -95,6 +97,7 @@ function App() {
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </ErrorBoundary>
           <Toaster position="top-right" richColors />
           <InstallPrompt />
         </BrowserRouter>
