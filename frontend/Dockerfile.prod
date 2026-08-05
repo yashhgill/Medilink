@@ -1,0 +1,23 @@
+# Production build for the always-on cloud node: build static assets, serve over plain HTTP.
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm install --legacy-peer-deps
+# Fix CRA/craco build break: ajv-keywords needs ajv@8 but a transitive dep pulls ajv@6.
+RUN npm install --legacy-peer-deps ajv@8 ajv-keywords@5
+COPY . .
+ARG REACT_APP_BACKEND_URL
+ENV REACT_APP_BACKEND_URL=$REACT_APP_BACKEND_URL
+ENV CI=false
+# Small cloud box (t3.small ~2GB): disable sourcemaps (the biggest memory hog in
+# a CRA build) and give Node more heap so `npm run build` doesn't OOM.
+ENV GENERATE_SOURCEMAP=false
+ENV NODE_OPTIONS=--max-old-space-size=2048
+RUN npm run build
+
+FROM node:20-alpine
+WORKDIR /app
+RUN npm install -g serve
+COPY --from=build /app/build ./build
+EXPOSE 3000
+CMD ["serve", "-s", "build", "-l", "3000"]
