@@ -882,8 +882,11 @@ async def health():
 # ── Auth ──────────────────────────────────────────────────────────────────────
 @api.post("/auth/register", status_code=201)
 async def register(body: RegisterIn, request: Request):
-    if is_public_request(request):
-        raise HTTPException(403, "Account registration is done at the clinic")
+    # Public visitors may self-register as PATIENTS only. Staff accounts
+    # (doctor/pharmacist/receptionist/admin) can never be created from the public
+    # portal — those are provisioned by an admin on the clinic LAN.
+    if body.role != "patient" and is_public_request(request):
+        raise HTTPException(403, "Staff accounts are created by an admin at the clinic")
     if await database.fetch_one(users_t.select().where(users_t.c.email == body.email.lower())):
         raise HTTPException(400, "Email already registered")
     ic = body.ic_number
