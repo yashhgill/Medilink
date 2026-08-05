@@ -1370,11 +1370,17 @@ async def list_appointments(date: Optional[str] = None,
                             doctor_id: Optional[str] = None, u=Depends(current_user)):
     q = appointments_t.select()
     if u["role"] == "patient":
+        # A patient only ever sees their own appointments.
         q = q.where(appointments_t.c.patient_id == u["id"])
-    elif u["role"] == "doctor":
-        q = q.where(appointments_t.c.doctor_id == u["id"])
     elif doctor_id:
+        # Explicit filter (e.g. "my patients" toggle) still works.
         q = q.where(appointments_t.c.doctor_id == doctor_id)
+    # Doctors/reception/admin see the WHOLE clinic queue — like a real front desk.
+    # (A kiosk patient may be auto-assigned to any doctor; every doctor must still
+    #  see them in the live queue, or the queue looks empty. Facility scoping keeps
+    #  it to this clinic's own patients.)
+    if u["role"] in ("doctor", "receptionist", "pharmacist", "clinic_admin", "admin") and not is_super(u):
+        q = q.where(appointments_t.c.facility_id == u.get("facility_id"))
     if date:
         q = q.where(appointments_t.c.scheduled_at.like(f"{date}%"))
     if from_date:
