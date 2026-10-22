@@ -1,3 +1,5 @@
+import { QueueTicket } from "@/components/Triage";
+import { fmtDateTime, fmtDate } from "@/lib/utils";
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import AppShell from "@/components/AppShell";
@@ -28,18 +30,19 @@ const downloadPdf = async (path, filename) => {
   URL.revokeObjectURL(url);
 };
 
+const STATUS_TEXT = { scheduled: "Booked", checked_in: "Waiting", in_progress: "With doctor", completed: "Seen", ready_for_pharmacy: "At pharmacy", dispensed: "Done", cancelled: "Cancelled" };
 const statusColors = {
-  scheduled: "bg-[#EAF5F5] text-[#0B7C8C]",
-  checked_in: "bg-[#086788]/30 text-[#0B7C8C]",
-  in_progress: "bg-[#0A3D62]/20 text-[#9B2226]",
-  completed: "bg-[#2D6A4F]/20 text-[#2D6A4F]",
-  ready_for_pharmacy: "bg-[#0B7C8C] text-[#F4F9F9]",
-  dispensed: "bg-[#2D6A4F] text-[#F4F9F9]",
-  cancelled: "bg-[#5A6B70]/15 text-[#5A6B70]",
+  scheduled: "bg-white text-[#10201D]",
+  checked_in: "bg-[var(--ml-wash)] text-[var(--ml-primary-soft)]",
+  in_progress: "bg-[#10262E] text-white",
+  completed: "bg-[#DCE6F0] text-[#10262E]",
+  ready_for_pharmacy: "bg-[var(--ml-primary)] text-white",
+  dispensed: "bg-[#EEF3F1] text-[#566663]",
+  cancelled: "bg-[#EEF3F1] text-[#566663] line-through",
 };
 
 const Card = ({ children, className = "" }) => (
-  <div className={`rounded-2xl border border-[#DCE8E9] bg-white p-6 ${className}`}>{children}</div>
+  <div className={`rounded-2xl border border-[#DAE2DF] bg-white p-6 ${className}`}>{children}</div>
 );
 
 export default function PatientDashboard() {
@@ -61,6 +64,7 @@ export default function PatientDashboard() {
   const [records, setRecords] = useState([]);
   const [receipts, setReceipts] = useState([]);
   const [vax, setVax] = useState([]);
+  const [facilityMap, setFacilityMap] = useState({});
   const [openBook, setOpenBook] = useState(false);
   const [openPay, setOpenPay] = useState(null);
   const [qrPay, setQrPay] = useState(null);
@@ -71,15 +75,19 @@ export default function PatientDashboard() {
   const [loading, setLoading] = useState(false);
 
   const load = async () => {
-    const [a, d, r, rc, vx] = await Promise.all([
+    const [a, d, r, rc, vx, facs] = await Promise.all([
       api.get("/appointments").catch(() => ({ data: [] })),
       api.get("/doctors").catch(() => ({ data: [] })),
       api.get(`/records/patient/${user.id}`).catch(() => ({ data: [] })),
       api.get("/patient/receipts").catch(() => ({ data: [] })),
       api.get(`/patients/${user.id}/vaccinations`).catch(() => ({ data: [] })),
+      api.get("/facilities").catch(() => ({ data: [] })),
     ]);
     setAppts(a.data || []); setDoctors(d.data || []); setRecords(r.data || []);
     setReceipts(rc.data || []); setVax(vx.data || []);
+    const fm = {};
+    (facs.data || []).forEach(f => { fm[f.code] = f.name; });
+    setFacilityMap(fm);
   };
   useEffect(() => { load(); }, []);
   useQueueSocket((ev) => { if (ev?.type?.startsWith("appointment.")) load(); });
@@ -106,8 +114,11 @@ export default function PatientDashboard() {
   const confirmPay = async () => {
     if (!qrPay) return; setConfirming(true);
     try {
-      await api.post(`/patient/payments/${qrPay.ref}/confirm`);
-      toast.success("Payment received — thank you"); setQrPay(null); setOpenPay(null); load();
+      const r = await api.post(`/patient/payments/${qrPay.ref}/confirm`);
+      toast.success(r.data?.awaiting_staff
+        ? "Thanks. The counter will confirm your payment, then your medicine will be ready."
+        : "Payment received. Thank you.");
+      setQrPay(null); setOpenPay(null); load();
     } catch (e) { toast.error(errMsg(e, "Confirmation failed")); } finally { setConfirming(false); }
   };
 
@@ -130,65 +141,69 @@ export default function PatientDashboard() {
     >
       {view === "overview" && (
         <div className="space-y-6">
-          <Card>
-            <div className="overline mb-1">Share my records with a clinic</div>
-            <div className="text-sm text-[#5A6B70] mb-3">If a doctor at another clinic asks to see your history, enter the 6-digit code they give you.</div>
-            <div className="flex items-center gap-2">
-              <input value={approveCode} onChange={(e) => setApproveCode(e.target.value)} inputMode="numeric" maxLength={6}
-                placeholder="6-digit code" className="flex-1 rounded-xl border border-[#DCE8E9] bg-[#F4F9F9] px-3 py-2.5 text-sm font-mono outline-none focus:border-[#0B7C8C]" />
-              <button onClick={approveAccess} className="px-4 py-2.5 rounded-xl bg-[#0B7C8C] text-white text-sm hover:bg-[#075F6C]">Approve</button>
-            </div>
-          </Card>
-          <div className="grid lg:grid-cols-2 gap-6">
-            <Card>
-              <div className="flex items-center justify-between mb-3">
-                <div className="overline">My Queue Number</div>
-                <WaveTriangle size={18} weight="duotone" color="#0B7C8C" />
+          {nextAppt ? (
+            <section>
+              <h2 className="text-lg font-bold mb-3">Your visit today</h2>
+              <QueueTicket number={nextAppt.queue_number} zone={nextAppt.triage_colour}>
+                <div className="text-[15px] text-[#566663]">Doctor</div>
+                <div className="text-lg font-bold">{nextAppt.doctor?.name}</div>
+                <div className="mt-2 text-[15px] font-semibold text-[var(--ml-primary-soft)]">
+                  {{ scheduled: "Booked. Check in at the kiosk when you arrive.",
+                     checked_in: "Waiting to be called.",
+                     in_progress: "With the doctor now.",
+                     ready_for_pharmacy: "Collect your medicine at the pharmacy." }[nextAppt.status] || ""}
+                </div>
+              </QueueTicket>
+            </section>
+          ) : (
+            <section className="rounded-2xl border border-[#DAE2DF] bg-white p-5 flex flex-wrap items-center gap-4 justify-between">
+              <div>
+                <h2 className="text-lg font-bold">No visit today</h2>
+                <p className="text-[15px] text-[#566663]">Book a time, or just walk in and check in at the kiosk.</p>
               </div>
-              {nextAppt ? (
-                <>
-                  <div className="font-display text-7xl text-[#0B7C8C] font-mono tabular-nums leading-none">
-                    #{String(nextAppt.queue_number).padStart(3, "0")}
-                  </div>
-                  <div className="text-sm text-[#5A6B70] mt-3">with <span className="font-medium text-[#12262B]">{nextAppt.doctor?.name}</span></div>
-                  <Badge className={`mt-3 ${statusColors[nextAppt.status]}`}>{nextAppt.status.replaceAll("_", " ")}</Badge>
-                </>
-              ) : <div className="text-sm text-[#5A6B70]">No active visit right now.</div>}
-            </Card>
-            <div className="rounded-2xl border border-[#DCE8E9] bg-[#0B7C8C] text-[#F4F9F9] p-6 flex flex-col">
-              <div className="overline text-white/60">Quick action</div>
-              <h3 className="font-display text-2xl mt-2">Book your next visit</h3>
-              <p className="text-sm text-white/70 mt-1 mb-5 flex-1">Choose a doctor, pick a time, and we&apos;ll assign you a token number instantly.</p>
-              <Button onClick={() => setOpenBook(true)} className="bg-[#0A3D62] hover:bg-[#083150] text-[#F4F9F9] rounded-full self-start">
-                <Plus size={16} className="mr-1.5" /> Book appointment
+              <Button onClick={() => setOpenBook(true)} className="bg-[var(--ml-primary)] hover:bg-[var(--ml-primary-soft)] text-white rounded-full h-11 px-5">
+                <Plus size={16} className="mr-1.5" /> Book a visit
               </Button>
-            </div>
-          </div>
+            </section>
+          )}
           <Card>
             <div className="flex items-center justify-between mb-4">
-              <div><div className="overline">My Appointments</div><h3 className="font-display text-xl mt-1">{appts.length} total</h3></div>
-              <Calendar size={18} weight="duotone" color="#0B7C8C" />
+              <h2 className="text-lg font-bold">My visits <span className="text-[#566663] font-semibold">({appts.length})</span></h2>
+              {nextAppt && <Button size="sm" variant="outline" onClick={() => setOpenBook(true)} className="rounded-full border-[#C8D3CF]"><Plus size={14} className="mr-1" /> Book</Button>}
             </div>
             <div className="space-y-2">
-              {appts.length === 0 && <div className="text-sm text-[#5A6B70]">No appointments yet.</div>}
+              {appts.length === 0 && <div className="text-sm text-[#566663]">No appointments yet.</div>}
               {appts.map((a) => (
-                <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border border-[#DCE8E9] hover:bg-[#EAF5F5] transition-colors">
+                <div key={a.id} className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border border-[#DAE2DF] hover:bg-[var(--ml-wash)] transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-[#EAF5F5] flex items-center justify-center font-mono text-sm">#{a.queue_number}</div>
+                    <div className="w-12 text-center font-mono text-lg font-bold">{String(a.queue_number ?? "").padStart(3, "0")}</div>
                     <div>
-                      <div className="text-sm font-medium">{a.doctor?.name} · <span className="text-[#5A6B70] font-normal">{a.doctor?.specialty || "General"}</span></div>
-                      <div className="text-xs text-[#5A6B70] font-mono">{new Date(a.scheduled_at).toLocaleString()}</div>
-                      <div className="text-xs text-[#5A6B70]">{a.reason}</div>
+                      <div className="text-sm font-medium">{a.doctor?.name} · <span className="text-[#566663] font-normal">{a.doctor?.specialty || "General"}</span></div>
+                      <div className="text-xs text-[#566663] font-mono">{fmtDateTime(a.scheduled_at)}</div>
+                      <div className="text-xs text-[#566663]">{a.reason}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge className={statusColors[a.status]}>{a.status.replaceAll("_", " ")}</Badge>
+                    <Badge className={statusColors[a.status]}>{(STATUS_TEXT[a.status] || a.status)}</Badge>
                     {a.payment_status === "paid"
-                      ? <Badge className="bg-[#2D6A4F]/20 text-[#2D6A4F]">Paid · RM{a.paid_amount}</Badge>
-                      : <Button size="sm" onClick={() => setOpenPay(a)} className="bg-[#0A3D62] hover:bg-[#083150] text-[#F4F9F9] rounded-full h-8 px-3"><CreditCard size={14} className="mr-1.5" /> Pay</Button>}
+                      ? <span className="text-[13px] font-semibold text-[var(--ml-primary)]">Paid · RM{Number(a.paid_amount || 0).toFixed(2)}</span>
+                      : a.payment_status === "pending"
+                      ? <span className="text-[13px] font-semibold text-[#10262E]">Payment being checked</span>
+                      : a.status === "completed"
+                      ? <Button size="sm" onClick={() => setOpenPay(a)} className="bg-[#10262E] hover:bg-[#0A1A20] text-white rounded-full h-9 px-4"><CreditCard size={14} className="mr-1.5" /> Pay</Button>
+                      : null}
                   </div>
                 </div>
               ))}
+            </div>
+          </Card>
+          <Card>
+            <h2 className="text-lg font-bold mb-1">Share my records with another clinic</h2>
+            <div className="text-sm text-[#566663] mb-3">If a doctor at another clinic asks to see your history, enter the 6-digit code they give you.</div>
+            <div className="flex items-center gap-2">
+              <input value={approveCode} onChange={(e) => setApproveCode(e.target.value)} inputMode="numeric" maxLength={6}
+                placeholder="6-digit code" className="flex-1 rounded-xl border border-[#DAE2DF] bg-[#EEF2F1] px-3 py-2.5 text-sm font-mono outline-none focus:border-[var(--ml-primary)]" />
+              <button onClick={approveAccess} className="px-4 py-2.5 rounded-xl bg-[var(--ml-primary)] text-white text-sm hover:bg-[var(--ml-primary-soft)]">Approve</button>
             </div>
           </Card>
         </div>
@@ -200,26 +215,26 @@ export default function PatientDashboard() {
             <div className="overline">Medical Records</div>
             <div className="flex items-center gap-2">
               <button onClick={() => downloadPdf("/patient/history/pdf", "medical-history.pdf").catch(() => toast.error("Download failed"))}
-                className="text-xs px-3 py-1.5 rounded-full border border-[#DCE8E9] hover:bg-[#EAF5F5] text-[#0B7C8C]">Download PDF</button>
+                className="text-xs px-3 py-1.5 rounded-full border border-[#DAE2DF] hover:bg-[var(--ml-wash)] text-[var(--ml-primary)]">Download PDF</button>
               <button onClick={() => { setProfile({ email: user.email?.includes("@patient.medilink") ? "" : user.email, phone: user.phone || "" }); setProfileOpen(true); }}
-                className="text-xs px-3 py-1.5 rounded-full border border-[#DCE8E9] hover:bg-[#EAF5F5] text-[#0B7C8C]">Edit profile</button>
-              <FileText size={18} weight="duotone" color="#0B7C8C" />
+                className="text-xs px-3 py-1.5 rounded-full border border-[#DAE2DF] hover:bg-[var(--ml-wash)] text-[var(--ml-primary)]">Edit profile</button>
+              <FileText size={18} weight="duotone" color="#0A6E62" />
             </div>
           </div>
-          {records.length === 0 && <div className="text-sm text-[#5A6B70]">No records yet.</div>}
+          {records.length === 0 && <div className="text-sm text-[#566663]">No records yet.</div>}
           <div className="grid md:grid-cols-2 gap-3">
             {records.map((r) => (
-              <div key={r.id} className="p-4 rounded-xl bg-[#EAF5F5] border border-[#DCE8E9]">
-                <div className="text-[10px] uppercase tracking-[0.18em] text-[#5A6B70]">
-                  {new Date(r.created_at).toLocaleDateString()} · {r.doctor?.name}
-                  {r.external && <span className="ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-100 text-blue-700">{r.facility_id}</span>}
+              <div key={r.id} className="p-4 rounded-xl bg-[var(--ml-wash)] border border-[#DAE2DF]">
+                <div className="text-[10px] text-[#566663]">
+                  {fmtDate(r.created_at)} · {r.doctor?.name || (r.external ? (r.facility_name || facilityMap[r.facility_id] || r.facility_id) : "Clinic Staff")}
+                  {r.external && <span className="ml-2 inline-block px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-blue-100 text-blue-700">{r.facility_name || facilityMap[r.facility_id] || r.facility_id}</span>}
                 </div>
                 <div className="text-sm font-medium mt-1">{r.diagnosis}</div>
-                {r.notes && <div className="text-xs text-[#5A6B70] mt-1">{r.notes}</div>}
+                {r.notes && <div className="text-xs text-[#566663] mt-1">{r.notes}</div>}
                 {r.prescriptions?.length > 0 && (
                   <div className="mt-2 space-y-1">
                     {r.prescriptions.map((p, i) => (
-                      <div key={i} className="text-xs font-mono flex items-center gap-2 text-[#0B7C8C]"><Pill size={12} weight="duotone" /> {p.medicine} · {p.dosage} · {p.frequency}</div>
+                      <div key={i} className="text-xs font-mono flex items-center gap-2 text-[var(--ml-primary)]"><Pill size={12} weight="duotone" /> {p.medicine} · {p.dosage} · {p.frequency}</div>
                     ))}
                   </div>
                 )}
@@ -233,20 +248,20 @@ export default function PatientDashboard() {
 
       {view === "billing" && (
         <Card>
-          <div className="flex items-center justify-between mb-4"><div className="overline">Receipts</div><CreditCard size={18} weight="duotone" color="#0B7C8C" /></div>
-          {receipts.length === 0 && <div className="text-sm text-[#5A6B70]">No payments yet.</div>}
+          <div className="flex items-center justify-between mb-4"><div className="overline">Receipts</div><CreditCard size={18} weight="duotone" color="#0A6E62" /></div>
+          {receipts.length === 0 && <div className="text-sm text-[#566663]">No payments yet.</div>}
           <div className="grid md:grid-cols-2 gap-3">
             {receipts.map((r) => (
-              <div key={r.txn_ref} className="flex items-center justify-between p-4 rounded-xl border border-[#DCE8E9]">
+              <div key={r.txn_ref} className="flex items-center justify-between p-4 rounded-xl border border-[#DAE2DF]">
                 <div>
                   <div className="text-sm font-medium">RM {Number(r.amount).toFixed(2)} · {r.method}</div>
-                  <div className="text-[11px] font-mono text-[#5A6B70]">{r.txn_ref}</div>
-                  <div className="text-[11px] text-[#5A6B70]">{new Date(r.paid_at).toLocaleString()} · {r.reason}</div>
+                  <div className="text-[11px] font-mono text-[#566663]">{r.txn_ref}</div>
+                  <div className="text-[11px] text-[#566663]">{fmtDateTime(r.paid_at)} · {r.reason}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => downloadPdf(`/patient/receipts/${r.txn_ref}/pdf`, `receipt-${r.txn_ref}.pdf`).catch(() => toast.error("Download failed"))}
-                    className="text-[11px] px-2 py-1 rounded-full border border-[#DCE8E9] hover:bg-[#EAF5F5] text-[#0B7C8C]">PDF</button>
-                  <Badge className="bg-[#2D6A4F]/20 text-[#2D6A4F]">paid</Badge>
+                    className="text-[11px] px-2 py-1 rounded-full border border-[#DAE2DF] hover:bg-[var(--ml-wash)] text-[var(--ml-primary)]">PDF</button>
+                  <Badge className="bg-[#0A6E62]/20 text-[var(--ml-primary)]">paid</Badge>
                 </div>
               </div>
             ))}
@@ -259,17 +274,17 @@ export default function PatientDashboard() {
           <div className="flex items-center justify-between mb-4">
             <div className="overline">Vaccinations</div>
             <button onClick={() => downloadPdf(`/patients/${user.id}/vaccinations/pdf`, "vaccination-certificate.pdf").catch(() => toast.error("Download failed"))}
-              className="text-xs px-3 py-1.5 rounded-full border border-[#DCE8E9] hover:bg-[#EAF5F5] text-[#0B7C8C]">Certificate PDF</button>
+              className="text-xs px-3 py-1.5 rounded-full border border-[#DAE2DF] hover:bg-[var(--ml-wash)] text-[var(--ml-primary)]">Certificate PDF</button>
           </div>
-          {vax.length === 0 && <div className="text-sm text-[#5A6B70]">No vaccinations recorded.</div>}
+          {vax.length === 0 && <div className="text-sm text-[#566663]">No vaccinations recorded.</div>}
           <div className="grid md:grid-cols-2 gap-3">
             {vax.map((v) => (
-              <div key={v.id} className="flex items-center justify-between p-4 rounded-xl border border-[#DCE8E9]">
+              <div key={v.id} className="flex items-center justify-between p-4 rounded-xl border border-[#DAE2DF]">
                 <div>
-                  <div className="text-sm font-medium">{v.vaccine} · <span className="font-normal text-[#5A6B70]">{v.dose}</span></div>
-                  <div className="text-[11px] text-[#5A6B70]">{(v.administered_at || "").slice(0, 10)} · {v.doctor_name}</div>
+                  <div className="text-sm font-medium">{v.vaccine} · <span className="font-normal text-[#566663]">{v.dose}</span></div>
+                  <div className="text-[11px] text-[#566663]">{(v.administered_at || "").slice(0, 10)} · {v.doctor_name}</div>
                 </div>
-                <Badge className="bg-[#2D6A4F]/20 text-[#2D6A4F]">done</Badge>
+                <Badge className="bg-[#0A6E62]/20 text-[var(--ml-primary)]">done</Badge>
               </div>
             ))}
           </div>
@@ -278,58 +293,58 @@ export default function PatientDashboard() {
 
       {/* Book dialog */}
       <Dialog open={openBook} onOpenChange={setOpenBook}>
-        <DialogContent className="bg-[#F4F9F9] border-[#DCE8E9] max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-[#EEF2F1] border-[#DAE2DF] max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle className="font-display text-2xl">Book an appointment</DialogTitle><DialogDescription>Pick a doctor and time.</DialogDescription></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label>Doctor</Label>
               <Select value={booking.doctor_id} onValueChange={(v) => setBooking({ ...booking, doctor_id: v })}>
-                <SelectTrigger className="border-[#DCE8E9]"><SelectValue placeholder="Choose a doctor" /></SelectTrigger>
+                <SelectTrigger className="border-[#DAE2DF]"><SelectValue placeholder="Choose a doctor" /></SelectTrigger>
                 <SelectContent>{doctors.map((d) => <SelectItem key={d.id} value={d.id}>{d.name} · {d.specialty || "General"}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5"><Label>Pick a slot</Label><SlotPicker doctorId={booking.doctor_id} value={booking.scheduled_at} onChange={(iso) => setBooking({ ...booking, scheduled_at: iso })} /></div>
-            <div className="space-y-1.5"><Label>Reason for visit</Label><Textarea value={booking.reason} onChange={(e) => setBooking({ ...booking, reason: e.target.value })} placeholder="e.g. Persistent cough for 4 days" className="border-[#DCE8E9]" /></div>
+            <div className="space-y-1.5"><Label>Reason for visit</Label><Textarea value={booking.reason} onChange={(e) => setBooking({ ...booking, reason: e.target.value })} placeholder="e.g. Persistent cough for 4 days" className="border-[#DAE2DF]" /></div>
           </div>
-          <DialogFooter><Button disabled={!booking.doctor_id || !booking.scheduled_at || loading} onClick={book} className="bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9]">{loading ? "Booking…" : "Confirm booking"}</Button></DialogFooter>
+          <DialogFooter><Button disabled={!booking.doctor_id || !booking.scheduled_at || loading} onClick={book} className="bg-[var(--ml-primary)] hover:bg-[var(--ml-primary-soft)] text-[#EEF2F1]">{loading ? "Booking…" : "Confirm booking"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Pay dialog */}
       <Dialog open={!!openPay} onOpenChange={(o) => !o && (setOpenPay(null), setQrPay(null))}>
-        <DialogContent className="bg-[#F4F9F9] border-[#DCE8E9]">
+        <DialogContent className="bg-[#EEF2F1] border-[#DAE2DF]">
           <DialogHeader><DialogTitle className="font-display text-2xl">Pay your bill</DialogTitle><DialogDescription>Scan the DuitNow QR with your banking app.</DialogDescription></DialogHeader>
           {openPay && !qrPay && (
-            <div className="rounded-2xl border border-[#DCE8E9] bg-white p-5">
+            <div className="rounded-2xl border border-[#DAE2DF] bg-white p-5">
               <div className="overline">Amount</div>
               <div className="font-display text-4xl mt-1">RM {(openPay.fee || 50).toFixed(2)}</div>
-              <div className="text-sm text-[#5A6B70] mt-2">{openPay.doctor?.name} · {new Date(openPay.scheduled_at).toLocaleString()}</div>
+              <div className="text-sm text-[#566663] mt-2">{openPay.doctor?.name} · {fmtDateTime(openPay.scheduled_at)}</div>
             </div>
           )}
           {qrPay && (
-            <div className="rounded-2xl border border-[#DCE8E9] bg-white p-5 text-center">
-              <img src={`data:image/png;base64,${qrPay.qr}`} alt="DuitNow QR" className="w-52 h-52 mx-auto rounded-xl border border-[#DCE8E9]" />
-              <div className="font-mono text-xs text-[#5A6B70] mt-2">{qrPay.ref}</div>
+            <div className="rounded-2xl border border-[#DAE2DF] bg-white p-5 text-center">
+              <img src={`data:image/png;base64,${qrPay.qr}`} alt="DuitNow QR" className="w-52 h-52 mx-auto rounded-xl border border-[#DAE2DF]" />
+              <div className="font-mono text-xs text-[#566663] mt-2">{qrPay.ref}</div>
               <div className="font-display text-2xl mt-1">RM {Number(qrPay.amount).toFixed(2)}</div>
             </div>
           )}
           <DialogFooter>
             {!qrPay
-              ? <Button onClick={() => pay(openPay)} className="bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9]"><CreditCard size={16} className="mr-1.5" /> Show DuitNow QR</Button>
-              : <Button onClick={confirmPay} disabled={confirming} className="bg-[#2D6A4F] hover:bg-[#064F5A] text-[#F4F9F9]">{confirming ? "Checking…" : "I've paid"}</Button>}
+              ? <Button onClick={() => pay(openPay)} className="bg-[var(--ml-primary)] hover:bg-[var(--ml-primary-soft)] text-[#EEF2F1]"><CreditCard size={16} className="mr-1.5" /> Show DuitNow QR</Button>
+              : <Button onClick={confirmPay} disabled={confirming} className="bg-[var(--ml-primary)] hover:bg-[#064F5A] text-[#EEF2F1]">{confirming ? "Sending…" : "I've paid"}</Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Profile dialog */}
       <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
-        <DialogContent className="bg-[#F4F9F9] border-[#DCE8E9]">
+        <DialogContent className="bg-[#EEF2F1] border-[#DAE2DF]">
           <DialogHeader><DialogTitle className="font-display text-2xl">My profile</DialogTitle><DialogDescription>Add contact details for reminders and receipts. You always sign in with your IC.</DialogDescription></DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1.5"><Label>Email (optional)</Label><Input value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} placeholder="you@email.com" className="border-[#DCE8E9]" /></div>
-            <div className="space-y-1.5"><Label>Phone</Label><Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} placeholder="012-345 6789" className="border-[#DCE8E9]" /></div>
+            <div className="space-y-1.5"><Label>Email (optional)</Label><Input value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} placeholder="you@email.com" className="border-[#DAE2DF]" /></div>
+            <div className="space-y-1.5"><Label>Phone</Label><Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} placeholder="012-345 6789" className="border-[#DAE2DF]" /></div>
           </div>
-          <DialogFooter><Button onClick={saveProfile} className="bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9]">Save</Button></DialogFooter>
+          <DialogFooter><Button onClick={saveProfile} className="bg-[var(--ml-primary)] hover:bg-[var(--ml-primary-soft)] text-[#EEF2F1]">Save</Button></DialogFooter>
         </DialogContent>
       </Dialog>
       <div className="h-20 lg:hidden" aria-hidden="true" />

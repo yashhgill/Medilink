@@ -1,143 +1,126 @@
-import React from "react";
-import { IS_PUBLIC } from "@/lib/api";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import {
-  Heartbeat, WaveTriangle, Stethoscope, CloudCheck, ShieldCheck,
-  ArrowRight, Pill, IdentificationCard, Broadcast, Lock,
-} from "@phosphor-icons/react";
+import { IdentificationCard, FileText, Stethoscope, WifiSlash, ArrowRight, Television } from "@phosphor-icons/react";
+import api, { IS_PUBLIC } from "@/lib/api";
+import { PRODUCT } from "@/brand";
+import { ZONE_COLOUR, useQueueBoard, useClock } from "@/components/QueueBoard";
 
-/* Malaysian healthcare palette */
-const C = {
-  teal: "#0B7C8C", tealDark: "#075F6C", navy: "#0A3D62",
-  mist: "#EAF5F5", ink: "#12262B", slate: "#5A6B70", red: "#D64550",
-};
-
-const features = [
-  { icon: IdentificationCard, title: "Kiosk IC Check-in",
-    body: "Patients walk in and enter their IC — registered, AI-triaged and queued in under a minute. No receptionist required." },
-  { icon: Stethoscope, title: "Clinician Workspace",
-    body: "AI pre-consult briefings, live Bluetooth vitals, e-prescriptions and one-tap medical certificates for every doctor." },
-  { icon: Pill, title: "Pharmacy & Inventory",
-    body: "Prescriptions flow straight to the dispensary with a full stock ledger, low-stock and expiry alerts." },
-  { icon: CloudCheck, title: "Local-first, Cloud-mirrored",
-    body: "Records write to the clinic's own storage first, then mirror to the cloud. Care never stops when the internet does." },
-  { icon: ShieldCheck, title: "Encrypted & Auditable",
-    body: "IC numbers are encrypted at rest with a searchable blind index. Every record access is logged — PDPA-ready." },
-  { icon: Broadcast, title: "One Patient, One Record",
-    body: "Records follow the patient across every connected clinic, labelled by facility — a truly national health record." },
-];
-
+/* The clinic's front door. On a clinic machine this is the first screen anyone
+   sees, so it names the clinic (from Branding), not the software, shows the
+   queue as it stands (numbers only, never names), and sends each kind of
+   visitor straight to the one thing they came to do. */
 export default function Landing() {
   const nav = useNavigate();
+  const [brand, setBrand] = useState(null);
+  const board = useQueueBoard();
+  const now = useClock();
+  useEffect(() => {
+    api.get("/branding").then((r) => setBrand(r.data)).catch(() => setBrand({}));
+  }, []);
+  const clinic = brand?.clinic_name || board?.clinic_name || "Your clinic";
+
+  const doors = [
+    !IS_PUBLIC && {
+      icon: IdentificationCard, title: "Check in for a visit", body: "Use your MyKad at the kiosk and take a queue number.",
+      cta: "Open the kiosk", go: "/kiosk", primary: true, testid: "landing-kiosk",
+    },
+    {
+      icon: FileText, title: "See my records and bills", body: "Results, prescriptions, receipts and medical certificates.",
+      cta: "Patient sign in", go: "/login?as=patient", testid: "landing-patient",
+    },
+    {
+      icon: Stethoscope, title: "Clinic staff", body: "Doctors, reception, pharmacy and administrators.",
+      cta: "Staff sign in", go: "/login", testid: "landing-staff",
+    },
+  ].filter(Boolean);
+
+  const serving = board?.now_serving || [];
+  const waiting = board?.waiting || [];
 
   return (
-    <div className="min-h-screen" style={{ background: "#FFFFFF", color: C.ink }}>
-      {/* Nav */}
-      <header className="sticky top-0 z-30 backdrop-blur-md" style={{ background: "rgba(255,255,255,0.9)", borderBottom: `1px solid ${C.mist}`, paddingTop: "env(safe-area-inset-top)" }}>
-        <div className="max-w-[1200px] mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: C.teal }}>
-              <Heartbeat size={20} color="#fff" weight="duotone" />
-            </div>
-            <div>
-              <div className="font-display text-lg leading-none" style={{ color: C.navy }}>MediLink</div>
-              <div className="text-[10px] uppercase tracking-[0.2em]" style={{ color: C.slate }}>Health Systems</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => nav("/login")} className="px-4 py-2 rounded-full text-sm font-medium hover:bg-[#EAF5F5]" style={{ color: C.navy }}>
-              Sign in
-            </button>
-            {!IS_PUBLIC && (
-              <button onClick={() => nav("/kiosk")} className="px-4 py-2 rounded-full text-sm font-semibold text-white" style={{ background: C.teal }}>
-                Open Kiosk
-              </button>
-            )}
-          </div>
+    <div className="min-h-screen grid lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] bg-[#EEF2F1] text-[#10201D]">
+      {/* The board side: who the clinic is, and the queue right now */}
+      <section className="relative bg-[#10262E] text-white px-6 sm:px-10 lg:px-14 py-8 lg:py-12 flex flex-col overflow-hidden" style={{ paddingTop: "max(2rem, env(safe-area-inset-top))" }}>
+        <div className="flex items-center gap-3">
+          {brand?.logo ? (
+            <img src={brand.logo} alt="" className="w-10 h-10 rounded-xl object-contain bg-white p-0.5" />
+          ) : (
+            <img src={PRODUCT.logo} alt="" className="w-10 h-10 rounded-xl object-cover" />
+          )}
+          <span className="text-white/70 text-[15px]">{brand?.clinic_address || "Welcome"}</span>
         </div>
-      </header>
 
-      {/* Hero */}
-      <section className="relative overflow-hidden" style={{ background: `linear-gradient(160deg, ${C.mist} 0%, #FFFFFF 60%)` }}>
-        <div className="max-w-[1200px] mx-auto px-6 pt-20 pb-24 text-center">
-          
-          <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
-            className="font-display font-semibold tracking-tight leading-[1.05]"
-            style={{ fontSize: "clamp(2.4rem,6vw,4.4rem)", color: C.navy }}>
-            Run the whole clinic.<br />
-            <span style={{ color: C.teal }}>Check-in to prescription.</span>
-          </motion.h1>
-          <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}
-            className="mt-6 max-w-2xl mx-auto text-lg leading-relaxed" style={{ color: C.slate }}>
-            MediLink runs the front desk, the doctor's room, the pharmacy and the patient app as one system —
-            local-first so it keeps working when the internet doesn't, and mirrored to a national cloud record.
-          </motion.p>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
-            className="mt-9 flex flex-wrap gap-3 justify-center">
-            <button onClick={() => nav("/login")} className="px-7 h-12 rounded-full text-white font-semibold inline-flex items-center gap-2"
-              style={{ background: C.teal }}>
-              Get started <ArrowRight size={18} />
-            </button>
-            <button onClick={() => nav("/activate")} className="px-7 h-12 rounded-full font-semibold"
-              style={{ background: "#fff", color: C.navy, border: `1px solid ${C.mist}` }}>
-              Activate patient account
-            </button>
-          </motion.div>
-          <div className="mt-10 flex items-center gap-6 justify-center text-xs font-medium flex-wrap" style={{ color: C.slate }}>
-            <span className="flex items-center gap-1.5"><ShieldCheck size={14} weight="duotone" /> PDPA-ready</span>
-            <span className="flex items-center gap-1.5"><Lock size={14} weight="duotone" /> Encrypted records</span>
-            <span className="flex items-center gap-1.5"><CloudCheck size={14} weight="duotone" /> Works offline</span>
+        <div className="mt-10 lg:mt-16">
+          <div className="text-white/60 text-[17px]">
+            {now.toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long" })}
+            <span className="mx-2">·</span>
+            <span className="tabular-nums">{now.toLocaleTimeString("en-MY", { hour: "numeric", minute: "2-digit" })}</span>
+          </div>
+          <h1 className="mt-2 text-white text-[44px] sm:text-[60px] lg:text-[72px] leading-[0.98]">{clinic}</h1>
+          <p className="mt-4 text-white/70 text-[19px] max-w-[34ch]">{brand?.welcome_message || "Selamat datang. What would you like to do today?"}</p>
+          {brand?.opening_hours && <p className="mt-3 text-white/55 text-[15px]">Open {brand.opening_hours}</p>}
+        </div>
+
+        <div className="mt-10 lg:mt-auto grid grid-cols-2 gap-3 max-w-[560px]">
+          <div className="rounded-2xl bg-white/[0.06] border border-white/10 p-5">
+            <div className="text-[14px] text-white/60">Now seeing</div>
+            <div className="mt-2 flex flex-wrap gap-2 min-h-[56px] items-center">
+              {serving.length === 0 ? <span className="text-white/50 text-[15px]">Doctors will call soon</span> :
+                serving.map((s) => (
+                  <span key={s.number} className="figure text-[44px]" >
+                    {String(s.number).padStart(3, "0")}
+                  </span>
+                ))}
+            </div>
+          </div>
+          <div className="rounded-2xl bg-white/[0.06] border border-white/10 p-5">
+            <div className="text-[14px] text-white/60">Waiting now</div>
+            <div className="figure text-[44px] mt-2" data-testid="landing-waiting">{waiting.length}</div>
           </div>
         </div>
+        <button onClick={() => nav("/board")} className="mt-5 self-start flex items-center gap-2 text-[14px] text-white/60 hover:text-white">
+          <Television size={18} /> Open the waiting-room screen
+        </button>
       </section>
 
-      {/* Features */}
-      <section className="max-w-[1200px] mx-auto px-6 py-20">
-        <div className="text-center mb-12">
-          <div className="text-xs uppercase tracking-[0.2em] mb-3" style={{ color: C.teal }}>What's inside</div>
-          <h2 className="font-display text-3xl sm:text-4xl tracking-tight" style={{ color: C.navy }}>Everything a modern clinic needs</h2>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {features.map((f, i) => (
-            <motion.div key={f.title} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.06 }}
-              className="rounded-2xl p-6" style={{ background: "#fff", border: `1px solid ${C.mist}` }}>
-              <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4" style={{ background: C.mist }}>
-                <f.icon size={22} weight="duotone" color={C.teal} />
-              </div>
-              <div className="font-display text-lg mb-1.5" style={{ color: C.navy }}>{f.title}</div>
-              <p className="text-sm leading-relaxed" style={{ color: C.slate }}>{f.body}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* CTA band */}
-      <section style={{ background: C.navy }}>
-        <div className="max-w-[1200px] mx-auto px-6 py-16 text-center">
-          <h2 className="font-display text-3xl sm:text-4xl text-white tracking-tight">Ready when your clinic is.</h2>
-          <p className="mt-3 max-w-xl mx-auto" style={{ color: "#B9CDD8" }}>
-            One system for check-in, consultation, dispensing and patient records — deployable on a single machine.
-          </p>
-          <button onClick={() => nav("/login")} className="mt-8 px-8 h-12 rounded-full font-semibold inline-flex items-center gap-2"
-            style={{ background: C.teal, color: "#fff" }}>
-            Sign in <ArrowRight size={18} />
+      {/* The doors */}
+      <section className="px-6 sm:px-10 lg:px-14 py-10 lg:py-12 flex flex-col">
+        <div className="flex justify-end">
+          <button onClick={() => nav("/activate")} className="text-[15px] font-semibold text-[var(--ml-primary)] hover:underline">
+            New patient app account
           </button>
         </div>
+        <ul className="my-auto py-8 space-y-3 max-w-[560px] w-full mx-auto">
+          {doors.map((d) => (
+            <li key={d.go}>
+              <button
+                onClick={() => nav(d.go)}
+                data-testid={d.testid}
+                className={`group w-full text-left flex items-center gap-5 rounded-2xl border p-6 transition-colors ${
+                  d.primary ? "bg-[var(--ml-primary)] border-[var(--ml-primary)] text-white hover:bg-[var(--ml-primary-soft)]" : "bg-white border-[#DAE2DF] hover:border-[var(--ml-primary)] shadow-[var(--shadow-card)]"
+                }`}
+              >
+                <span className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${d.primary ? "bg-white/15" : "bg-[var(--ml-wash)]"}`}>
+                  <d.icon size={30} className={d.primary ? "text-white" : "text-[var(--ml-primary)]"} />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[20px] font-bold leading-snug">{d.title}</span>
+                  <span className={`block text-[15px] mt-0.5 ${d.primary ? "text-white/80" : "text-[#566663]"}`}>{d.body}</span>
+                  <span className={`sm:hidden block mt-2 text-[15px] font-semibold ${d.primary ? "text-white" : "text-[var(--ml-primary)]"}`}>{d.cta}</span>
+                </span>
+                <ArrowRight size={22} className={`hidden sm:block shrink-0 transition-transform group-hover:translate-x-0.5 ${d.primary ? "text-white" : "text-[var(--ml-primary)]"}`} />
+              </button>
+            </li>
+          ))}
+        </ul>
+        <footer className="text-[13px] text-[#566663] flex flex-wrap items-start gap-x-6 gap-y-2">
+          <span className="flex items-start gap-2 max-w-[46ch]">
+            <WifiSlash size={18} className="mt-0.5 shrink-0" />
+            Records are kept on this clinic's own computer, so check-in, consultations and payment keep working when the internet is down.
+          </span>
+          <span className="ml-auto">{brand?.clinic_phone}{brand?.clinic_phone ? " · " : ""}Runs on {PRODUCT.name}</span>
+        </footer>
       </section>
-
-      {/* Footer */}
-      <footer style={{ background: "#fff", borderTop: `1px solid ${C.mist}` }}>
-        <div className="max-w-[1200px] mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style={{ color: C.slate }}>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: C.teal }}>
-              <Heartbeat size={13} color="#fff" weight="duotone" />
-            </div>
-            <span className="font-medium" style={{ color: C.navy }}>MediLink Health Systems</span>
-          </div>
-          <div>© {new Date().getFullYear()} MediLink · All rights reserved to <a href="https://harnova.my" style={{ color: C.teal }}>harnova.my</a></div>
-        </div>
-      </footer>
     </div>
   );
 }

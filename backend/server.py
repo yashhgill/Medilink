@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from databases import Database
 from sqlalchemy import (
     MetaData, Table, Column, String, Float, Integer, Boolean,
-    Text, JSON, create_engine, text,
+    Text, JSON, create_engine, text, func,
 )
 from dotenv import load_dotenv
 from pathlib import Path
@@ -26,18 +26,256 @@ import bcrypt, jwt
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
+# ── Cloud connection saved by Settings → Cloud (cloud.json in the data folder) ─
+# Read before anything else, because it decides the deployment mode, the
+# facility and the cloud URL. Environment variables still win, so a clinic run
+# by a script or a service file is configured exactly as before.
+def _load_cloud_file():
+    d = os.environ.get("MEDILINK_DATA_DIR") or os.path.join(os.path.expanduser("~"), ".medilink")
+    path = os.path.join(d, "cloud.json")
+    if os.environ.get("CLOUD_DATABASE_URL") or not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            c = json.load(f)
+        os.environ["CLOUD_DATABASE_URL"] = c["url"]
+        os.environ["CLOUD_SCHEMA"] = c.get("schema", "medilink")
+        os.environ["FACILITY_ID"] = c["facility"]
+        os.environ["DEPLOYMENT_MODE"] = "networked"
+        os.environ["CLOUD_MANAGED_SCHEMA"] = "true"   # tables come from the migrations, not from clinics
+        return c
+    except Exception as e:
+        logging.getLogger("medilink").warning("cloud.json unreadable, staying offline: %s", e)
+        return None
+CLOUD_FILE = _load_cloud_file()
+CLOUD_MANAGED_SCHEMA = os.environ.get("CLOUD_MANAGED_SCHEMA", "false").lower() == "true"
+
 # ── Config ────────────────────────────────────────────────────────────────────
-DATABASE_URL    = os.environ["DATABASE_URL"]
-JWT_SECRET      = os.environ["JWT_SECRET"]
+CLOUD_DB_URL    = os.environ.get("CLOUD_DATABASE_URL", "")   # Supabase Postgres
+# The cloud node keeps MediLink's tables in their own schema, so the mirror is
+# separated from anything else sharing that Postgres project.
+CLOUD_SCHEMA    = os.environ.get("CLOUD_SCHEMA", "medilink")
+IS_CLOUD        = os.environ.get("IS_CLOUD_NODE", "false").lower() == "true"
+
+# Deployment mode is computed FIRST because it decides the default database:
+# a bundled STANDALONE install ships with no DATABASE_URL and falls back to a
+# zero-config local SQLite file (this is what makes the one-click installer work).
+def _derive_deployment_mode_early() -> str:
+    m = os.environ.get("DEPLOYMENT_MODE", "").strip().lower()
+    if m in ("standalone", "networked"):
+        return m
+    if IS_CLOUD or CLOUD_DB_URL:
+        return "networked"
+    return "standalone"
+_MODE_EARLY = _derive_deployment_mode_early()
+
+# Data directory for the standalone SQLite DB + uploads (bundled-app friendly).
+DATA_DIR = os.environ.get("MEDILINK_DATA_DIR") or os.path.join(
+    os.path.expanduser("~"), ".medilink")
+
+def _default_database_url() -> str:
+    """Where THIS node keeps its own data.
+
+    Only the CLOUD node genuinely requires Postgres. Both desktop editions are
+    still a clinic PC and both default to a local SQLite file, because the
+    difference between Core and Connect is whether that clinic also syncs
+    outward, not what it stores locally.
+
+    Getting this wrong shipped a Connect installer that raised at import and
+    died before the window ever appeared."""
+    url = os.environ.get("DATABASE_URL")
+    if url:
+        return url
+    if IS_CLOUD:
+        raise RuntimeError(
+            "DATABASE_URL is required on a cloud node. Point it at your Postgres "
+            "(Neon) instance."
+        )
+    os.makedirs(DATA_DIR, exist_ok=True)
+    return f"sqlite:///{os.path.join(DATA_DIR, 'medilink.db')}"
+
+DATABASE_URL    = _default_database_url()
+IS_SQLITE       = DATABASE_URL.startswith("sqlite")
+
+# If a SQLite path was supplied explicitly (demo runner, tests, a custom data
+# location), its folder may not exist yet. Create it here rather than letting
+# SQLite fail with the famously unhelpful "unable to open database file".
+if IS_SQLITE:
+    _db_path = DATABASE_URL.split("sqlite:///", 1)[-1]
+    if _db_path and _db_path != ":memory:":
+        try:
+            os.makedirs(os.path.dirname(os.path.abspath(_db_path)), exist_ok=True)
+        except Exception as _e:                      # read-only location, etc.
+            logging.getLogger(__name__).warning(
+                "could not create the database folder (%s)", _e)
+def _resolve_jwt_secret() -> str:
+    """The key that signs staff login tokens.
+
+    Both desktop editions are a clinic PC with no operator to set environment
+    variables, so each install generates its own random secret on first run and
+    keeps it. Persisting matters: a secret regenerated on every launch would log
+    every member of staff out each time the app restarts.
+
+    Only a CLOUD node insists on being told, because that is infrastructure we
+    run and configure deliberately.
+
+    Requiring it from the environment on a networked *desktop* build is what
+    made MediLink Connect die at launch with KeyError: 'JWT_SECRET'.
+    """
+    env = os.environ.get("JWT_SECRET")
+    if env:
+        return env
+
+    if IS_CLOUD:
+        raise RuntimeError(
+            "JWT_SECRET is required on a cloud node. Set it to a long random "
+            "string, and keep it stable: changing it signs out every user."
+        )
+
+    key_path = os.path.join(DATA_DIR, "secret.key")
+    try:
+        with open(key_path, "r", encoding="utf-8") as f:
+            existing = f.read().strip()
+            if len(existing) >= 32:
+                return existing
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        logging.getLogger(__name__).warning("could not read secret.key (%s)", e)
+
+    new_secret = secrets.token_urlsafe(48)
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(key_path, "w", encoding="utf-8") as f:
+            f.write(new_secret)
+        os.chmod(key_path, 0o600)          # readable only by this user
+        logging.getLogger(__name__).info("generated a new signing key for this install")
+    except Exception as e:
+        # Worst case we run with an in-memory secret: everyone is signed out on
+        # restart, which is annoying but still lets the clinic work today.
+        logging.getLogger(__name__).warning(
+            "could not persist secret.key (%s); staff will be signed out on restart", e)
+    return new_secret
+
+JWT_SECRET      = _resolve_jwt_secret()
 GROQ_API_KEY    = os.environ.get("GROQ_API_KEY", "")
-CLOUD_DB_URL    = os.environ.get("CLOUD_DATABASE_URL", "")   # Supabase/AWS RDS
 JWT_ALG         = "HS256"
 JWT_EXP_HOURS   = 24 * 7
-CLINIC_NAME     = os.environ.get("CLINIC_NAME", "MediLink Clinic")
-CLINIC_ADDR     = os.environ.get("CLINIC_ADDRESS", "")
-CLINIC_PHONE    = os.environ.get("CLINIC_PHONE", "")
+# Standalone remembers clinic details in a local config file written by the
+# first-run setup wizard (so a bundled install needs no .env). Env still wins.
+def _clinic_cfg(key, default=""):
+    v = os.environ.get(key)
+    if v:
+        return v
+    try:
+        import json as _json
+        with open(os.path.join(DATA_DIR, "clinic.json")) as f:
+            return _json.load(f).get(key, default)
+    except Exception:
+        return default
+
+CLINIC_NAME     = _clinic_cfg("CLINIC_NAME", "MediLink Clinic")
+CLINIC_ADDR     = _clinic_cfg("CLINIC_ADDRESS", "")
+CLINIC_PHONE    = _clinic_cfg("CLINIC_PHONE", "")
 FACILITY_ID     = os.environ.get("FACILITY_ID", "main")
-IS_CLOUD        = os.environ.get("IS_CLOUD_NODE", "false").lower() == "true"
+
+# ── Clinic branding (white-label) ────────────────────────────────────────────
+# Each clinic can upload their OWN logo, their OWN bank-issued DuitNow QR, and
+# letterhead/footer text. These appear on receipts, medicine labels, MC letters,
+# reports and the kiosk — so the clinic's patients see THEIR brand, not ours.
+BRAND_DIR = os.path.join(DATA_DIR, "branding")
+
+def _brand_path(name: str) -> str:
+    return os.path.join(BRAND_DIR, name)
+
+def brand_cfg() -> dict:
+    """Read branding settings fresh each call so edits apply without a restart."""
+    defaults = {
+        "clinic_name": CLINIC_NAME, "clinic_address": CLINIC_ADDR,
+        "clinic_phone": CLINIC_PHONE, "registration_no": "", "email": "",
+        "letterhead_line1": "", "letterhead_line2": "", "footer_note": "",
+        "has_logo": os.path.isfile(_brand_path("logo.png")),
+        "has_duitnow_qr": os.path.isfile(_brand_path("duitnow.png")),
+        "has_letterhead": os.path.isfile(_brand_path("letterhead.png")),
+        "payment_note": "",
+        # Clinic customisation (Settings → Clinic): look, money and front-door text.
+        "brand_colour": "#0A6E62", "consultation_fee": 50.0,
+        "opening_hours": "", "welcome_message": "",
+    }
+    try:
+        import json as _json
+        with open(os.path.join(DATA_DIR, "branding.json")) as f:
+            defaults.update({k: v for k, v in _json.load(f).items() if v is not None})
+    except Exception:
+        pass
+    # recompute file flags (json may be stale)
+    defaults["has_logo"] = os.path.isfile(_brand_path("logo.png"))
+    defaults["has_duitnow_qr"] = os.path.isfile(_brand_path("duitnow.png"))
+    defaults["has_letterhead"] = os.path.isfile(_brand_path("letterhead.png"))
+    return defaults
+
+def default_fee() -> float:
+    try:
+        return float(brand_cfg().get("consultation_fee") or 50.0)
+    except (TypeError, ValueError):
+        return 50.0
+
+def _brand_b64(name: str) -> str:
+    """Return a data-URI for a branding image, or '' if the clinic hasn't set one."""
+    p = _brand_path(name)
+    if not os.path.isfile(p):
+        return ""
+    try:
+        with open(p, "rb") as f:
+            return "data:image/png;base64," + base64.b64encode(f.read()).decode()
+    except Exception:
+        return ""
+
+# ── Deployment tier (MediLink SaaS) ───────────────────────────────────────
+# STANDALONE  = runs entirely on the clinic's own machine (SQLite, offline). No
+#               cloud sync, no cross-clinic records, no public patient portal.
+# NETWORKED   = local + cloud: cross-clinic shared records, patient portal, and
+#               multi-branch monitoring. (Computed early — see _MODE_EARLY above.)
+DEPLOYMENT_MODE = _MODE_EARLY
+IS_NETWORKED    = DEPLOYMENT_MODE == "networked"
+IS_STANDALONE   = DEPLOYMENT_MODE == "standalone"
+
+# ── Licensing ────────────────────────────────────────────────────────────────
+# The licence decides the *entitlement tier* (core | connect). The build mode
+# decides what the binary is even capable of. The effective tier is the
+# intersection, so a Connect code can never light up cloud features inside a
+# Core binary, and a Core code can never use the cloud in a Connect binary.
+#
+# Cloud nodes are infrastructure we run ourselves, so they are never licensed.
+APP_VERSION = "1.0.0"
+
+def effective_tier() -> str:
+    """MediLink has no commercial tiers. The deployment mode alone decides
+    whether cross-clinic sync is available, which keeps the FYP scope honest:
+    one system, two run modes, no licensing."""
+    return "connect" if (IS_CLOUD or IS_NETWORKED) else "core"
+
+def tier_allows(feature: str) -> bool:
+    return feature in TIER_FEATURES.get(effective_tier(), set())
+
+# What each tier unlocks. Kept as data so there is exactly one place to look.
+TIER_FEATURES = {
+    "core": {
+        "kiosk", "triage", "doctor_console", "labs", "prescriptions",
+        "pharmacy", "inventory", "billing", "receipts", "mc_letters",
+        "branding", "staff_accounts", "local_reports", "attachments",
+    },
+    "connect": {
+        # everything in core...
+        "kiosk", "triage", "doctor_console", "labs", "prescriptions",
+        "pharmacy", "inventory", "billing", "receipts", "mc_letters",
+        "branding", "staff_accounts", "local_reports", "attachments",
+        # ...plus the networked features
+        "cloud_sync", "cross_clinic_records", "consent", "break_glass",
+        "patient_app", "cloud_storage", "result_notifications",
+        "multi_branch_monitoring",
+    },
+}
 KIOSK_TOKEN     = os.environ.get("KIOSK_TOKEN", "")          # shared secret for kiosk devices
 ALLOW_SEED      = os.environ.get("ALLOW_SEED", "false").lower() == "true"
 STAFF_JWT_EXP_HOURS = int(os.environ.get("STAFF_JWT_EXP_HOURS", "12"))
@@ -48,9 +286,15 @@ RDS_INSTANCE_ID = os.environ.get("RDS_INSTANCE_ID", "medilink-cloud")
 EC2_INSTANCE_ID = os.environ.get("EC2_INSTANCE_ID", "")
 CLOUD_NODE_URL  = os.environ.get("CLOUD_NODE_URL", "")   # e.g. http://44.209.64.89:8000 (clinics proxy CloudWatch to here)
 _cw_client = None
+CLOUDWATCH_ENABLED = bool(EC2_INSTANCE_ID or os.environ.get("CLOUDWATCH_ENABLED", "").lower() == "true")
 def cloudwatch():
-    """Lazy boto3 CloudWatch client (uses instance role on EC2). None if unavailable."""
+    """Lazy boto3 CloudWatch client. Only used when AWS is actually configured
+    (EC2_INSTANCE_ID or CLOUDWATCH_ENABLED=true). The cloud node moved to
+    Supabase, so on a normal install this returns None immediately instead of
+    letting boto3 spend a minute timing out against AWS."""
     global _cw_client
+    if not CLOUDWATCH_ENABLED:
+        return None
     if _cw_client is None:
         try:
             import boto3
@@ -59,23 +303,59 @@ def cloudwatch():
             log.warning(f"CloudWatch disabled: {e}")
             return None
     return _cw_client
+# ── Object storage (Cloudflare R2, or any S3-compatible bucket) ──────────────
+# R2 speaks the S3 API, so the same boto3 client drives both. R2 is the default
+# target because medical imaging is egress-heavy: a patient opening an X-ray on
+# their phone costs roughly $0.09/GB on S3 and $0.00 on R2. Over a network of
+# clinics that difference is the whole storage bill.
+#
+# Set S3_ENDPOINT_URL to the R2 endpoint to switch:
+#   https://<account_id>.r2.cloudflarestorage.com
+# Leave it unset and this behaves exactly as before against AWS S3.
+S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL", "")
+S3_ACCESS_KEY   = os.environ.get("S3_ACCESS_KEY_ID") or os.environ.get("AWS_ACCESS_KEY_ID", "")
+S3_SECRET_KEY   = os.environ.get("S3_SECRET_ACCESS_KEY") or os.environ.get("AWS_SECRET_ACCESS_KEY", "")
+
 _s3_client = None
 def s3():
-    """Lazy boto3 S3 client. Uses the instance role (LabRole) on EC2, or env keys.
-    Returns None if boto3/bucket unavailable so uploads fall back to local disk."""
+    """Lazy boto3 client for S3 or R2.
+
+    Returns None when no bucket is configured or boto3 is unavailable, so
+    uploads quietly fall back to local disk rather than failing an upload the
+    doctor is waiting on."""
     global _s3_client
     if not S3_BUCKET:
         return None
     if _s3_client is None:
         try:
             import boto3
-            _s3_client = boto3.client("s3", region_name=AWS_REGION)
+            from botocore.config import Config
+            kwargs = {"region_name": AWS_REGION if not S3_ENDPOINT_URL else "auto"}
+            if S3_ENDPOINT_URL:
+                # R2 requires SigV4 and path-style addressing.
+                kwargs["endpoint_url"] = S3_ENDPOINT_URL
+                kwargs["config"] = Config(signature_version="s3v4",
+                                          s3={"addressing_style": "path"})
+            if S3_ACCESS_KEY and S3_SECRET_KEY:
+                kwargs["aws_access_key_id"] = S3_ACCESS_KEY
+                kwargs["aws_secret_access_key"] = S3_SECRET_KEY
+            # else: fall back to the instance role (how the AWS node works today)
+            _s3_client = boto3.client("s3", **kwargs)
+            log.info("Object storage: %s (%s)", S3_BUCKET,
+                     "R2" if S3_ENDPOINT_URL else "AWS S3")
         except Exception as e:
-            log.warning(f"S3 disabled: {e}")
+            log.warning(f"Object storage disabled: {e}")
             return None
     return _s3_client
-PUBLIC_APP_URL  = os.environ.get("PUBLIC_APP_URL", "https://medilink.harnova.my")
+# Where patients go. This URL is printed on kiosk chits and encoded into the QR
+# on receipts, so it has to be the patient app, not the old MediLink hostname.
+PUBLIC_APP_URL  = os.environ.get("PUBLIC_APP_URL", "https://app.medilink.local")
 SYNC_INTERVAL   = int(os.environ.get("SYNC_INTERVAL_SECONDS", "30"))
+# Payments. There is no payment gateway behind the kiosk or the patient app, so
+# a patient pressing "I've paid" proves nothing: money is only confirmed by
+# staff who can see it arrive (cash in hand, DuitNow in the clinic's account).
+# SELF_CONFIRM_PAYMENTS=true restores instant self-confirmation for demos only.
+SELF_CONFIRM_PAYMENTS = os.environ.get("SELF_CONFIRM_PAYMENTS", "false").lower() == "true"
 IC_ENCRYPTION_KEY = os.environ.get("IC_ENCRYPTION_KEY", "")
 try:
     from cryptography.fernet import Fernet as _Fernet
@@ -119,8 +399,173 @@ log = logging.getLogger("medilink")
 database = Database(DATABASE_URL)
 metadata = MetaData()
 
-# Cloud DB for sync (only on local node)
-cloud_db: Optional[Database] = Database(CLOUD_DB_URL) if CLOUD_DB_URL and not IS_CLOUD else None
+# Cloud DB for sync — only on a NETWORKED local node. In STANDALONE mode this is
+# always None, so a standalone clinic can never sync out even if a stray
+# CLOUD_DATABASE_URL is present in its environment (privacy guarantee).
+# The cloud node enforces per-clinic isolation with Postgres Row-Level Security
+# (see migrations/001_rls_multitenancy.sql). Every policy keys off the session
+# variable app.facility_id, so we pin it at connection time: this node only ever
+# acts as its own clinic, and a connection that forgot to set it sees nothing.
+#
+# Failing closed is the point. If this setting were ever dropped, the clinic
+# would see zero rows and notice immediately, rather than quietly seeing another
+# clinic's patients.
+def _cloud_conn_options() -> dict:
+    if not CLOUD_DB_URL.startswith("postgres"):
+        return {}
+    # Transaction Pooler (port 6543) does not support server_settings — it
+    # drops persistent session state between transactions. We set search_path
+    # via the URL options parameter instead, which is forwarded per-query.
+    # app.facility_id is omitted here; RLS is enforced at the Supabase level.
+    return {}
+
+# ── Guarded cloud connection ────────────────────────────────────────────────
+# The cloud is optional to clinical work, so no request may ever wait long on
+# it. Every cloud call goes through this guard, which adds:
+#   • a hard timeout (a link that silently drops packets otherwise hangs a
+#     request until TCP gives up, minutes later),
+#   • a circuit breaker: after a connection failure, calls fail instantly for
+#     a short cool-down instead of each paying the timeout again,
+#   • lazy reconnection, so a clinic that boots while offline starts syncing
+#     as soon as the link returns, without a restart.
+# Errors that mean "the network is down" are raised as CloudUnavailable, which
+# the sync engine treats differently from a row the cloud rejected.
+CLOUD_TIMEOUT_S = float(os.environ.get("CLOUD_TIMEOUT_SECONDS", "5"))
+CLOUD_PROBE_S = float(os.environ.get("CLOUD_PROBE_SECONDS", "5"))
+# Pin app.facility_id on every cloud transaction so the cloud node's row-level
+# security (migration 002) isolates clinics. On by default for PostgreSQL.
+CLOUD_PIN_FACILITY = os.environ.get("CLOUD_PIN_FACILITY", "true").lower() == "true" and CLOUD_DB_URL.startswith("postgres")
+# The cloud schema built by migration 002 is "medilink". Set CLOUD_SCHEMA=medilink
+# for such a node; left unset, the connection's default search path is used.
+CLOUD_SEARCH_PATH = os.environ.get("CLOUD_SCHEMA_PATH") or (os.environ.get("CLOUD_SCHEMA") if "CLOUD_SCHEMA" in os.environ else "")
+
+class CloudUnavailable(ConnectionError):
+    pass
+
+def _is_connectivity_error(e: BaseException) -> bool:
+    if isinstance(e, (CloudUnavailable, ConnectionError, OSError, asyncio.TimeoutError, TimeoutError)):
+        return True
+    name = type(e).__name__
+    if name in ("ConnectionDoesNotExistError", "InterfaceError", "InternalClientError",
+                "CannotConnectNowError", "ConnectionFailureError", "TooManyConnectionsError"):
+        return True
+    msg = str(e).lower()
+    return any(k in msg for k in ("connection", "connect", "timed out", "timeout", "errno",
+                                  "server closed", "network", "not connected"))
+
+class GuardedCloud:
+    def __init__(self, db: Database):
+        self._db = db
+        self.online: Optional[bool] = None       # None = never tried
+        self.open_until = 0.0                    # breaker open until this time
+        self.state_since = time.time()
+        self.last_error: Optional[str] = None
+        self._connect_lock = asyncio.Lock()
+
+    def __getattr__(self, name):                  # url, is_connected, transaction, ...
+        return getattr(self._db, name)
+
+    def _mark(self, online: bool, err: Optional[str] = None):
+        if self.online != online:
+            self.state_since = time.time()
+            log.info("Cloud link %s%s", "UP" if online else "DOWN", f" ({err})" if err else "")
+        self.online = online
+        self.last_error = err
+        self.open_until = 0.0 if online else time.time() + CLOUD_PROBE_S
+
+    def _breaker_open(self) -> bool:
+        return bool(self.open_until) and time.time() < self.open_until
+
+    async def connect(self):
+        if self._breaker_open():
+            raise CloudUnavailable(f"cloud link down ({self.last_error or 'unreachable'})")
+        async with self._connect_lock:
+            # Callers queue here while one of them reconnects. If that attempt
+            # failed, the breaker is now open: give up at once rather than each
+            # waiting out its own timeout in turn.
+            if self._breaker_open():
+                raise CloudUnavailable(f"cloud link down ({self.last_error or 'unreachable'})")
+            if not self._db.is_connected:
+                await asyncio.wait_for(self._db.connect(), CLOUD_TIMEOUT_S)
+
+    async def _reset_pool(self):
+        try:
+            await asyncio.wait_for(self._db.disconnect(), 2)
+        except Exception:
+            pass
+
+    async def disconnect(self):
+        if self._db.is_connected:
+            try:
+                await asyncio.wait_for(self._db.disconnect(), CLOUD_TIMEOUT_S)
+            except Exception:
+                pass
+
+    async def _call(self, method: str, *a, _timeout: Optional[float] = None, **kw):
+        if self._breaker_open():
+            raise CloudUnavailable(f"cloud link down ({self.last_error or 'unreachable'})")
+        try:
+            if not self._db.is_connected:
+                await self.connect()
+            out = await asyncio.wait_for(self._scoped(method, *a, **kw), _timeout or CLOUD_TIMEOUT_S)
+        except Exception as e:
+            if _is_connectivity_error(e):
+                self._mark(False, f"{type(e).__name__}: {str(e)[:120]}")
+                # A half-dead pool can poison later calls: rebuild it, but in the
+                # background, never on the request that found the fault.
+                asyncio.create_task(self._reset_pool())
+                raise CloudUnavailable(str(e)[:200]) from e
+            raise
+        if not self.online:
+            self._mark(True)
+        return out
+
+    async def _scoped(self, method, *a, **kw):
+        """Run one statement in its own transaction with this clinic's identity
+        pinned, so the cloud's row-level security applies to it. SET LOCAL
+        semantics (set_config(..., true)) survive a transaction-mode pooler,
+        where a session-level SET would leak to or from other clients."""
+        if not CLOUD_PIN_FACILITY:
+            return await getattr(self._db, method)(*a, **kw)
+        async with self._db.connection() as conn:
+            async with conn.transaction():
+                await conn.execute("SELECT set_config('app.facility_id', :f, true)", {"f": FACILITY_ID})
+                if CLOUD_SEARCH_PATH:
+                    # Connection-string options are not applied by every driver
+                    # or pooler, so the schema is set per transaction as well.
+                    await conn.execute("SELECT set_config('search_path', :sp, true)", {"sp": CLOUD_SEARCH_PATH})
+                return await getattr(conn, method)(*a, **kw)
+
+    async def fetch_one(self, *a, **kw): return await self._call("fetch_one", *a, **kw)
+    async def fetch_all(self, *a, **kw): return await self._call("fetch_all", *a, **kw)
+    async def fetch_val(self, *a, **kw): return await self._call("fetch_val", *a, **kw)
+    async def execute(self, *a, **kw):   return await self._call("execute", *a, **kw)
+
+    async def probe(self) -> bool:
+        """Cheap reachability check that ignores the breaker."""
+        self.open_until = 0.0
+        try:
+            await self._call("fetch_val", "SELECT 1")
+            return True
+        except Exception:
+            return False
+
+cloud_db: Optional[GuardedCloud] = (
+    GuardedCloud(Database(CLOUD_DB_URL, **_cloud_conn_options()))
+    if (CLOUD_DB_URL and not IS_CLOUD and IS_NETWORKED) else None
+)
+
+def sync_enabled() -> bool:
+    """Whether this node may push anything to the cloud, right now.
+
+    Two independent gates, both of which must pass:
+      • the BUILD must be networked (cloud_db is None otherwise, so a Core
+        binary physically cannot reach a cloud), and
+      • the LICENCE must currently entitle this clinic to Connect.
+
+    Checked per-call rather than once at boot so that activating (or losing) a
+    Connect licence takes effect without restarting the clinic's machine."""
+    return cloud_db is not None and tier_allows("cloud_sync")
 
 # ── Tables ────────────────────────────────────────────────────────────────────
 users_t = Table("users", metadata,
@@ -375,6 +820,33 @@ api = APIRouter(prefix="/api")
 def uid() -> str: return str(uuid.uuid4())
 def now_iso() -> str: return datetime.now(timezone.utc).isoformat()
 
+# ── Clinic-local "today" ─────────────────────────────────────────────────────
+# Timestamps are stored in UTC, but a clinic's day runs on local time. Using the
+# UTC date meant that between 00:00 and 08:00 in Malaysia every "today" screen
+# (reception queue, kiosk lookup, daily cash report, queue numbering) looked at
+# yesterday. All day boundaries go through these helpers instead.
+from zoneinfo import ZoneInfo as _ZoneInfo
+CLINIC_TZ = _ZoneInfo(os.environ.get("CLINIC_TZ", "Asia/Kuala_Lumpur"))
+
+def clinic_today() -> str:
+    return datetime.now(CLINIC_TZ).strftime("%Y-%m-%d")
+
+def today_bounds():
+    """(start, end) of the clinic's current local day, as UTC ISO strings that
+    compare correctly against stored now_iso() values."""
+    start_local = datetime.now(CLINIC_TZ).replace(hour=0, minute=0, second=0, microsecond=0)
+    start = start_local.astimezone(timezone.utc)
+    return start.isoformat(), (start + timedelta(days=1)).isoformat()
+
+def is_today(col):
+    s, e = today_bounds()
+    return (col >= s) & (col < e)
+
+def iso_is_today(v) -> bool:
+    if not v: return False
+    s, e = today_bounds()
+    return s <= v < e
+
 def hash_pw(pw: str) -> str:
     return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
 
@@ -547,6 +1019,10 @@ _SYNC_TABLES = {
     "payments": payments_t, "pharmacy_inventory": inventory_t, "dispense_records": dispense_t,
     "attachments": attachments_t, "vaccinations": vaccinations_t, "facilities": facilities_t,
     "lab_orders": lab_orders_t, "stock_movements": stock_movements_t,
+    # Consents must reach the cloud in full: the cloud's records_with_consent()
+    # releases another clinic's records only against a granted consent row there.
+    # (Missing here, consents were queued as empty rows and never replicated.)
+    "record_consents": record_consents_t,
 }
 
 async def enqueue_sync(table: str, record_id: str, operation: str, payload: dict):
@@ -568,7 +1044,7 @@ async def enqueue_sync(table: str, record_id: str, operation: str, payload: dict
         # Live sync: kick an immediate push in the background so a walk-in shows
         # up at other clinics in ~1-2s. Fire-and-forget — never blocks the write.
         # If it fails (offline), the 30s loop remains the safety net.
-        if cloud_db and not IS_CLOUD:
+        if sync_enabled() and not IS_CLOUD:
             try:
                 asyncio.create_task(run_sync_job())
             except RuntimeError:
@@ -601,28 +1077,52 @@ ws_mgr = WSManager()
 def broadcast(event: dict): asyncio.create_task(ws_mgr.broadcast(event))
 
 # ── Queue counter ─────────────────────────────────────────────────────────────
+_next_q_lock = asyncio.Lock()
+
 async def next_q() -> int:
-    key = f"queue-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}"
-    row = await database.fetch_one(counters_t.select().where(counters_t.c.key == key))
-    if row:
-        n = row["value"] + 1
-        await database.execute(counters_t.update().where(counters_t.c.key == key).values(value=n))
-        return n
-    await database.execute(counters_t.insert().values(key=key, value=1))
-    return 1
+    """Next queue number for the clinic's day. Atomic: the old read-then-write
+    let two simultaneous check-ins get the same number, and the first two of a
+    new day collided on the counter's unique key (HTTP 500 at the kiosk)."""
+    key = f"queue-{clinic_today()}"
+    async with _next_q_lock:                      # one process: serialise
+        return int(await database.fetch_val(       # many writers: atomic in SQL
+            "INSERT INTO counters (key, value) VALUES (:k, 1) "
+            "ON CONFLICT (key) DO UPDATE SET value = counters.value + 1 RETURNING value",
+            {"k": key}))
 
 # ── DuitNow QR ────────────────────────────────────────────────────────────────
 _APP_QR_CACHE = {}
 def _app_qr() -> str:
-    """QR of the public patient-app URL, rendered once and cached."""
+    """QR of the public patient-app URL, rendered once and cached.
+    Fail-safe: the patient-app QR is a nice-to-have on the chit. If the qrcode
+    library is unavailable (e.g. not bundled in a standalone build), return an
+    empty string instead of raising — a missing QR must never block check-in."""
     if "qr" not in _APP_QR_CACHE:
-        import qrcode
-        buf = io.BytesIO()
-        qrcode.make(PUBLIC_APP_URL).save(buf, format="PNG")
-        _APP_QR_CACHE["qr"] = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+        try:
+            import qrcode
+            buf = io.BytesIO()
+            qrcode.make(PUBLIC_APP_URL).save(buf, format="PNG")
+            _APP_QR_CACHE["qr"] = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+        except Exception as e:
+            log.warning(f"App QR unavailable ({e}) — chit will print without it")
+            _APP_QR_CACHE["qr"] = ""
     return _APP_QR_CACHE["qr"]
 
 def make_duitnow_qr(amount: float, ref: str) -> str:
+    """Return the QR the patient scans to pay.
+
+    IMPORTANT: a real DuitNow QR is issued by the clinic's BANK — it encodes their
+    merchant details so money reaches THEIR account. If the clinic has uploaded
+    their own DuitNow QR (Settings → Branding), we serve that. Otherwise we fall
+    back to a placeholder QR which is NOT a payable code (dev/demo only).
+    """
+    own = _brand_path("duitnow.png")
+    if os.path.isfile(own):
+        try:
+            with open(own, "rb") as f:
+                return base64.b64encode(f.read()).decode()
+        except Exception as e:
+            log.warning(f"clinic DuitNow QR unreadable: {e}")
     try:
         import qrcode
         qr = qrcode.QRCode(version=2, box_size=6, border=2)
@@ -631,7 +1131,8 @@ def make_duitnow_qr(amount: float, ref: str) -> str:
         img = qr.make_image(fill_color="black", back_color="white")
         buf = io.BytesIO(); img.save(buf, format="PNG")
         return base64.b64encode(buf.getvalue()).decode()
-    except: return ""
+    except Exception:
+        return ""
 
 # ── Groq AI ───────────────────────────────────────────────────────────────────
 AI_SAFETY_RULES = """
@@ -653,7 +1154,7 @@ async def groq(system: str, messages: list, max_tokens: int = 600,
         from groq import AsyncGroq
         client = AsyncGroq(api_key=GROQ_API_KEY, timeout=15.0, max_retries=1)
         kwargs = dict(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "system", "content": system}, *messages],
             max_tokens=max_tokens,
             temperature=temperature,
@@ -674,7 +1175,7 @@ async def groq_stream(system: str, messages: list):
         from groq import AsyncGroq
         client = AsyncGroq(api_key=GROQ_API_KEY, timeout=20.0, max_retries=1)
         stream = await client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             messages=[{"role": "system", "content": system}, *messages],
             max_tokens=512, temperature=0.4, stream=True,
         )
@@ -709,7 +1210,7 @@ class AppointmentIn(BaseModel):
     doctor_id: str
     scheduled_at: str
     reason: str
-    fee: float = 50.0
+    fee: Optional[float] = None          # None: the clinic's standard consultation fee
 
 class AppointmentUpdate(BaseModel):
     status: Optional[Literal[
@@ -732,7 +1233,7 @@ class KioskCheckinIn(BaseModel):
     ic_number: str
     doctor_id: Optional[str] = None
     reason: Optional[str] = "Walk-in consultation"
-    fee: float = 50.0
+    fee: Optional[float] = None
     symptoms: Optional[str] = None      # "how are you feeling" free text
     pain_score: Optional[int] = None    # 0-10
 
@@ -839,12 +1340,58 @@ DEFAULT_AVAIL = {
 
 # ── Patient helpers ───────────────────────────────────────────────────────────
 async def patient_by_ic(ic: str):
+    """Look up a patient by IC number.
+    1. Always checks local SQLite first (offline-first guarantee).
+    2. If not found locally AND cloud is available, checks Supabase and
+       pulls the patient's user record into local DB so the kiosk / portal
+       can work with them without requiring re-registration at every clinic.
+    """
     parsed = parse_ic(ic)
     search_ic = parsed["formatted"] if parsed["valid"] else ic.strip()
-    return await database.fetch_one(
+    ic_h = ic_index(search_ic)
+    local = await database.fetch_one(
         users_t.select().where(
-            (users_t.c.ic_hash == ic_index(search_ic)) | (users_t.c.ic_number == search_ic))
+            (users_t.c.ic_hash == ic_h) | (users_t.c.ic_number == search_ic))
     )
+    if local:
+        return local
+    # Cloud fallback: patient registered at another clinic — pull them locally
+    if cloud_db and not IS_CLOUD and tier_allows("cross_clinic_records"):
+        try:
+            cloud_row = await cloud_db.fetch_one(
+                users_t.select().where(users_t.c.ic_hash == ic_h), _timeout=1.5
+            )
+            if cloud_row:
+                cr = dict(cloud_row)
+                now = now_iso()
+                # Build the row dict — override sync fields so we never
+                # re-push a patient that's already on the cloud.
+                row = {k: v for k, v in cr.items()}
+                row["sync_status"] = "cloud"
+                row["synced_at"] = now
+                # Insert a local shadow record so every subsequent query is fast
+                # and works offline.  Keep the original id so cross-clinic
+                # record joins work correctly.
+                # Use INSERT OR IGNORE (SQLite) so a second kiosk lookup or a
+                # concurrent request doesn't blow up with a unique-key violation.
+                try:
+                    await database.execute(
+                        "INSERT OR IGNORE INTO users (" +
+                        ", ".join(row.keys()) +
+                        ") VALUES (" +
+                        ", ".join(f":{k}" for k in row.keys()) +
+                        ")",
+                        row,
+                    )
+                except Exception:
+                    pass  # already exists locally — that's fine
+                log.info(f"Pulled cloud patient {cr.get('id')} ({search_ic}) into local DB")
+                return await database.fetch_one(
+                    users_t.select().where(users_t.c.id == cr["id"])
+                )
+        except Exception as e:
+            log.warning(f"Cloud patient lookup failed (offline?): {e}")
+    return None
 
 async def enrich_appointments(rows) -> list:
     result = []
@@ -865,7 +1412,7 @@ async def enrich_appointments(rows) -> list:
 @api.get("/")
 async def root():
     return {"service": "MediLink EHR", "version": "3.0.0",
-            "facility": FACILITY_ID, "node": "cloud" if IS_CLOUD else "local", "status": "ok"}
+            "facility": FACILITY_ID, "node": "cloud" if IS_CLOUD else "local", "status": "ok", "deployment_mode": DEPLOYMENT_MODE}
 
 @api.get("/ic/parse/{ic_number}")
 async def ic_parse(ic_number: str):
@@ -877,7 +1424,177 @@ async def health():
         await database.fetch_val(text("SELECT 1"))
         db_ok = True
     except: db_ok = False
-    return {"ok": db_ok, "ts": now_iso(), "node": "cloud" if IS_CLOUD else "local"}
+    return {"ok": db_ok, "ts": now_iso(), "node": "cloud" if IS_CLOUD else "local",
+            "deployment_mode": DEPLOYMENT_MODE,
+            "tier": effective_tier(),
+            "features": sorted(TIER_FEATURES.get(effective_tier(), set())),
+            "sync_enabled": sync_enabled()}
+
+# ── First-run setup (one-click installer wizard) ─────────────────────────────
+# On a fresh bundled install there are no users and no .env. The setup wizard
+# calls these to create the clinic + first admin through the browser. Guarded:
+# /setup only works while the users table is EMPTY, so it can never hijack a
+# clinic that's already running.
+@api.get("/setup/status")
+async def setup_status():
+    try:
+        # needs_setup is true when no admin/super_admin exists yet (demo staff
+        # seeded before first-run wizard don't count as "configured").
+        n = await database.fetch_val(
+            text("SELECT COUNT(*) FROM users WHERE role IN ('admin','super_admin','clinic_admin')")
+        ) or 0
+    except Exception:
+        n = 0
+    return {"needs_setup": n == 0, "deployment_mode": DEPLOYMENT_MODE,
+            "clinic_name": CLINIC_NAME, "version": APP_VERSION,
+            "effective_tier": effective_tier()}
+
+def require_feature(feature: str):
+    """Enforce a mode feature server-side. UI hiding is a courtesy; this is the
+    actual boundary."""
+    def dep(u=Depends(current_user)):
+        if not tier_allows(feature):
+            raise HTTPException(402, detail={
+                "error": "unavailable",
+                "feature": feature,
+                "message": "This feature requires MediLink in networked mode.",
+            })
+        return u
+    return dep
+
+
+class SetupIn(BaseModel):
+    clinic_name: str
+    admin_name: str
+    admin_email: str
+    admin_password: str
+    clinic_address: Optional[str] = ""
+    clinic_phone: Optional[str] = ""
+
+@api.post("/setup", status_code=201)
+async def first_run_setup(body: SetupIn):
+    existing = await database.fetch_val(
+        text("SELECT COUNT(*) FROM users WHERE role IN ('admin','super_admin','clinic_admin')")
+    ) or 0
+    if existing > 0:
+        raise HTTPException(409, "Setup already completed — this clinic is configured.")
+    if len(body.admin_password) < 8:
+        raise HTTPException(400, "Admin password must be at least 8 characters")
+    email = body.admin_email.strip().lower()
+    try:
+        _ = EmailStr._validate(email) if hasattr(EmailStr, "_validate") else email
+    except Exception:
+        raise HTTPException(400, "Please enter a valid admin email")
+    uid_ = uid(); now = now_iso()
+    await database.execute(users_t.insert().values(
+        id=uid_, email=email, password_hash=hash_pw(body.admin_password), activated=True,
+        name=body.admin_name.strip() or "Clinic Admin", role="super_admin",
+        slot_minutes=30, facility_id=FACILITY_ID, source="setup",
+        created_at=now, updated_at=now, sync_status="local"))
+    # Persist clinic details for receipts/kiosk into a local config file the app
+    # reads on next boot (so the bundled app remembers without a .env).
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        import json as _json
+        with open(os.path.join(DATA_DIR, "clinic.json"), "w") as f:
+            _json.dump({"CLINIC_NAME": body.clinic_name.strip(),
+                        "CLINIC_ADDRESS": body.clinic_address or "",
+                        "CLINIC_PHONE": body.clinic_phone or ""}, f)
+    except Exception as e:
+        log.warning(f"could not persist clinic.json: {e}")
+    log.info(f"First-run setup complete for clinic '{body.clinic_name}'")
+    return {"ok": True, "token": make_token(uid_, "super_admin"),
+            "user": {"id": uid_, "email": email, "name": body.admin_name, "role": "super_admin"},
+            "effective_tier": effective_tier()}
+
+# ── Clinic branding / white-label ────────────────────────────────────────────
+# Lets each clinic use THEIR logo, THEIR bank DuitNow QR and THEIR letterhead on
+# receipts, medicine labels, MC letters, reports and the kiosk.
+
+@api.get("/branding")
+async def get_branding():
+    """The kiosk and print views need the logo + clinic details."""
+    b = brand_cfg()
+    return {**b, "logo": _brand_b64("logo.png"),
+            "letterhead": _brand_b64("letterhead.png"),
+            "duitnow": _brand_b64("duitnow.png")}
+
+class BrandingIn(BaseModel):
+    clinic_name: Optional[str] = None
+    clinic_address: Optional[str] = None
+    clinic_phone: Optional[str] = None
+    registration_no: Optional[str] = None
+    email: Optional[str] = None
+    letterhead_line1: Optional[str] = None
+    letterhead_line2: Optional[str] = None
+    footer_note: Optional[str] = None
+    payment_note: Optional[str] = None
+    brand_colour: Optional[str] = Field(None, pattern=r"^#[0-9A-Fa-f]{6}$")
+    consultation_fee: Optional[float] = Field(None, ge=0, le=10000)
+    opening_hours: Optional[str] = Field(None, max_length=300)
+    welcome_message: Optional[str] = Field(None, max_length=200)
+
+@api.patch("/branding")
+async def update_branding(body: BrandingIn, u=Depends(any_admin_required)):
+    """Admins edit the clinic identity shown on all printed/official documents."""
+    import json as _json
+    os.makedirs(DATA_DIR, exist_ok=True)
+    cur = brand_cfg()
+    cur.update({k: v for k, v in body.dict().items() if v is not None})
+    save = {k: cur.get(k, "") for k in
+            ("clinic_name", "clinic_address", "clinic_phone", "registration_no",
+             "email", "letterhead_line1", "letterhead_line2", "footer_note", "payment_note",
+             "brand_colour", "consultation_fee", "opening_hours", "welcome_message")}
+    with open(os.path.join(DATA_DIR, "branding.json"), "w") as f:
+        _json.dump(save, f, indent=2)
+    try:  # keep clinic.json in step so receipts stay consistent
+        with open(os.path.join(DATA_DIR, "clinic.json"), "w") as f:
+            _json.dump({"CLINIC_NAME": save["clinic_name"],
+                        "CLINIC_ADDRESS": save["clinic_address"],
+                        "CLINIC_PHONE": save["clinic_phone"]}, f)
+    except Exception as e:
+        log.warning(f"clinic.json sync failed: {e}")
+    await audit_log(u["id"], u["role"], "UPDATE_BRANDING", "branding", "clinic")
+    return {"ok": True, **brand_cfg()}
+
+_BRAND_SLOTS = {"logo": "logo.png", "duitnow": "duitnow.png", "letterhead": "letterhead.png"}
+
+@api.post("/branding/{slot}", status_code=201)
+async def upload_branding_image(slot: str, file: UploadFile = File(...),
+                                u=Depends(any_admin_required)):
+    """Upload the clinic's logo / DuitNow QR / letterhead (PNG or JPG).
+
+    The DuitNow QR MUST be the clinic's own bank-issued QR — that is what makes
+    patient payments land in the clinic's own account."""
+    if slot not in _BRAND_SLOTS:
+        raise HTTPException(400, f"Unknown slot. Use one of: {', '.join(_BRAND_SLOTS)}")
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(413, "Image must be under 5 MB")
+    try:
+        from PIL import Image
+        im = Image.open(io.BytesIO(content)).convert("RGBA")
+        im.thumbnail((1200, 1200))          # keep PDFs small
+        os.makedirs(BRAND_DIR, exist_ok=True)
+        out = io.BytesIO(); im.save(out, format="PNG")
+        with open(_brand_path(_BRAND_SLOTS[slot]), "wb") as f:
+            f.write(out.getvalue())
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, f"Could not read that image ({e}). Use a PNG or JPG.")
+    await audit_log(u["id"], u["role"], f"UPLOAD_BRANDING_{slot.upper()}", "branding", slot)
+    return {"ok": True, "slot": slot, **brand_cfg()}
+
+@api.delete("/branding/{slot}")
+async def delete_branding_image(slot: str, u=Depends(any_admin_required)):
+    if slot not in _BRAND_SLOTS:
+        raise HTTPException(400, "Unknown slot")
+    p = _brand_path(_BRAND_SLOTS[slot])
+    if os.path.isfile(p):
+        os.remove(p)
+    await audit_log(u["id"], u["role"], f"DELETE_BRANDING_{slot.upper()}", "branding", slot)
+    return {"ok": True, **brand_cfg()}
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 @api.post("/auth/register", status_code=201)
@@ -1069,12 +1786,12 @@ async def list_doctors(u=Depends(current_user)):
 @api.get("/kiosk/lookup/{ic_number}")
 async def kiosk_lookup(ic_number: str, _=Depends(kiosk_auth)):
     p = await patient_by_ic(ic_number)
-    if not p: raise HTTPException(404, "No patient registered with this IC")
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if not p: raise HTTPException(404, "No patient registered with this IC. Please register at the kiosk.")
+    today = clinic_today()
     appts_rows = await database.fetch_all(
         appointments_t.select()
         .where((appointments_t.c.patient_id == p["id"]) &
-               (appointments_t.c.scheduled_at.like(f"{today}%")))
+               (is_today(appointments_t.c.scheduled_at)))
         .order_by(appointments_t.c.queue_number)
     )
     appts = await enrich_appointments(appts_rows)
@@ -1085,8 +1802,19 @@ async def kiosk_register(body: KioskRegisterIn, _=Depends(kiosk_auth)):
     parsed = parse_ic(body.ic_number)
     if not parsed["valid"]:
         raise HTTPException(400, f"Invalid IC: {parsed.get('error','format must be YYMMDD-SS-NNNN')}")
-    if await patient_by_ic(body.ic_number):
-        raise HTTPException(400, "Patient with this IC already registered. Please check in instead.")
+    existing = await patient_by_ic(body.ic_number)
+    if existing:
+        # Already registered (locally or pulled from cloud) — return existing record
+        # with a fresh activation code so they can activate the portal at this clinic too
+        code = f"{secrets.randbelow(1000000):06d}"
+        await database.execute(users_t.update().where(users_t.c.id == existing["id"]).values(
+            activation_code=code,
+            activation_expires=(datetime.now(timezone.utc) + timedelta(hours=72)).isoformat(),
+        ))
+        await enqueue_sync("users", existing["id"], "UPDATE", {})
+        user = clean(dict(await database.fetch_one(users_t.select().where(users_t.c.id == existing["id"]))))
+        user.pop("activation_code", None); user.pop("activation_expires", None)
+        return {"patient": user, "ic_info": parse_ic(body.ic_number), "activation_code": code}
     email = (body.email or f"{parsed['formatted'].replace('-','').lower()}@patient.medilink").lower()
     if await database.fetch_one(users_t.select().where(users_t.c.email == email)):
         email = f"{parsed['formatted'].replace('-','').lower()}.{uid()[:6]}@patient.medilink"
@@ -1152,8 +1880,25 @@ async def kiosk_triage(symptoms: str, pain_score, patient: dict) -> dict:
     # Parsing/AI failure with symptoms present: err UP, not down.
     safe = {"colour": "Orange", "category": "Very Urgent", "target_wait_minutes": 10,
             "reasoning": "Could not auto-assess — routed for urgent clinician review."}
-    if not symptoms or not GROQ_API_KEY:
+    if not symptoms:
         return green
+
+    # No AI service: use the deterministic Manchester Triage engine rather than
+    # returning Green.
+    #
+    # This previously read `if not symptoms or not GROQ_API_KEY: return green`,
+    # which meant that on any clinic without an AI key — that is, every offline
+    # clinic, which is the entire premise of this system — a patient typing
+    # "chest pain" at the kiosk was placed in the GREEN queue with a 120 minute
+    # target wait. The docstring above promised fail-safe escalation; the code
+    # did the opposite, and it did so silently.
+    if not GROQ_API_KEY:
+        import triage_offline
+        r = triage_offline.assess(chief_complaint=symptoms, pain_score=pain_score,
+                                  known_conditions=patient.get("known_conditions"))
+        log.info("kiosk triage (offline rules): %s / %s", r["colour"], r["category"])
+        return r
+
     try:
         prompt = f"""PATIENT: DOB {patient.get('dob','Unknown')}, Gender: {patient.get('gender','Unknown')}
 CHIEF COMPLAINT (self-reported at kiosk): {symptoms}
@@ -1179,12 +1924,12 @@ sentence. Output the JSON object only."""
 async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
     p = await patient_by_ic(body.ic_number)
     if not p: raise HTTPException(404, "Patient not registered. Please register first.")
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = clinic_today()
     # Check for existing today appointment
     existing = await database.fetch_one(
         appointments_t.select().where(
             (appointments_t.c.patient_id == p["id"]) &
-            (appointments_t.c.scheduled_at.like(f"{today}%")) &
+            (is_today(appointments_t.c.scheduled_at)) &
             appointments_t.c.status.in_(["scheduled","checked_in"])
         ).order_by(appointments_t.c.scheduled_at)
     )
@@ -1220,7 +1965,7 @@ async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
             scheduled_at=now, reason=reason_txt,
             triage_colour=triage.get("colour"), triage_category=triage.get("category"),
             triage_target_mins=triage.get("target_wait_minutes"),
-            fee=body.fee, status="checked_in", queue_number=q,
+            fee=body.fee if body.fee is not None else default_fee(), status="checked_in", queue_number=q,
             payment_status="unpaid", created_at=now, updated_at=now,
             created_by="kiosk", facility_id=FACILITY_ID,
             source="kiosk", sync_status="local",
@@ -1241,7 +1986,8 @@ async def kiosk_checkin(body: KioskCheckinIn, _=Depends(kiosk_auth)):
     doc_row = await database.fetch_one(users_t.select().where(users_t.c.id == appt["doctor_id"]))
     doc = clean(dict(doc_row)) if doc_row else {}
     chit = {
-        "type":"QUEUE", "clinic_name":CLINIC_NAME,
+        "type":"QUEUE", "clinic_name":brand_cfg().get("clinic_name") or CLINIC_NAME,
+        "clinic_logo": _brand_b64("logo.png"),
         "patient_name":p["name"], "patient_ic":ic_show(p["ic_number"]),
         "queue_number":appt["queue_number"],
         "doctor_name":doc.get("name","-"), "doctor_specialty":doc.get("specialty","General"),
@@ -1265,7 +2011,9 @@ async def kiosk_pay(body: KioskPayIn, _=Depends(kiosk_auth)):
     appt = dict(appt_row)
     if appt.get("payment_status") == "paid":
         raise HTTPException(400, "Already paid")
-    consult_fee = float(appt.get("fee") or 50.0)
+    if appt.get("status") != "completed":
+        raise HTTPException(409, "Payment opens after you have seen the doctor.")
+    consult_fee = float(appt["fee"]) if appt.get("fee") is not None else default_fee()   # a free visit stays free
     rec_for_bill = await record_for_visit(p["id"], appt["id"])
     med_total, med_lines = await price_prescriptions(
         (dict(rec_for_bill).get("prescriptions") or []) if rec_for_bill else [])
@@ -1281,10 +2029,11 @@ async def kiosk_pay(body: KioskPayIn, _=Depends(kiosk_auth)):
                         "account_no":os.environ.get("BANK_ACCOUNT_NO","1234567890"),
                         "bank":os.environ.get("BANK_NAME","Maybank"),"ref":txn_ref,"amount":amount}
     else:
-        payment_info = {"type":"Cash","ref":txn_ref,"amount":amount}
+        payment_info = {"type":"Pay at counter","ref":txn_ref,"amount":amount}
 
     pay_id = uid(); now = now_iso()
-    is_instant = body.method == "cash"
+    # Nothing paid at a self-service kiosk is confirmed until staff see the money.
+    is_instant = SELF_CONFIRM_PAYMENTS and body.method == "cash"
     await database.execute(payments_t.insert().values(
         id=pay_id, appointment_id=appt["id"], amount=amount, method=body.method,
         status="succeeded" if is_instant else "pending",
@@ -1311,15 +2060,18 @@ async def kiosk_pay(body: KioskPayIn, _=Depends(kiosk_auth)):
     prescriptions = (dict(rec).get("prescriptions") or []) if rec else []
     doc_row = await database.fetch_one(users_t.select().where(users_t.c.id == appt["doctor_id"]))
     receipt = {
-        "type":"RECEIPT","clinic_name":CLINIC_NAME,"clinic_address":CLINIC_ADDR,
-        "clinic_phone":CLINIC_PHONE,"patient_name":p["name"],"patient_ic":ic_show(p["ic_number"]),
+        "type":"RECEIPT","clinic_name":brand_cfg().get("clinic_name") or CLINIC_NAME,
+        "clinic_address":brand_cfg().get("clinic_address") or CLINIC_ADDR,
+        "clinic_logo": _brand_b64("logo.png"),
+        "clinic_phone":brand_cfg().get("clinic_phone") or CLINIC_PHONE,"patient_name":p["name"],"patient_ic":ic_show(p["ic_number"]),
         "consultation_fee":consult_fee,"medication_total":med_total,"medication_lines":med_lines,
         "amount":amount,"method":body.method,"txn_ref":txn_ref,"paid_at":now,"appointment_id":appt["id"],
     }
     medicine_chit = None
     if prescriptions:
         medicine_chit = {
-            "type":"MEDICINE","clinic_name":f"{CLINIC_NAME} — Pharmacy",
+            "type":"MEDICINE","clinic_name":(brand_cfg().get("clinic_name") or CLINIC_NAME) + " — Pharmacy",
+            "clinic_logo": _brand_b64("logo.png"),
             "patient_name":p["name"],"patient_ic":ic_show(p["ic_number"]),
             "queue_number":appt["queue_number"],
             "doctor_name":doc_row["name"] if doc_row else "-",
@@ -1327,8 +2079,55 @@ async def kiosk_pay(body: KioskPayIn, _=Depends(kiosk_auth)):
         }
     return {"appointment":appt,"payment":payment_info,"receipt":receipt,"medicine_chit":medicine_chit}
 
+async def _settle_payment(txn_ref: str) -> dict:
+    """Mark a pending payment as received and move the visit on. Idempotent."""
+    pay_row = await database.fetch_one(payments_t.select().where(payments_t.c.txn_ref == txn_ref))
+    if not pay_row: raise HTTPException(404, "Transaction not found")
+    if pay_row["status"] == "succeeded":
+        return {"ok": True, "txn_ref": txn_ref, "already_confirmed": True}
+    if pay_row["status"] not in ("pending", "initiated"):
+        raise HTTPException(409, f"Cannot confirm payment in status {pay_row['status']}")
+    now = now_iso()
+    await database.execute(payments_t.update().where(payments_t.c.txn_ref == txn_ref)
+        .values(status="succeeded", paid_at=now))
+    _appt = await database.fetch_one(appointments_t.select().where(appointments_t.c.id == pay_row["appointment_id"]))
+    _rec = await record_for_visit(dict(_appt)["patient_id"], pay_row["appointment_id"]) if _appt else None
+    _next = "ready_for_pharmacy" if _visit_has_meds(_rec) else "completed"
+    await database.execute(
+        appointments_t.update().where(appointments_t.c.id == pay_row["appointment_id"])
+        .values(payment_status="paid", status=_next, updated_at=now))
+    await enqueue_sync("payments", pay_row["id"], "UPDATE", {})
+    await enqueue_sync("appointments", pay_row["appointment_id"], "UPDATE", {})
+    broadcast({"type": "appointment.updated", "appointment_id": pay_row["appointment_id"]})
+    return {"ok": True, "txn_ref": txn_ref, "next": _next}
+
+@api.get("/payments/pending")
+async def pending_payments(u=Depends(role_required("receptionist", "admin", "clinic_admin", "super_admin"))):
+    """Payments started at the kiosk or in the app that staff still need to check."""
+    rows = await database.fetch_all(payments_t.select()
+        .where(payments_t.c.status.in_(["pending", "initiated"])).order_by(payments_t.c.paid_at))
+    out = []
+    for r in rows:
+        d = dict(r)
+        a = await database.fetch_one(appointments_t.select().where(appointments_t.c.id == d["appointment_id"]))
+        if a:
+            [ea] = await enrich_appointments([a])
+            d["appointment"] = ea
+        out.append(d)
+    return out
+
+@api.post("/payments/{txn_ref}/confirm")
+async def staff_confirm_payment(txn_ref: str, u=Depends(role_required("receptionist", "admin", "clinic_admin", "super_admin"))):
+    """Staff confirm the money has actually arrived. The only way, by default,
+    that a visit becomes paid and its medicine is released to the pharmacy."""
+    out = await _settle_payment(txn_ref)
+    await audit_log(u["id"], u["role"], "PAYMENT_CONFIRMED_STAFF", "payments", txn_ref)
+    return out
+
 @api.post("/kiosk/payment-confirm/{txn_ref}")
 async def confirm_payment(txn_ref: str, _=Depends(kiosk_auth)):
+    if not SELF_CONFIRM_PAYMENTS:
+        return {"ok": True, "txn_ref": txn_ref, "awaiting_staff": True}
     pay_row = await database.fetch_one(payments_t.select().where(payments_t.c.txn_ref == txn_ref))
     if not pay_row: raise HTTPException(404, "Transaction not found")
     if pay_row["status"] == "succeeded":          # idempotent — already confirmed
@@ -1354,7 +2153,7 @@ async def create_appointment(body: AppointmentIn, u=Depends(current_user)):
     q = await next_q(); appt_id = uid(); now = now_iso()
     appt = dict(
         id=appt_id, patient_id=body.patient_id, doctor_id=body.doctor_id,
-        scheduled_at=body.scheduled_at, reason=body.reason, fee=body.fee,
+        scheduled_at=body.scheduled_at, reason=body.reason, fee=body.fee if body.fee is not None else default_fee(),
         status="scheduled", queue_number=q, payment_status="unpaid",
         created_at=now, updated_at=now, created_by=u["id"],
         facility_id=FACILITY_ID, source="web", sync_status="local",
@@ -1390,13 +2189,44 @@ async def list_appointments(date: Optional[str] = None,
     rows = await database.fetch_all(q.order_by(appointments_t.c.scheduled_at.asc()))
     return await enrich_appointments(rows)
 
-@api.get("/queue/today")
-async def todays_queue(u=Depends(current_user)):
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+@api.get("/queue/board")
+async def queue_board():
+    """The waiting-room board: queue numbers and triage colour only, never names,
+    so it can show on a TV in the waiting room and on the clinic's front door
+    without signing in."""
     rows = await database.fetch_all(
         appointments_t.select()
-        .where(appointments_t.c.scheduled_at.like(f"{today}%"))
-        .where(~appointments_t.c.is_block)
+        .where(is_today(appointments_t.c.scheduled_at))
+        .where(appointments_t.c.is_block.isnot(True)))
+    prio = {"Red": 0, "Orange": 1, "Yellow": 2, "Green": 3, "Blue": 4}
+    rows = sorted((dict(r) for r in rows), key=lambda r: (prio.get(r.get("triage_colour"), 5), r.get("queue_number") or 0))
+    def item(r):
+        return {"number": r.get("queue_number"), "zone": r.get("triage_colour")}
+    def by(*st):
+        return [item(r) for r in rows if r.get("status") in st]
+    room = {}
+    for r in rows:
+        if r.get("status") == "in_progress" and r.get("doctor_id"):
+            room[r["doctor_id"]] = r
+    doctors = {}
+    if room:
+        for d in await database.fetch_all(users_t.select().where(users_t.c.id.in_(list(room)))):
+            doctors[d["id"]] = d["name"]
+    return {
+        "clinic_name": brand_cfg().get("clinic_name") or CLINIC_NAME,
+        "now_serving": [{**item(r), "doctor": doctors.get(did)} for did, r in room.items()],
+        "waiting": by("scheduled", "checked_in"),
+        "collect": by("ready_for_pharmacy"),
+        "seen_today": len([r for r in rows if r.get("status") in ("completed", "ready_for_pharmacy", "dispensed")]),
+    }
+
+@api.get("/queue/today")
+async def todays_queue(u=Depends(current_user)):
+    today = clinic_today()
+    rows = await database.fetch_all(
+        appointments_t.select()
+        .where(is_today(appointments_t.c.scheduled_at))
+        .where(appointments_t.c.is_block.isnot(True))
     )
     # Malaysian triage ordering: Red first, then Yellow, Green, untriaged; FIFO within zone
     prio = {"Red": 0, "Yellow": 1, "Green": 2}
@@ -1407,6 +2237,25 @@ async def todays_queue(u=Depends(current_user)):
 async def update_appointment(appt_id: str, body: AppointmentUpdate, u=Depends(current_user)):
     updates = {k:v for k,v in body.model_dump().items() if v is not None}
     if not updates: raise HTTPException(400, "Nothing to update")
+    cur_row = await database.fetch_one(appointments_t.select().where(appointments_t.c.id == appt_id))
+    if not cur_row: raise HTTPException(404, "Appointment not found")
+    cur = dict(cur_row)
+    # Patients may only cancel their own upcoming booking. Everything else on a
+    # visit (status, fee, doctor) is a staff action.
+    if u["role"] == "patient":
+        if cur.get("patient_id") != u["id"]:
+            raise HTTPException(404, "Appointment not found")
+        if set(updates) - {"status"} or updates.get("status") != "cancelled" or cur.get("status") != "scheduled":
+            raise HTTPException(403, "You can only cancel an upcoming appointment.")
+    # Medicine is released by payment and handed over by the pharmacy, never by
+    # editing a status, so these two states cannot be set directly.
+    if updates.get("status") in ("ready_for_pharmacy", "dispensed") and cur.get("payment_status") != "paid":
+        raise HTTPException(409, "This visit hasn't been paid. Confirm the payment first.")
+    if updates.get("status") == "dispensed" and u["role"] not in ("pharmacist", "admin", "clinic_admin", "super_admin"):
+        raise HTTPException(403, "Only the pharmacy can mark medicine as handed over.")
+    if "fee" in updates and (u["role"] not in ("receptionist", "admin", "clinic_admin", "super_admin")
+                             or cur.get("payment_status") in ("paid", "pending")):
+        raise HTTPException(403, "The fee can only be changed by the front desk before payment.")
     updates["updated_at"] = now_iso()
     await database.execute(appointments_t.update()
         .where(appointments_t.c.id == appt_id).values(**updates))
@@ -1487,12 +2336,13 @@ async def create_record(body: MedicalRecordIn, u=Depends(role_required("doctor",
             attachments_t.update()
             .where(attachments_t.c.id.in_(body.attachment_ids))
             .values(record_id=rec_id, patient_id=body.patient_id))
-    # Auto-advance appointment to ready_for_pharmacy if it was in_progress
+    # Saving the visit's record ends the consultation, whether or not the doctor
+    # pressed "start" first; the visit then waits for payment.
     if body.appointment_id:
         appt_row = await database.fetch_one(
             appointments_t.select().where(appointments_t.c.id == body.appointment_id)
         )
-        if appt_row and dict(appt_row)["status"] == "in_progress":
+        if appt_row and dict(appt_row)["status"] in ("scheduled", "checked_in", "in_progress"):
             await database.execute(
                 appointments_t.update().where(appointments_t.c.id == body.appointment_id)
                 .values(status="completed", updated_at=now)
@@ -1554,9 +2404,16 @@ async def approve_consent(body: ConsentApproveIn, u=Depends(current_user)):
     if not row:
         raise HTTPException(404, "Invalid code")
     d = dict(row)
-    # A patient may only approve access to their OWN records.
-    if u["role"] == "patient" and d["patient_id"] != u["id"]:
+    # Only the patient can consent, and only to their own records. Staff could
+    # previously approve a code, so a doctor could request access and approve
+    # it themselves; emergency access without consent is the audited
+    # break-glass route instead.
+    if u["role"] != "patient":
+        raise HTTPException(403, "Only the patient can approve access to their records. For an emergency, use emergency access.")
+    if d["patient_id"] != u["id"]:
         raise HTTPException(403, "You can only approve access to your own records")
+    if d.get("granted"):
+        return {"ok": True, "facility": d["requesting_facility"], "already_granted": True}
     now = now_iso()
     await database.execute(record_consents_t.update().where(record_consents_t.c.id == d["id"])
         .values(granted=True, granted_at=now,
@@ -1591,6 +2448,17 @@ async def break_glass(body: BreakGlassIn, u=Depends(role_required("doctor","admi
     await audit_log(u["id"], u["role"], "BREAK_GLASS_ACCESS", "record_consents", cid)
     return {"ok": True, "mode": "break_glass"}
 
+_cloud_consent_fns = None
+async def cloud_has_consent_functions() -> bool:
+    """True when the cloud was built from migration 002 (schema medilink with the
+    consent-gated SECURITY DEFINER functions). A plain mirror (public schema, the
+    single-clinic demo set-up) has neither, and the plain queries apply there."""
+    global _cloud_consent_fns
+    if _cloud_consent_fns is None:
+        _cloud_consent_fns = bool(await cloud_db.fetch_val(
+            "SELECT to_regprocedure('medilink.records_with_consent(text)') IS NOT NULL"))
+    return _cloud_consent_fns
+
 @api.get("/records/patient/{patient_id}")
 async def patient_records(patient_id: str, u=Depends(current_user), request: Request = None):
     if u["role"] == "patient" and u["id"] != patient_id:
@@ -1602,7 +2470,7 @@ async def patient_records(patient_id: str, u=Depends(current_user), request: Req
     # National record sharing: pull this patient's records from OTHER facilities
     # via the cloud mirror, matched by IC (the national identity key).
     external_rows = []
-    if cloud_db and not IS_CLOUD:
+    if cloud_db and not IS_CLOUD and tier_allows("cross_clinic_records"):
         try:
             p_row = await database.fetch_one(users_t.select().where(users_t.c.id == patient_id))
             # Match by the deterministic blind index (ic_hash), NOT the encrypted
@@ -1610,15 +2478,33 @@ async def patient_records(patient_id: str, u=Depends(current_user), request: Req
             # equality check can never match the same person across nodes.
             ic_h = dict(p_row).get("ic_hash") if p_row else None
             if ic_h:
-                cloud_users = await cloud_db.fetch_all(
-                    users_t.select().where(users_t.c.ic_hash == ic_h))
-                cloud_ids = [dict(cu)["id"] for cu in cloud_users]
-                if cloud_ids:
+                _consent_now = None if u["role"] == "patient" else await _active_consent(ic_h)
+                if u["role"] == "patient" or _consent_now is not None:
+                    # Consent (or the patient themself): the database releases the
+                    # records, and only if a granted, unexpired consent exists there.
                     ext = await cloud_db.fetch_all(
-                        records_t.select().where(
-                            (records_t.c.patient_id.in_(cloud_ids)) &
-                            (records_t.c.facility_id != FACILITY_ID)))
+                        "SELECT * FROM medilink.records_with_consent(:h) WHERE facility_id <> :me"
+                        if await cloud_has_consent_functions() else
+                        "SELECT r.* FROM medical_records r JOIN users u ON u.id = r.patient_id "
+                        "WHERE u.ic_hash = :h AND r.facility_id <> :me",
+                        {"h": ic_h, "me": FACILITY_ID})
                     external_rows = list(ext)
+                else:
+                    # No consent: learn only WHERE records exist, never what they say.
+                    if await cloud_has_consent_functions():
+                        sql, args = ("SELECT facility_id, record_count, last_visit "
+                                     "FROM medilink.find_patient_facilities(:h)", {"h": ic_h})
+                    else:   # plain mirror: same answer, computed directly
+                        sql, args = ("SELECT r.facility_id, count(*) AS record_count, max(r.created_at) AS last_visit "
+                                     "FROM medical_records r JOIN users u ON u.id = r.patient_id "
+                                     "WHERE u.ic_hash = :h AND r.facility_id <> :me GROUP BY r.facility_id",
+                                     {"h": ic_h, "me": FACILITY_ID})
+                    for f in await cloud_db.fetch_all(sql, args):
+                        fd = dict(f)
+                        if fd.get("record_count"):
+                            external_rows.append({"id": f"locked-{fd['facility_id']}", "patient_id": patient_id,
+                                                  "facility_id": fd["facility_id"], "created_at": fd.get("last_visit"),
+                                                  "record_count": fd["record_count"]})
         except Exception as e:
             log.warning(f"Cross-facility fetch unavailable (offline?): {e}")
     await audit_log(u["id"], u["role"], "READ_RECORD", "medical_records", patient_id,
@@ -1650,13 +2536,24 @@ async def patient_records(patient_id: str, u=Depends(current_user), request: Req
         rec["external"] = True
         rec["attachments"] = []   # files stay at their origin facility (local-first)
         if _consented:
-            doc_name = "-"
+            doc_name = None
+            if not CLOUD_PIN_FACILITY:   # another clinic's staff are not visible under isolation
+                try:
+                    cd = await cloud_db.fetch_one(users_t.select().where(users_t.c.id == rec.get("doctor_id")))
+                    if cd: doc_name = dict(cd).get("name") or None
+                except Exception:
+                    pass
+            # Look up the facility name so the UI can show "Klinik Jasin" instead of raw code
+            fac_name = rec.get("facility_id", "")
             try:
-                cd = await cloud_db.fetch_one(users_t.select().where(users_t.c.id == rec.get("doctor_id")))
-                if cd: doc_name = dict(cd).get("name", "-")
+                fac_row = await cloud_db.fetch_one(
+                    facilities_t.select().where(facilities_t.c.code == rec.get("facility_id")))
+                if fac_row:
+                    fac_name = dict(fac_row).get("name") or fac_name
             except Exception:
                 pass
-            rec["doctor"] = {"name": doc_name}
+            rec["facility_name"] = fac_name
+            rec["doctor"] = {"name": doc_name} if doc_name else None
             rec["consent_mode"] = (_consent or {}).get("mode") if _consent else "self"
         else:
             # Locked: show only that a record exists + safe metadata. No clinical detail.
@@ -1665,7 +2562,9 @@ async def patient_records(patient_id: str, u=Depends(current_user), request: Req
             for k in ("diagnosis", "notes", "prescriptions", "vitals", "allergies",
                       "triage_red_flags", "triage_category"):
                 rec[k] = None
-            rec["diagnosis"] = "🔒 Locked — patient consent required to view"
+            n = rec.get("record_count")
+            rec["diagnosis"] = (f"{n} record(s) at this clinic. Patient consent required to view." if n
+                                else "Locked: patient consent required to view")
         result.append(rec)
     result.sort(key=lambda x: x.get("created_at") or "", reverse=True)
     return result
@@ -1727,14 +2626,36 @@ HISTORY: {body.history or "None provided"}
 
 Apply MTS strictly. Output JSON only."""
 
-    raw = await groq(MTS_SYSTEM, [{"role":"user","content":prompt}],
-                     max_tokens=800, temperature=0.1, response_format="json")
+    # Always run the offline rules. They are the floor the result cannot fall
+    # below, and on a Core clinic with no key and no internet they ARE the
+    # result. Triage is advertised as a Core feature, and Core is the offline
+    # tier, so returning 503 here would break the feature on exactly the clinic
+    # it was designed for.
+    import triage_offline
+    offline = triage_offline.assess(
+        chief_complaint=body.chief_complaint,
+        vitals=(body.vitals.model_dump() if body.vitals else None),
+        pain_score=body.pain_score,
+        age=body.age,
+        known_conditions=body.known_conditions,
+    )
+
+    if not GROQ_API_KEY:
+        return offline
+
     try:
+        raw = await groq(MTS_SYSTEM, [{"role": "user", "content": prompt}],
+                         max_tokens=800, temperature=0.1, response_format="json")
         result = _extract_json(raw)
-    except Exception:
-        result = {"raw":raw,"parse_error":True,"category":"Urgent","colour":"Yellow",
-                  "target_wait_minutes":60,"reasoning":"Parse error — review manually"}
-    return result
+    except Exception as e:
+        # Offline, rate-limited, or malformed JSON. The clinic still gets a
+        # category; it just came from the rules instead.
+        log.info("triage: falling back to offline rules (%s)", type(e).__name__)
+        return offline
+
+    # Take the HIGHER acuity of the two. A model that says "Green" cannot
+    # override an observed SpO2 of 88%.
+    return triage_offline.reconcile(result, offline)
 
 @api.post("/ai/symptom-check")
 async def ai_symptom_check(body: AISymptomIn, u=Depends(current_user)):
@@ -1758,6 +2679,25 @@ async def ai_symptom_check(body: AISymptomIn, u=Depends(current_user)):
         "assessment messages, not on questions. Max 100 words. Plain text only."
     )
     messages = body.history + [{"role":"user","content":body.message}]
+
+    # With no AI service reachable, answer from the SAME tested Manchester
+    # Triage rules the clinic kiosk uses, so a patient offline gets advice
+    # consistent with what the clinic would tell them, erring upward the same
+    # way. The alternative was streaming "[ERROR] AI not configured" at a
+    # patient describing chest pain.
+    import ai_offline
+    if not GROQ_API_KEY:
+        async def _offline_stream():
+            text = ai_offline.local_symptom_reply(body.message)
+            for chunk in text.split(" "):
+                yield f"data: {chunk} \n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(
+            _offline_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control":"no-cache","X-Accel-Buffering":"no"},
+        )
+
     return StreamingResponse(
         groq_stream(system, messages),
         media_type="text/event-stream",
@@ -1773,11 +2713,11 @@ async def ai_summary(body: AISummaryIn, u=Depends(role_required("doctor","admin"
         .order_by(records_t.c.created_at.desc()).limit(20)
     )
     # Today's presenting complaint from the kiosk (reason + AI triage), most recent first
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = clinic_today()
     todays = await database.fetch_all(
         appointments_t.select()
         .where((appointments_t.c.patient_id == body.patient_id) &
-               (appointments_t.c.scheduled_at.like(f"{today}%")) &
+               (is_today(appointments_t.c.scheduled_at)) &
                (appointments_t.c.is_block.isnot(True)))
         .order_by(appointments_t.c.scheduled_at.desc()))
     presenting = ""
@@ -1820,7 +2760,24 @@ async def ai_summary(body: AISummaryIn, u=Depends(role_required("doctor","admin"
     cached = _AI_SUMMARY_CACHE.get(cache_key)
     if cached:
         return {"summary": cached, "patient": clean(pd), "record_count": len(rows), "cached": True}
-    summary = await groq(system, [{"role":"user","content":prompt}], max_tokens=300, temperature=0.0)
+    # MediLink runs without an AI service on a clinic machine, so build the
+    # brief from the clinic's OWN records rather than failing. Nothing is
+    # inferred: this only re-arranges data the clinic already holds.
+    import ai_offline
+    if not GROQ_API_KEY:
+        return {"summary": ai_offline.local_summary(
+                    pd, [dict(r) for r in rows],
+                    dict(todays[0]) if todays else None),
+                "engine": "offline"}
+    try:
+        summary = await groq(system, [{"role":"user","content":prompt}],
+                             max_tokens=300, temperature=0.0)
+    except Exception as e:
+        log.info("ai_summary: falling back to the local brief (%s)", type(e).__name__)
+        return {"summary": ai_offline.local_summary(
+                    pd, [dict(r) for r in rows],
+                    dict(todays[0]) if todays else None),
+                "engine": "offline"}
     if len(_AI_SUMMARY_CACHE) > 500:
         _AI_SUMMARY_CACHE.clear()
     _AI_SUMMARY_CACHE[cache_key] = summary
@@ -1841,9 +2798,20 @@ async def ai_drug_check(body: AIDrugCheckIn, u=Depends(role_required("doctor","a
         "4. SAFE TO PRESCRIBE TOGETHER? (Yes/No/With caution) "
         "Be concise. End with: '⚠️ Clinical judgement required. This is a screening tool only.'"
     ).replace("{context}", context)
-    result = await groq(system, [{"role":"user","content":"Medicines: " + ", ".join(body.medicines)}],
-                        max_tokens=400)
-    return {"analysis":result,"medicines":body.medicines}
+    # Offline we do an ALLERGY cross-check from recorded data and decline
+    # interaction screening outright. There is no drug database in the
+    # installer, and a plausible invented interaction is more dangerous than an
+    # honest "not available", because a prescriber might act on it.
+    import ai_offline
+    if not GROQ_API_KEY:
+        return ai_offline.local_drug_check(body.medicines, body.known_conditions)
+    try:
+        result = await groq(system, [{"role":"user","content":"Medicines: " + ", ".join(body.medicines)}],
+                            max_tokens=400)
+    except Exception as e:
+        log.info("ai_drug_check: falling back to the allergy check (%s)", type(e).__name__)
+        return ai_offline.local_drug_check(body.medicines, body.known_conditions)
+    return {"analysis":result,"medicines":body.medicines,"engine":"ai"}
 
 # ── Availability & slots ──────────────────────────────────────────────────────
 @api.get("/availability/{doctor_id}")
@@ -2057,11 +3025,11 @@ async def record_for_visit(patient_id: str, appointment_id: str):
         .order_by(records_t.c.created_at.desc()))
     if rec:
         return rec
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = clinic_today()
     return await database.fetch_one(
         records_t.select()
         .where((records_t.c.patient_id == patient_id) &
-               (records_t.c.created_at.like(f"{today}%")))
+               (is_today(records_t.c.created_at)))
         .order_by(records_t.c.created_at.desc()))
 
 @api.get("/pharmacy/queue")
@@ -2153,15 +3121,16 @@ async def sync_status(u=Depends(current_user)):
         "sync_errors": errors,
         "last_synced": dict(last_row).get("synced_at") if last_row else None,
         "cloud_connected": cloud_db is not None,
-        "hardware": "HP Folio 9470m (local)" if not IS_CLOUD else "Cloud Node",
+        "hardware": (__import__("platform").node() or "This computer") if not IS_CLOUD else "Cloud node",
     }
 
 @api.post("/sync/full")
 async def sync_full(u=Depends(super_admin_required)):
     """Push EVERY local row to the cloud mirror (upsert). Covers data created
     outside the live app (e.g. seed scripts) that never entered the sync queue."""
-    if not cloud_db or IS_CLOUD:
-        raise HTTPException(400, "No cloud mirror configured on this node")
+    if not sync_enabled():
+        raise HTTPException(400, "Cloud sync is not available on this plan. "
+                                 "MediLink Connect is required.")
     tables = {"users": users_t, "facilities": facilities_t,
               "appointments": appointments_t, "medical_records": records_t,
               "payments": payments_t, "dispense_records": dispense_t,
@@ -2234,17 +3203,33 @@ async def audit_logs(limit: int = Query(100, le=500), u=Depends(any_admin_requir
 # ── Admin stats ───────────────────────────────────────────────────────────────
 @api.get("/admin/stats")
 async def admin_stats(u=Depends(any_admin_required)):
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # The date pattern goes in as a BOUND PARAMETER, not an f-string. Inlining
+    # it put a literal % into the SQL, which the driver then tried to read as a
+    # Python format specifier and blew up with "unsupported format character".
+    # That took out the whole admin dashboard on Core.
+    _ts, _te = today_bounds()
     return {
-        "patients": await database.fetch_val(text("SELECT COUNT(*) FROM users WHERE role='patient'")) or 0,
-        "doctors":  await database.fetch_val(text("SELECT COUNT(*) FROM users WHERE role='doctor'")) or 0,
+        "patients": await database.fetch_val(
+            text("SELECT COUNT(*) FROM users WHERE role='patient'")) or 0,
+        "doctors": await database.fetch_val(
+            text("SELECT COUNT(*) FROM users WHERE role='doctor'")) or 0,
+        # NB: pass the SQL as a plain string when binding values. `databases`
+        # reads .values off the query object, which a SQLAlchemy TextClause
+        # doesn't have, so text(...) + a values dict raises AttributeError.
         "today_appointments": await database.fetch_val(
-            text(f"SELECT COUNT(*) FROM appointments WHERE scheduled_at LIKE '{today}%'")) or 0,
+            "SELECT COUNT(*) FROM appointments WHERE scheduled_at >= :s AND scheduled_at < :e",
+            {"s": _ts, "e": _te}) or 0,
         "today_completed": await database.fetch_val(
-            text(f"SELECT COUNT(*) FROM appointments WHERE scheduled_at LIKE '{today}%' AND status='dispensed'")) or 0,
+            "SELECT COUNT(*) FROM appointments "
+            "WHERE scheduled_at >= :s AND scheduled_at < :e AND status='dispensed'",
+            {"s": _ts, "e": _te}) or 0,
         "inventory_alerts": await database.fetch_val(
-            text("SELECT COUNT(*) FROM pharmacy_inventory WHERE stock_qty <= reorder_level AND active=true")) or 0,
-        "pending_sync": await database.fetch_val(text("SELECT COUNT(*) FROM sync_queue WHERE synced=false")) or 0,
+            "SELECT COUNT(*) FROM pharmacy_inventory "
+            "WHERE stock_qty <= reorder_level AND active = :yes",
+            {"yes": True}) or 0,
+        "pending_sync": await database.fetch_val(
+            "SELECT COUNT(*) FROM sync_queue WHERE synced = :no",
+            {"no": False}) or 0,
     }
 
 # ── Super-Admin: network monitoring ──────────────────────────────────────────
@@ -2321,11 +3306,11 @@ async def admin_monitoring(u=Depends(super_admin_required)):
             if cloud["online"]:
                 try:
                     recs_cloud = await cloud_db.fetch_val(
-                        text("SELECT COUNT(*) FROM medical_records WHERE facility_id=:c"), {"c": code})
+                        "SELECT COUNT(*) FROM medical_records WHERE facility_id=:c", {"c": code})
                 except Exception:
                     recs_cloud = None
             recs_local = await database.fetch_val(
-                text("SELECT COUNT(*) FROM medical_records WHERE facility_id=:c"), {"c": code}) or 0
+                "SELECT COUNT(*) FROM medical_records WHERE facility_id=:c", {"c": code}) or 0
             facilities.append({"code": code, "name": fd.get("name") or code, "type": fd.get("type"),
                                "active": fd.get("active", True),
                                "records_local": recs_local, "records_cloud": recs_cloud})
@@ -2380,13 +3365,13 @@ async def internal_cloudwatch(x_metrics_token: Optional[str] = Header(None)):
     is not publicly readable. No user login — keeps the zero-trust boundary."""
     if not KIOSK_TOKEN or x_metrics_token != KIOSK_TOKEN:
         raise HTTPException(403, "Forbidden")
-    return _fetch_cloudwatch()
+    return await asyncio.to_thread(_fetch_cloudwatch)
 
 @api.get("/admin/monitoring/cloudwatch")
 async def admin_cloudwatch(u=Depends(super_admin_required)):
     """CloudWatch infra metrics. If this node has AWS creds, read directly;
     otherwise (a clinic) proxy to the cloud node's internal endpoint."""
-    local = _fetch_cloudwatch()
+    local = await asyncio.to_thread(_fetch_cloudwatch)   # boto3 is blocking: keep it off the event loop
     if local.get("available"):
         return local
     if CLOUD_NODE_URL and KIOSK_TOKEN:
@@ -2401,26 +3386,112 @@ async def admin_cloudwatch(u=Depends(super_admin_required)):
             log.warning(f"CloudWatch proxy failed: {e}")
     return {"available": False, "reason": "No AWS creds locally and cloud proxy unavailable"}
 
+# ── Settings → Cloud: connect this clinic with the key HarNova issues ─────────
+# A cloud key is "mlk1." + base64url(JSON {"u": url, "f": facility, "s": schema}).
+# It holds this clinic's own database login, so it is shown once and stored
+# only in cloud.json (readable by this computer's user alone).
+def _decode_cloud_key(key: str) -> dict:
+    key = (key or "").strip()
+    if not key.startswith("mlk1."):
+        raise HTTPException(400, "That doesn't look like a MediLink cloud key. It starts with mlk1.")
+    try:
+        raw = key[5:]
+        data = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode())
+        assert data["u"].startswith("postgres") and data["f"]
+        return {"url": data["u"], "facility": data["f"], "schema": data.get("s", "medilink")}
+    except Exception:
+        raise HTTPException(400, "The cloud key is incomplete. Copy the whole key and try again.")
+
+def _restart_soon(delay: float = 1.5):
+    """Restart this clinic node in place so the new cloud setting takes effect."""
+    import sys as _sys
+    def _go():
+        time.sleep(delay)
+        log.info("Restarting to apply the new cloud connection")
+        os.environ["MEDILINK_RESTARTED"] = "1"
+        args = _sys.argv if getattr(_sys, "frozen", False) else [_sys.executable] + _sys.argv
+        os.execv(_sys.executable, args)
+    import threading as _th
+    _th.Thread(target=_go, daemon=True).start()
+
+@api.get("/admin/cloud")
+async def cloud_status(u=Depends(any_admin_required)):
+    host = None
+    if CLOUD_DB_URL:
+        try:
+            from urllib.parse import urlparse
+            host = urlparse(CLOUD_DB_URL).hostname
+        except Exception:
+            host = None
+    pending = await database.fetch_val(sync_queue_t.select().with_only_columns(func.count()).where(sync_queue_t.c.synced == False))
+    return {"clinic_id": FACILITY_ID, "connected": bool(cloud_db), "configured_in_app": bool(CLOUD_FILE),
+            "online": bool(cloud_db and cloud_db.online), "host": host, "pending": pending}
+
+class CloudKeyIn(BaseModel):
+    key: str
+
+@api.post("/admin/cloud/connect")
+async def cloud_connect(body: CloudKeyIn, u=Depends(any_admin_required)):
+    c = _decode_cloud_key(body.key)
+    if c["facility"] != FACILITY_ID:
+        raise HTTPException(409, f"This key belongs to clinic {c['facility']}, but this computer is clinic {FACILITY_ID}. "
+                                 "Ask HarNova for the key issued to your Clinic ID.")
+    # Prove the key works, and that the cloud itself names this clinic, before saving it.
+    try:
+        import asyncpg as _apg
+        con = await asyncio.wait_for(_apg.connect(c["url"], timeout=8, statement_cache_size=0), 12)
+        try:
+            who = await con.fetchval(f"SELECT {c['schema']}.current_facility()")
+        finally:
+            await con.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(502, f"Couldn't reach the cloud with this key ({type(e).__name__}). Check the internet connection and try again.")
+    if who != FACILITY_ID:
+        raise HTTPException(409, "The cloud doesn't recognise this key as your clinic's login. Ask HarNova for a new key.")
+    path = os.path.join(DATA_DIR, "cloud.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({**c, "connected_at": now_iso()}, f)
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+    await audit_log(u["id"], u["role"], "CLOUD_CONNECT", "cloud", FACILITY_ID)
+    _restart_soon()
+    return {"ok": True, "restarting": True}
+
+@api.post("/admin/cloud/disconnect")
+async def cloud_disconnect(u=Depends(any_admin_required)):
+    path = os.path.join(DATA_DIR, "cloud.json")
+    if not os.path.isfile(path):
+        raise HTTPException(400, "This clinic isn't connected through Settings.")
+    os.replace(path, path + ".off")
+    await audit_log(u["id"], u["role"], "CLOUD_DISCONNECT", "cloud", FACILITY_ID)
+    _restart_soon()
+    return {"ok": True, "restarting": True}
+
 @api.post("/admin/monitoring/reconcile")
 async def admin_reconcile(u=Depends(super_admin_required)):
     """Fast recovery: force-push any pending/drifted local rows to the cloud now."""
     await run_sync_job()
-    # also reconcile drifted patient names/facilities (local is source of truth)
+    pushed = await reconcile_local_only()
+    # Correct drifted patient names on this clinic's own cloud rows (local is the
+    # source of truth). Never touches facility_id: under per-clinic rows, a row
+    # with another facility_id belongs to that clinic, not to us.
     fixed = 0
-    if cloud_db and not IS_CLOUD:
+    if sync_enabled() and not IS_CLOUD:
         try:
             for p in await database.fetch_all(users_t.select().where(users_t.c.role == "patient")):
-                d = dict(p); h = d.get("ic_hash")
-                if not h: continue
-                c = await cloud_db.fetch_one(users_t.select().where(users_t.c.ic_hash == h))
-                if c and (dict(c).get("name") != d.get("name") or dict(c).get("facility_id") != d.get("facility_id")):
-                    await cloud_db.execute(users_t.update().where(users_t.c.id == dict(c)["id"])
-                        .values(name=d.get("name"), facility_id=d.get("facility_id")))
+                d = dict(p)
+                c = await cloud_db.fetch_one(users_t.select().where(users_t.c.id == d["id"]))
+                if c and dict(c).get("name") != d.get("name"):
+                    await cloud_db.execute(users_t.update().where(users_t.c.id == d["id"]).values(name=d.get("name")))
                     fixed += 1
         except Exception as e:
             log.warning(f"reconcile drift: {e}")
     await audit_log(u["id"], u["role"], "FORCE_RECONCILE", "sync", "all")
-    return {"ok": True, "reconciled_patients": fixed}
+    return {"ok": True, "pushed": pushed, "reconciled_patients": fixed}
 
 # ── Patient self-service: bills, payments, receipts ──────────────────────────
 def _appt_owned(appt_row, user):
@@ -2446,7 +3517,9 @@ async def patient_pay(appt_id: str, u=Depends(current_user)):
     appt = dict(appt_row)
     if appt.get("payment_status") == "paid":
         raise HTTPException(400, "Already paid")
-    consult_fee = float(appt.get("fee") or 50.0)
+    if appt.get("status") != "completed":
+        raise HTTPException(409, "This bill opens after you have seen the doctor.")
+    consult_fee = float(appt["fee"]) if appt.get("fee") is not None else default_fee()   # a free visit stays free
     _rec = await record_for_visit(appt["patient_id"], appt["id"])
     med_total, _ = await price_prescriptions((dict(_rec).get("prescriptions") or []) if _rec else [])
     amount = round(consult_fee + med_total, 2)
@@ -2474,6 +3547,9 @@ async def patient_confirm(txn_ref: str, u=Depends(current_user)):
         raise HTTPException(404, "Transaction not found")
     if pay_row["status"] == "succeeded":
         return {"ok": True, "txn_ref": txn_ref, "already_confirmed": True}
+    if not SELF_CONFIRM_PAYMENTS:
+        await audit_log(u["id"], u["role"], "PAYMENT_CLAIMED_APP", "payments", txn_ref)
+        return {"ok": True, "txn_ref": txn_ref, "awaiting_staff": True}
     now = now_iso()
     await database.execute(payments_t.update().where(payments_t.c.txn_ref == txn_ref)
                            .values(status="succeeded"))
@@ -2651,15 +3727,46 @@ def _latin(v) -> str:
     return str(v if v is not None else "-").encode("latin-1", "replace").decode("latin-1")
 
 def _pdf_doc(title: str):
+    """Start a branded PDF: the CLINIC's own logo + letterhead details.
+
+    White-label: every official document (receipt, MC letter, report) carries the
+    clinic's identity — not ours. Falls back to plain text if no logo is set.
+    """
     from fpdf import FPDF
+    b = brand_cfg()
+    name  = b.get("clinic_name")  or CLINIC_NAME
+    addr  = b.get("clinic_address") or CLINIC_ADDR
+    phone = b.get("clinic_phone") or CLINIC_PHONE
+    reg   = b.get("registration_no") or ""
+    email = b.get("email") or ""
+
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=18)
     pdf.add_page()
+
+    # Clinic logo (top-right) if uploaded
+    logo = _brand_path("logo.png")
+    text_w = 0
+    if os.path.isfile(logo):
+        try:
+            pdf.image(logo, x=170, y=10, w=26)
+            text_w = 150   # keep header text clear of the logo
+        except Exception as e:
+            log.warning(f"logo not drawn on PDF: {e}")
+
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 9, _latin(CLINIC_NAME), ln=1)
+    pdf.cell(text_w or 0, 9, _latin(name), ln=1)
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(110, 110, 110)
-    pdf.cell(0, 5, _latin(f"{CLINIC_ADDR}  ·  {CLINIC_PHONE}"), ln=1)
+    line2 = "  ·  ".join([x for x in (addr, phone) if x])
+    if line2:
+        pdf.cell(text_w or 0, 5, _latin(line2), ln=1)
+    line3 = "  ·  ".join([x for x in (email, (f"Reg: {reg}" if reg else "")) if x])
+    if line3:
+        pdf.cell(text_w or 0, 5, _latin(line3), ln=1)
+    for extra in (b.get("letterhead_line1"), b.get("letterhead_line2")):
+        if extra:
+            pdf.cell(text_w or 0, 5, _latin(extra), ln=1)
     pdf.set_text_color(0, 0, 0)
     pdf.ln(3)
     pdf.set_font("Helvetica", "B", 13)
@@ -2771,7 +3878,23 @@ async def list_facilities(u=Depends(current_user)):
     if not is_super(u):
         q = q.where(facilities_t.c.code == u.get("facility_id"))
     rows = await database.fetch_all(q)
-    return [dict(r) for r in rows]
+    local = [dict(r) for r in rows]
+    # In networked mode a super-admin should see ALL facilities across the network,
+    # not just the ones registered in this clinic's local SQLite. Pull from Supabase
+    # and merge, deduplicating by code so the local record wins (it has the freshest
+    # name / phone from clinic.json which is written on every setup).
+    if is_super(u) and cloud_db and not IS_CLOUD and tier_allows("multi_branch_monitoring"):
+        try:
+            cloud_rows = await cloud_db.fetch_all(facilities_t.select().order_by(facilities_t.c.name))
+            local_codes = {r["code"] for r in local}
+            for cr in cloud_rows:
+                cd = dict(cr)
+                if cd["code"] not in local_codes:
+                    local.append(cd)
+            local.sort(key=lambda x: x.get("name") or "")
+        except Exception as e:
+            log.warning(f"Cloud facilities fetch failed (offline?): {e}")
+    return local
 
 @api.post("/facilities", status_code=201)
 async def add_facility(body: FacilityIn, u=Depends(super_admin_required)):
@@ -2816,11 +3939,29 @@ STAFF_ROLES = ("doctor", "receptionist", "pharmacist", "clinic_admin")
 
 @api.get("/admin/staff")
 async def list_staff(u=Depends(any_admin_required)):
-    q = users_t.select().where(users_t.c.role.in_(list(STAFF_ROLES) + ["super_admin", "admin"]))        .order_by(users_t.c.role, users_t.c.name)
+    q = users_t.select().where(users_t.c.role.in_(list(STAFF_ROLES) + ["super_admin", "admin"])) \
+        .order_by(users_t.c.role, users_t.c.name)
     if not is_super(u):
         q = q.where(users_t.c.facility_id == u.get("facility_id"))
     rows = await database.fetch_all(q)
-    return [clean(dict(r)) for r in rows]
+    local = [clean(dict(r)) for r in rows]
+    # Super-admin in networked mode: also pull staff from other clinics via Supabase
+    # so the Network admin panel shows the full cross-clinic staff roster.
+    if is_super(u) and cloud_db and not IS_CLOUD and tier_allows("multi_branch_monitoring"):
+        try:
+            cloud_rows = await cloud_db.fetch_all(
+                users_t.select()
+                .where(users_t.c.role.in_(list(STAFF_ROLES) + ["super_admin", "admin"]))
+                .order_by(users_t.c.role, users_t.c.name)
+            )
+            local_ids = {r["id"] for r in local}
+            for cr in cloud_rows:
+                cd = clean(dict(cr))
+                if cd["id"] not in local_ids:
+                    local.append(cd)
+        except Exception as e:
+            log.warning(f"Cloud staff fetch failed (offline?): {e}")
+    return local
 
 @api.post("/admin/staff", status_code=201)
 async def create_staff(body: StaffIn, u=Depends(any_admin_required)):
@@ -2878,7 +4019,7 @@ async def deactivate_staff(sid: str, u=Depends(any_admin_required)):
 # ── Admin: analytics + daily cash report ────────────────────────────────────
 @api.get("/admin/analytics")
 async def admin_analytics(u=Depends(any_admin_required)):
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = clinic_today()
     week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
     appts = await database.fetch_all(
         scope_facility(appointments_t.select().where(
@@ -2893,11 +4034,11 @@ async def admin_analytics(u=Depends(any_admin_required)):
     visits_today = 0
     for a in appts:
         d = dict(a)
-        if (d.get("created_at") or "").startswith(today):
+        if iso_is_today(d.get("created_at")):
             visits_today += 1
         key = d.get("triage_colour") or "None"
         triage[key] = triage.get(key, 0) + 1
-    rev_today = sum((dict(p_).get("amount") or 0) for p_ in pays if (dict(p_).get("paid_at") or "").startswith(today))
+    rev_today = sum((dict(p_).get("amount") or 0) for p_ in pays if iso_is_today(dict(p_).get("paid_at")))
     diag_count = {}
     for r in recs:
         dg = (dict(r).get("diagnosis") or "").strip()
@@ -2910,10 +4051,10 @@ async def admin_analytics(u=Depends(any_admin_required)):
 
 @api.get("/admin/cash-report/pdf")
 async def cash_report_pdf(u=Depends(any_admin_required)):
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today = clinic_today()
     pays = await database.fetch_all(
         scope_facility(payments_t.select().where(
-            (payments_t.c.status == "succeeded") & (payments_t.c.paid_at.like(f"{today}%"))),
+            (payments_t.c.status == "succeeded") & (is_today(payments_t.c.paid_at))),
             payments_t.c.facility_id, u)
         .order_by(payments_t.c.paid_at))
     pdf = _pdf_doc(f"Daily Collection Report - {today}")
@@ -3340,77 +4481,120 @@ async def ws_queue(ws: WebSocket, token: str = Query(...)):
 
 # ── Background sync engine ────────────────────────────────────────────────────
 _sync_running = False
+_SYNC_TBL_MAP = None
+def _sync_tbl(name: str):
+    global _SYNC_TBL_MAP
+    if _SYNC_TBL_MAP is None:
+        # Every syncable table: must match _SYNC_TABLES so nothing is dead-lettered.
+        _SYNC_TBL_MAP = {
+            "users": users_t, "appointments": appointments_t,
+            "medical_records": records_t, "payments": payments_t,
+            "dispense_records": dispense_t, "vaccinations": vaccinations_t,
+            "attachments": attachments_t, "lab_orders": lab_orders_t,
+            "facilities": facilities_t, "stock_movements": stock_movements_t,
+            "inventory": inventory_t, "pharmacy_inventory": inventory_t,
+            "record_consents": record_consents_t,
+        }
+    return _SYNC_TBL_MAP.get(name)
+
+SYNC_BATCH = 200
+SYNC_MAX_ATTEMPTS = 5          # for rows the cloud REJECTS; outages never count
+
+async def _push_row(tbl, record_id: str, payload: dict):
+    """One round trip: insert, or update if the row already exists."""
+    if CLOUD_DB_URL.startswith("postgres"):
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+        cols = {k: v for k, v in payload.items() if k in tbl.c}
+        stmt = pg_insert(tbl).values(**cols)
+        upd = {k: stmt.excluded[k] for k in cols if k != "id"}
+        stmt = stmt.on_conflict_do_update(index_elements=[tbl.c.id], set_=upd) if upd else stmt.on_conflict_do_nothing()
+        await cloud_db.execute(stmt)
+    else:
+        existing = await cloud_db.fetch_one(tbl.select().where(tbl.c.id == record_id))
+        if existing:
+            await cloud_db.execute(tbl.update().where(tbl.c.id == record_id)
+                                   .values(**{k: v for k, v in payload.items() if k != "id"}))
+        else:
+            await cloud_db.execute(tbl.insert().values(**payload))
+
+_OUTAGE_ERR_HINTS = ("connect", "errno", "timeout", "timed out", "link down", "closed", "network", "reset by peer")
+
+async def requeue_outage_failures():
+    """Rows that ran out of attempts only because the link was down (the old
+    engine counted outages against the retry budget) go back in the queue."""
+    rows = await database.fetch_all(
+        sync_queue_t.select().where((sync_queue_t.c.synced == False)
+                                    & (sync_queue_t.c.attempts >= SYNC_MAX_ATTEMPTS)
+                                    & (sync_queue_t.c.attempts < 999)))
+    ids = [r["id"] for r in rows if any(h in (r["error"] or "").lower() for h in _OUTAGE_ERR_HINTS)]
+    for i in range(0, len(ids), 200):
+        await database.execute(sync_queue_t.update().where(sync_queue_t.c.id.in_(ids[i:i + 200])).values(attempts=0))
+    return len(ids)
+
 async def run_sync_job():
-    """Push local-only records to cloud DB. Single-flight guard: overlapping
-    live-sync kicks coalesce so we never run duplicate concurrent pushes."""
+    """Drain the local write-behind queue to the cloud.
+
+    Single-flight: overlapping kicks coalesce. Drains in batches until the
+    queue is empty or the link drops. A connectivity failure stops the drain
+    WITHOUT touching the rows, so an outage of any length costs no retry
+    budget; only a row the cloud actually rejects is counted, and dead-lettered
+    after SYNC_MAX_ATTEMPTS so one bad row never blocks the rest."""
     global _sync_running
-    if not cloud_db or IS_CLOUD:
+    if not sync_enabled() or IS_CLOUD:
         return
     if _sync_running:
-        return  # a push is already in progress; queued rows will still be caught
+        return
     _sync_running = True
+    pushed = 0
+    rejected_this_pass = set()
     try:
-        pending = await database.fetch_all(
-            sync_queue_t.select()
-            .where((sync_queue_t.c.synced == False) & (sync_queue_t.c.attempts < 5))
-            .order_by(sync_queue_t.c.created_at)
-            .limit(50)
-        )
-        if not pending:
-            return
-        log.info(f"Sync: processing {len(pending)} pending records")
-        for item in pending:
-            item_d = dict(item)
-            try:
-                # Every syncable table — must match _SYNC_TABLES so nothing gets
-                # dead-lettered as "Unknown table" (that was the 27 stuck rows).
-                tbl_map = {
-                    "users": users_t, "appointments": appointments_t,
-                    "medical_records": records_t, "payments": payments_t,
-                    "dispense_records": dispense_t, "vaccinations": vaccinations_t,
-                    "attachments": attachments_t, "lab_orders": lab_orders_t,
-                    "facilities": facilities_t, "stock_movements": stock_movements_t,
-                    "inventory": inventory_t, "pharmacy_inventory": inventory_t,
-                    "record_consents": record_consents_t,
-                }
-                tbl = tbl_map.get(item_d["table_name"])
+        if cloud_db.online is False and time.time() < cloud_db.open_until:
+            return                                   # link known down; the loop will probe
+        while True:
+            q = (sync_queue_t.select()
+                 .where((sync_queue_t.c.synced == False) & (sync_queue_t.c.attempts < SYNC_MAX_ATTEMPTS)))
+            if rejected_this_pass:
+                # A row the cloud rejected waits for the next pass rather than
+                # spending all its attempts in a few milliseconds.
+                q = q.where(sync_queue_t.c.id.notin_(list(rejected_this_pass)))
+            pending = await database.fetch_all(q.order_by(sync_queue_t.c.created_at).limit(SYNC_BATCH))
+            if not pending:
+                break
+            for item in pending:
+                item_d = dict(item)
+                tbl = _sync_tbl(item_d["table_name"])
+                if CLOUD_PIN_FACILITY and item_d["table_name"] == "facilities":
+                    # Under isolation the clinic directory is maintained centrally;
+                    # clinics can read it but not write it.
+                    await database.execute(sync_queue_t.update().where(sync_queue_t.c.id == item_d["id"])
+                                           .values(synced=True, attempted_at=now_iso(), error="directory managed centrally"))
+                    continue
                 if tbl is None:
-                    # Dead-letter: never mark fake-synced; park it out of the retry
-                    # window so it stays visible in /sync/queue as an error.
                     await database.execute(
                         sync_queue_t.update().where(sync_queue_t.c.id == item_d["id"])
-                        .values(attempts=999, error="Unknown table — dead-lettered")
-                    )
+                        .values(attempts=999, error="Unknown table — dead-lettered"))
                     continue
-                payload = item_d["payload"]
+                try:
+                    await _push_row(tbl, item_d["record_id"], item_d["payload"])
+                except CloudUnavailable:
+                    log.info("Sync paused: cloud unreachable (%d pushed this pass)", pushed)
+                    return                           # rows untouched; resume on reconnect
+                except Exception as e:
+                    await database.execute(
+                        sync_queue_t.update().where(sync_queue_t.c.id == item_d["id"])
+                        .values(attempts=item_d["attempts"] + 1, attempted_at=now_iso(), error=str(e)[:500]))
+                    log.warning(f"Sync rejected {item_d['table_name']}:{item_d['record_id']}: {e}")
+                    rejected_this_pass.add(item_d["id"])
+                    continue
                 now = now_iso()
-                # Upsert to cloud
-                existing = await cloud_db.fetch_one(
-                    tbl.select().where(tbl.c.id == item_d["record_id"])
-                )
-                if existing:
-                    await cloud_db.execute(
-                        tbl.update().where(tbl.c.id == item_d["record_id"])
-                        .values(**{k: v for k, v in payload.items() if k != "id"})
-                    )
-                else:
-                    await cloud_db.execute(tbl.insert().values(**payload))
-                # Mark synced locally
-                await database.execute(
-                    tbl.update().where(tbl.c.id == item_d["record_id"])
-                    .values(sync_status="cloud", synced_at=now)
-                )
-                await database.execute(
-                    sync_queue_t.update().where(sync_queue_t.c.id == item_d["id"])
-                    .values(synced=True, attempted_at=now)
-                )
-                log.info(f"Synced {item_d['table_name']}:{item_d['record_id']}")
-            except Exception as e:
-                await database.execute(
-                    sync_queue_t.update().where(sync_queue_t.c.id == item_d["id"])
-                    .values(attempts=item_d["attempts"]+1, attempted_at=now_iso(), error=str(e)[:500])
-                )
-                log.warning(f"Sync failed for {item_d['record_id']}: {e}")
+                mark = {k: v for k, v in (("sync_status", "cloud"), ("synced_at", now)) if k in tbl.c}
+                if mark:   # not every replicated table carries sync bookkeeping (e.g. record_consents)
+                    await database.execute(tbl.update().where(tbl.c.id == item_d["record_id"]).values(**mark))
+                await database.execute(sync_queue_t.update().where(sync_queue_t.c.id == item_d["id"])
+                                       .values(synced=True, attempted_at=now))
+                pushed += 1
+        if pushed:
+            log.info("Sync: pushed %d rows", pushed)
     except Exception as e:
         log.exception(f"Sync job error: {e}")
     finally:
@@ -3430,6 +4614,36 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Serve the built React UI from the backend (one-process standalone app) ────
+# When a built frontend is present (bundled installer, or FRONTEND_DIST set), the
+# backend serves it directly so Standalone is a single process — no separate web
+# server. In dev/networked with a separate React server, this is simply skipped.
+_FRONTEND_DIST = os.environ.get("FRONTEND_DIST") or os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "static")
+if os.path.isdir(_FRONTEND_DIST):
+    from fastapi.staticfiles import StaticFiles
+    from starlette.responses import FileResponse as _FileResponse
+
+    _index = os.path.join(_FRONTEND_DIST, "index.html")
+
+    # Serve hashed build assets (JS/CSS/media) under their real paths.
+    for _sub in ("static", "assets"):
+        _p = os.path.join(_FRONTEND_DIST, _sub)
+        if os.path.isdir(_p):
+            app.mount(f"/{_sub}", StaticFiles(directory=_p), name=f"fe_{_sub}")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def _spa(full_path: str):
+        # API + docs are handled above (router registered first). Everything else
+        # returns a real file if it exists, else index.html (SPA client routing).
+        candidate = os.path.join(_FRONTEND_DIST, full_path)
+        if full_path and os.path.isfile(candidate):
+            return _FileResponse(candidate)
+        if os.path.isfile(_index):
+            return _FileResponse(_index)
+        raise HTTPException(404, "Not found")
+    log.info(f"Serving bundled frontend from {_FRONTEND_DIST}")
+
 @app.middleware("http")
 async def security_headers(request, call_next):
     resp = await call_next(request)
@@ -3443,15 +4657,21 @@ async def startup():
     await database.connect()
     if cloud_db:
         try:
-            await cloud_db.connect()
+            await cloud_db.connect()          # bounded by CLOUD_TIMEOUT_S
             log.info("Cloud DB connected")
+            await verify_cloud_isolation()
         except Exception as e:
+            import traceback
             log.warning(f"Cloud DB connection failed (offline mode): {e}")
+            log.warning(f"Cloud DB traceback: {traceback.format_exc()}")
     # Create tables
     sync_db_url = DATABASE_URL
     if "postgresql://" in sync_db_url:
         sync_db_url = sync_db_url.replace("postgresql://","postgresql+psycopg2://")
-    engine = create_engine(sync_db_url)
+    if sync_db_url.startswith("sqlite"):
+        engine = create_engine(sync_db_url, connect_args={"check_same_thread": False})
+    else:
+        engine = create_engine(sync_db_url)
     metadata.create_all(engine)
     if "sqlite" not in sync_db_url:
         with engine.connect() as conn:
@@ -3498,28 +4718,10 @@ async def startup():
                 log.info(f"IC encryption backfill: secured {fixed} records")
         except Exception as e:
             log.warning(f"IC backfill skipped: {e}")
-    # Self-provision the cloud mirror: create tables there too on first connect
+    # Self-provision the cloud mirror in the background: a clinic must start
+    # (and keep working) whether or not the cloud is reachable at boot.
     if CLOUD_DB_URL and not IS_CLOUD:
-        try:
-            cloud_sync_url = CLOUD_DB_URL
-            if "postgresql://" in cloud_sync_url:
-                cloud_sync_url = cloud_sync_url.replace("postgresql://", "postgresql+psycopg2://")
-            cengine = create_engine(cloud_sync_url)
-            metadata.create_all(cengine)
-            with cengine.connect() as conn:
-                for ddl in ("ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_code VARCHAR",
-                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_expires VARCHAR",
-                            "ALTER TABLE users ADD COLUMN IF NOT EXISTS activated BOOLEAN",
-                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS ic_hash VARCHAR",
-                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS address VARCHAR"):
-                    try:
-                        conn.execute(text(ddl)); conn.commit()
-                    except Exception:
-                        pass
-            cengine.dispose()
-            log.info("Cloud mirror tables ready")
-        except Exception as e:
-            log.warning(f"Cloud mirror not provisioned yet (will keep queueing): {e}")
+        asyncio.create_task(provision_cloud())
     # Auto seed
     # Starter inventory (demo): only when empty and seeding allowed
     if ALLOW_SEED:
@@ -3563,10 +4765,117 @@ async def startup():
             await seed(); log.info("Demo data seeded (ALLOW_SEED=true)")
         else:
             log.warning("users table empty — set SUPER_ADMIN_EMAIL & SUPER_ADMIN_PASSWORD in .env to bootstrap a super-admin")
-    # Start background sync loop
+    # Start background sync + reconcile loops under the watchdog.
+    # The watchdog owns task lifecycle: if either loop crashes it is restarted
+    # automatically within 60 seconds — no operator action required.
     if not IS_CLOUD and cloud_db:
-        asyncio.create_task(sync_loop())
-        asyncio.create_task(reconcile_loop())
+        asyncio.create_task(_watchdog(), name="sync_watchdog")
+        log.info("Sync watchdog started — auto-healing enabled")
+
+
+
+
+async def verify_cloud_isolation():
+    """Prove, at boot, that this clinic is actually isolated on the shared cloud.
+
+    Two things must be true, and neither is safe to assume:
+
+      1. app.facility_id is set on our connections. If a pooler drops startup
+         parameters (Neon's transaction-mode pooler can), every RLS policy
+         evaluates against NULL. That fails CLOSED, so we'd see nothing rather
+         than someone else's data, but the clinic deserves to know why sync
+         suddenly went quiet instead of debugging it blind.
+
+      2. RLS is actually enforced for our role. A role that owns the tables, or
+         has BYPASSRLS, silently ignores every policy. That fails OPEN, and is
+         the one genuinely dangerous misconfiguration here: sync would appear to
+         work perfectly while the isolation guarantee was fiction.
+
+    This only logs. It must never stop a clinic from starting up."""
+    if not cloud_db or IS_CLOUD:
+        return
+    try:
+        fac = await cloud_db.fetch_val("SELECT current_setting('app.facility_id', true)")
+        if not fac:
+            log.error(
+                "CLOUD ISOLATION: app.facility_id is NOT set on this connection. "
+                "Row-Level Security will match nothing and sync will appear empty. "
+                "Use Neon's DIRECT connection string (not the pooled -pooler host), "
+                "or set the parameter per transaction."
+            )
+        elif fac != FACILITY_ID:
+            log.error("CLOUD ISOLATION: app.facility_id is '%s' but this node is '%s'.",
+                      fac, FACILITY_ID)
+        else:
+            log.info("Cloud isolation: app.facility_id = %s", fac)
+
+        bypass = await cloud_db.fetch_val(
+            "SELECT rolbypassrls OR rolsuper FROM pg_roles WHERE rolname = current_user")
+        if bypass:
+            log.error(
+                "CLOUD ISOLATION: this database role BYPASSES Row-Level Security. "
+                "Every clinic can read every other clinic's rows. Create a "
+                "non-owner role without BYPASSRLS and point CLOUD_DATABASE_URL at "
+                "it (see migrations/001_rls_multitenancy.sql, section 8)."
+            )
+        else:
+            log.info("Cloud isolation: RLS is enforced for role %s",
+                     await cloud_db.fetch_val("SELECT current_user"))
+    except Exception as e:
+        # Non-Postgres cloud, or an older schema. Not fatal.
+        log.debug("cloud isolation check skipped (%s)", type(e).__name__)
+
+
+async def verify_cloud_isolation():
+    """Prove, at boot, that this clinic is actually isolated on the shared cloud.
+
+    Two things must be true, and neither is safe to assume:
+
+      1. app.facility_id is set on our connections. If a pooler drops startup
+         parameters (Neon's transaction-mode pooler can), every RLS policy
+         evaluates against NULL. That fails CLOSED, so we'd see nothing rather
+         than someone else's data, but the clinic deserves to know why sync
+         suddenly went quiet instead of debugging it blind.
+
+      2. RLS is actually enforced for our role. A role that owns the tables, or
+         has BYPASSRLS, silently ignores every policy. That fails OPEN, and is
+         the one genuinely dangerous misconfiguration here: sync would appear to
+         work perfectly while the isolation guarantee was fiction.
+
+    This only logs. It must never stop a clinic from starting up."""
+    if not cloud_db or IS_CLOUD:
+        return
+    try:
+        fac = await cloud_db.fetch_val("SELECT current_setting('app.facility_id', true)")
+        if not fac:
+            log.error(
+                "CLOUD ISOLATION: app.facility_id is NOT set on this connection. "
+                "Row-Level Security will match nothing and sync will appear empty. "
+                "Use Neon's DIRECT connection string (not the pooled -pooler host), "
+                "or set the parameter per transaction."
+            )
+        elif fac != FACILITY_ID:
+            log.error("CLOUD ISOLATION: app.facility_id is '%s' but this node is '%s'.",
+                      fac, FACILITY_ID)
+        else:
+            log.info("Cloud isolation: app.facility_id = %s", fac)
+
+        bypass = await cloud_db.fetch_val(
+            "SELECT rolbypassrls OR rolsuper FROM pg_roles WHERE rolname = current_user")
+        if bypass:
+            log.error(
+                "CLOUD ISOLATION: this database role BYPASSES Row-Level Security. "
+                "Every clinic can read every other clinic's rows. Create a "
+                "non-owner role without BYPASSRLS and point CLOUD_DATABASE_URL at "
+                "it (see migrations/001_rls_multitenancy.sql, section 8)."
+            )
+        else:
+            log.info("Cloud isolation: RLS is enforced for role %s",
+                     await cloud_db.fetch_val("SELECT current_user"))
+    except Exception as e:
+        # Non-Postgres cloud, or an older schema. Not fatal.
+        log.debug("cloud isolation check skipped (%s)", type(e).__name__)
+
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -3575,50 +4884,158 @@ async def shutdown():
         try: await cloud_db.disconnect()
         except: pass
 
-async def reconcile_local_only():
-    """Every 30 min: push rows still marked sync_status='local' to the cloud.
-    Non-redundant — anything already 'cloud' is skipped. Catches data created
-    offline or outside the live app (e.g. seeds) that the queue-based loop missed."""
-    if not cloud_db or IS_CLOUD:
-        return
-    tables = {"users": users_t, "appointments": appointments_t,
-              "medical_records": records_t, "payments": payments_t,
-              "dispense_records": dispense_t, "vaccinations": vaccinations_t}
+async def reconcile_local_only() -> int:
+    """Push rows still marked sync_status != 'cloud' to the cloud (every 30 min,
+    and on Force reconcile). Catches data created outside the live app (seeds,
+    imports, a restored backup) that never entered the sync queue. Uses the same
+    upsert as the queue, so a row already on the cloud is simply overwritten."""
+    if not sync_enabled() or IS_CLOUD:
+        return 0
     total = 0
-    for name, tbl in tables.items():
-        if "sync_status" not in tbl.c:
+    for name, tbl in _SYNC_TABLES.items():
+        if "sync_status" not in tbl.c or (CLOUD_PIN_FACILITY and name == "facilities"):
             continue
-        try:
-            rows = await database.fetch_all(tbl.select().where(tbl.c.sync_status != "cloud"))
-            for r in rows:
-                d = dict(r)
-                try:
-                    existing = await cloud_db.fetch_one(tbl.select().where(tbl.c.id == d["id"]))
-                    if existing:
-                        await cloud_db.execute(tbl.update().where(tbl.c.id == d["id"])
-                            .values(**{k: v for k, v in d.items() if k != "id"}))
-                    else:
-                        await cloud_db.execute(tbl.insert().values(**d))
-                    await database.execute(tbl.update().where(tbl.c.id == d["id"])
-                        .values(sync_status="cloud"))
-                    total += 1
-                except Exception as e:
-                    log.warning(f"reconcile {name}:{d.get('id')} failed: {e}")
-        except Exception as e:
-            log.warning(f"reconcile table {name} failed: {e}")
+        rows = await database.fetch_all(tbl.select().where(
+            (tbl.c.sync_status != "cloud") | (tbl.c.sync_status.is_(None))))
+        for r in rows:
+            d = dict(r)
+            try:
+                await _push_row(tbl, d["id"], d)
+            except CloudUnavailable:
+                log.info("Reconcile paused: cloud unreachable (%d pushed)", total)
+                return total
+            except Exception as e:
+                log.warning(f"reconcile {name}:{d.get('id')} rejected: {e}")
+                continue
+            mark = {"sync_status": "cloud"}
+            if "synced_at" in tbl.c:
+                mark["synced_at"] = now_iso()
+            await database.execute(tbl.update().where(tbl.c.id == d["id"]).values(**mark))
+            total += 1
     if total:
         log.info(f"Reconcile: pushed {total} local-only rows to cloud")
+    return total
 
 async def reconcile_loop():
+    """30-minute reconciliation loop with self-healing exponential backoff.
+
+    A crash inside reconcile_local_only() is caught and retried with backoff
+    so a transient cloud error doesn't silence the reconciler permanently.
+    """
+    backoff = 60          # start at 1 min on first failure
+    MAX_BACKOFF = 1800    # cap at 30 min (one normal cycle)
     while True:
-        await asyncio.sleep(1800)   # 30 minutes
+        await asyncio.sleep(1800)
         try:
             await reconcile_local_only()
+            backoff = 60  # reset on success
         except Exception as e:
-            log.warning(f"reconcile loop error: {e}")
+            log.warning(f"reconcile loop error (retry in {backoff}s): {e}")
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, MAX_BACKOFF)
+
+
+_cloud_provisioned = False
+
+def _provision_cloud_blocking():
+    cloud_sync_url = CLOUD_DB_URL
+    if "postgresql://" in cloud_sync_url:
+        cloud_sync_url = cloud_sync_url.replace("postgresql://", "postgresql+psycopg2://")
+    # Transaction pooler (port 6543) not compatible with psycopg2 DDL;
+    # fall back to session pooler (port 5432) for table provisioning.
+    cloud_sync_url = cloud_sync_url.replace(":6543/", ":5432/")
+    cengine = create_engine(cloud_sync_url, connect_args={"connect_timeout": int(CLOUD_TIMEOUT_S)})
+    try:
+        metadata.create_all(cengine)
+        with cengine.connect() as conn:
+            for ddl in ("ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_code VARCHAR",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS activation_expires VARCHAR",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS activated BOOLEAN",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS ic_hash VARCHAR",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS address VARCHAR"):
+                try:
+                    conn.execute(text(ddl)); conn.commit()
+                except Exception:
+                    pass
+    finally:
+        cengine.dispose()
+
+async def provision_cloud():
+    """Create the mirror's tables if missing. Retried on every reconnect until it succeeds."""
+    global _cloud_provisioned
+    if _cloud_provisioned or not CLOUD_DB_URL.startswith("postgres"):
+        return
+    if CLOUD_MANAGED_SCHEMA:
+        # A clinic login has no DDL rights by design; the cloud's tables are
+        # built by migrations 002-004, never by a clinic.
+        _cloud_provisioned = True
+        return
+    try:
+        await asyncio.wait_for(asyncio.to_thread(_provision_cloud_blocking), CLOUD_TIMEOUT_S * 4)
+        _cloud_provisioned = True
+        log.info("Cloud mirror tables ready")
+    except Exception as e:
+        log.warning(f"Cloud mirror not provisioned yet (will keep queueing): {type(e).__name__}: {e}")
 
 async def sync_loop():
-    """Background loop — syncs every SYNC_INTERVAL seconds."""
+    """Keeps the cloud mirror current without ever holding up the clinic.
+
+    Online: drains every SYNC_INTERVAL seconds (writes also kick an immediate
+    push, so this is the safety net). Offline: probes the link every
+    CLOUD_PROBE_S seconds, and the moment it answers, re-queues any rows the
+    outage stranded and drains the backlog in one continuous pass."""
+    was_online = None
     while True:
-        await asyncio.sleep(SYNC_INTERVAL)
-        await run_sync_job()
+        try:
+            if cloud_db.online is False or not cloud_db._db.is_connected:
+                up = await cloud_db.probe()
+                if not up:
+                    was_online = False
+                    await asyncio.sleep(CLOUD_PROBE_S)
+                    continue
+            if was_online is not True:
+                await provision_cloud()
+                n = await requeue_outage_failures()
+                if n:
+                    log.info("Re-queued %s rows stranded by the outage", n)
+            was_online = True
+            await run_sync_job()
+        except Exception as e:
+            log.warning("Sync loop error: %s", e)
+        # Sleep, but notice within a second if a request finds the link down,
+        # so the loop switches to fast probing instead of finishing a 30 s nap.
+        wait = SYNC_INTERVAL if cloud_db.online else CLOUD_PROBE_S
+        t_end = time.time() + wait
+        while time.time() < t_end:
+            await asyncio.sleep(1)
+            if cloud_db.online is False and wait == SYNC_INTERVAL:
+                break
+
+
+async def _watchdog():
+    """Restart sync_loop or reconcile_loop if either task dies unexpectedly.
+
+    asyncio tasks that raise an unhandled exception are silently cancelled;
+    without a watchdog the background sync can die and nobody notices until
+    a demo. This task checks every 60 seconds and restarts any dead tasks.
+    """
+    # Give startup a moment before the first check
+    await asyncio.sleep(2)
+    tasks: dict[str, asyncio.Task] = {}
+    if not IS_CLOUD and cloud_db:
+        tasks["sync_loop"] = asyncio.create_task(sync_loop(), name="sync_loop")
+        tasks["reconcile_loop"] = asyncio.create_task(reconcile_loop(), name="reconcile_loop")
+    while True:
+        await asyncio.sleep(60)
+        if not cloud_db:
+            continue
+        for name, factory in (("sync_loop", sync_loop), ("reconcile_loop", reconcile_loop)):
+            t = tasks.get(name)
+            if t is None or t.done():
+                exc = t.exception() if (t and not t.cancelled()) else None
+                if exc:
+                    log.error("Task '%s' died with %s — restarting", name, exc)
+                else:
+                    log.warning("Task '%s' was cancelled — restarting", name)
+                tasks[name] = asyncio.create_task(factory(), name=name)
+                log.info("Task '%s' restarted by watchdog", name)

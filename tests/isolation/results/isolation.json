@@ -1,0 +1,67 @@
+{
+  "method": "Two clinic nodes, Melaka and Jasin, were connected to a PostgreSQL cloud node built from migration 002, using the least-privilege role medilink_app through the row-level security policies. A patient was seen at Melaka, then arrived at Jasin. Each check below was made either through the clinics' own interfaces or directly against the database as medilink_app.",
+  "rows": [
+    [
+      "Melaka's record reaches the cloud through RLS (as medilink_app)",
+      "present",
+      "present",
+      "Pass"
+    ],
+    [
+      "Melaka pinned: sees its own records",
+      "more than 0",
+      "1",
+      "Pass"
+    ],
+    [
+      "Jasin pinned: sees Melaka's records",
+      "0",
+      "0",
+      "Pass"
+    ],
+    [
+      "Jasin pinned: sees Melaka's patients",
+      "0",
+      "0",
+      "Pass"
+    ],
+    [
+      "Unpinned connection: sees any record",
+      "0",
+      "0",
+      "Pass"
+    ],
+    [
+      "Jasin writes a row labelled as Melaka's",
+      "refused",
+      "refused",
+      "Pass"
+    ],
+    [
+      "Jasin doctor without consent: told records exist at Melaka",
+      "1 locked entry",
+      "1 entry, no clinical detail",
+      "Pass"
+    ],
+    [
+      "Jasin doctor approves their own access request",
+      "refused (403)",
+      "403",
+      "Pass"
+    ],
+    [
+      "After the patient consents: Jasin doctor reads Melaka's record",
+      "readable",
+      "readable",
+      "Pass"
+    ],
+    [
+      "After the consent expires: records released by the database",
+      "0",
+      "0",
+      "Pass"
+    ]
+  ],
+  "passed": 10,
+  "total": 10
+}

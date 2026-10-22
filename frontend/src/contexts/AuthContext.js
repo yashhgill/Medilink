@@ -34,6 +34,16 @@ export function AuthProvider({ children }) {
     return r.data.user;
   };
 
+  // First-run setup (bundled installer): create clinic + admin, optionally
+  // activate the licence, then log in. Returns the FULL response, because the
+  // wizard needs to tell the user whether activation actually succeeded.
+  const completeSetup = async (payload) => {
+    const r = await api.post("/setup", payload);
+    localStorage.setItem("ml_token", r.data.token);
+    setUser(r.data.user);
+    return r.data;
+  };
+
   const logout = () => {
     localStorage.removeItem("ml_token");
     setUser(null);
@@ -44,7 +54,7 @@ export function AuthProvider({ children }) {
   const isAdmin = isSuperAdmin || isClinicAdmin;
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, isSuperAdmin, isClinicAdmin, isAdmin }}>
+    <AuthContext.Provider value={{ user, loading, login, register, completeSetup, logout, isSuperAdmin, isClinicAdmin, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

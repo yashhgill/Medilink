@@ -21,7 +21,7 @@ export default function PatientBottomNav({ onProfile }) {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white border-t border-[#DCE8E9]"
+      className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white border-t border-[#DAE2DF]"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       role="navigation"
       aria-label="Primary"
@@ -40,10 +40,10 @@ export default function PatientBottomNav({ onProfile }) {
               <Icon
                 size={24}
                 weight={active ? "fill" : "regular"}
-                color={active ? "#0B7C8C" : "#5A6B70"}
+                color={active ? "#0A6E62" : "#566663"}
               />
               <span
-                className={`text-[11px] font-medium ${active ? "text-[#0B7C8C]" : "text-[#5A6B70]"}`}
+                className={`text-[11px] font-medium ${active ? "text-[var(--ml-primary)]" : "text-[#566663]"}`}
               >
                 {it.label}
               </span>

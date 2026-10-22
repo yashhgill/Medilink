@@ -83,7 +83,7 @@ export default function BluetoothVitals({ onVital }) {
 
   if (!supported) {
     return (
-      <div className="flex items-center gap-2 text-xs text-[#5A6B70] rounded-xl border border-dashed border-[#DCE8E9] p-3">
+      <div className="flex items-center gap-2 text-xs text-[#566663] rounded-xl border border-dashed border-[#DAE2DF] p-3">
         <BluetoothSlash size={16} />
         Bluetooth devices need Chrome/Edge — enter vitals manually below.
       </div>
@@ -91,7 +91,7 @@ export default function BluetoothVitals({ onVital }) {
   }
 
   return (
-    <div className="flex items-center gap-3 flex-wrap rounded-xl border border-[#DCE8E9] bg-white p-3">
+    <div className="flex items-center gap-3 flex-wrap rounded-xl border border-[#DAE2DF] bg-white p-3">
       {status !== "connected" ? (
         <Button
           type="button"
@@ -100,7 +100,7 @@ export default function BluetoothVitals({ onVital }) {
           onClick={connect}
           disabled={status === "connecting"}
           data-testid="ble-connect"
-          className="rounded-full border-[#0B7C8C] text-[#0B7C8C]"
+          className="rounded-full border-[var(--ml-primary)] text-[var(--ml-primary)]"
         >
           <Bluetooth size={14} className="mr-1.5" />
           {status === "connecting" ? "Connecting…" : "Connect vitals device"}
@@ -112,18 +112,18 @@ export default function BluetoothVitals({ onVital }) {
           variant="outline"
           onClick={disconnect}
           data-testid="ble-disconnect"
-          className="rounded-full border-[#2D6A4F] text-[#2D6A4F]"
+          className="rounded-full border-[var(--ml-primary)] text-[var(--ml-primary)]"
         >
           <BluetoothConnected size={14} className="mr-1.5" /> {deviceName} · disconnect
         </Button>
       )}
       {lastReading && (
-        <span className="text-xs font-mono text-[#2D6A4F]">{lastReading}</span>
+        <span className="text-xs font-mono text-[var(--ml-primary)]">{lastReading}</span>
       )}
       {status === "error" && (
-        <span className="text-xs text-[#0A3D62]">Connection failed — try again</span>
+        <span className="text-xs text-[#10262E]">Connection failed — try again</span>
       )}
-      <span className="text-[11px] text-[#5A6B70]">
+      <span className="text-[11px] text-[#566663]">
         Readings fill the fields below automatically
       </span>
     </div>

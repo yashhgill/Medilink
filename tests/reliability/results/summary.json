@@ -1,0 +1,381 @@
+{
+  "e1": {
+    "lf_down": {
+      "during_avail": 100.0,
+      "before_avail": 100.0,
+      "after_avail": 100.0,
+      "during_req": 240,
+      "during_ok": 240,
+      "p50_before": 117.2,
+      "p95_before": 500.5,
+      "p50_during": 190.8,
+      "p95_during": 624.7,
+      "downtime": 0,
+      "outage_s": 60.0,
+      "by_op": {
+        "checkin": {
+          "requests": 60,
+          "succeeded": 60,
+          "availability_pct": 100.0,
+          "p50_ms": 39.8,
+          "p95_ms": 48.5,
+          "max_ms": 53.5
+        },
+        "read_queue": {
+          "requests": 60,
+          "succeeded": 60,
+          "availability_pct": 100.0,
+          "p50_ms": 563.2,
+          "p95_ms": 669.0,
+          "max_ms": 729.4
+        },
+        "record": {
+          "requests": 60,
+          "succeeded": 60,
+          "availability_pct": 100.0,
+          "p50_ms": 29.4,
+          "p95_ms": 37.4,
+          "max_ms": 41.8
+        },
+        "register": {
+          "requests": 60,
+          "succeeded": 60,
+          "availability_pct": 100.0,
+          "p50_ms": 335.6,
+          "p95_ms": 349.6,
+          "max_ms": 380.3
+        }
+      }
+    },
+    "lf_bh": {
+      "during_avail": 100.0,
+      "before_avail": 100.0,
+      "after_avail": 100.0,
+      "during_req": 239,
+      "during_ok": 239,
+      "p50_before": 100.5,
+      "p95_before": 489.4,
+      "p50_during": 284.7,
+      "p95_during": 4244.5,
+      "downtime": 0,
+      "outage_s": 60.0,
+      "by_op": {
+        "checkin": {
+          "requests": 60,
+          "succeeded": 60,
+          "availability_pct": 100.0,
+          "p50_ms": 101.6,
+          "p95_ms": 802.9,
+          "max_ms": 1053.1
+        },
+        "read_queue": {
+          "requests": 60,
+          "succeeded": 60,
+          "availability_pct": 100.0,
+          "p50_ms": 485.7,
+          "p95_ms": 2750.3,
+          "max_ms": 2990.9
+        },
+        "record": {
+          "requests": 59,
+          "succeeded": 59,
+          "availability_pct": 100.0,
+          "p50_ms": 52.0,
+          "p95_ms": 240.2,
+          "max_ms": 486.5
+        },
+        "register": {
+          "requests": 60,
+          "succeeded": 60,
+          "availability_pct": 100.0,
+          "p50_ms": 1618.5,
+          "p95_ms": 6251.2,
+          "max_ms": 6320.0
+        }
+      }
+    },
+    "co_down": {
+      "during_avail": 0.0,
+      "before_avail": 100.0,
+      "after_avail": 100.0,
+      "during_req": 120,
+      "during_ok": 0,
+      "p50_before": 193.4,
+      "p95_before": 392.0,
+      "p50_during": null,
+      "p95_during": null,
+      "downtime": 60,
+      "outage_s": 60.0,
+      "by_op": {
+        "checkin": {
+          "requests": 0,
+          "succeeded": 0,
+          "availability_pct": null,
+          "p50_ms": null,
+          "p95_ms": null,
+          "max_ms": null
+        },
+        "read_queue": {
+          "requests": 60,
+          "succeeded": 0,
+          "availability_pct": 0.0,
+          "p50_ms": null,
+          "p95_ms": null,
+          "max_ms": null
+        },
+        "record": {
+          "requests": 0,
+          "succeeded": 0,
+          "availability_pct": null,
+          "p50_ms": null,
+          "p95_ms": null,
+          "max_ms": null
+        },
+        "register": {
+          "requests": 60,
+          "succeeded": 0,
+          "availability_pct": 0.0,
+          "p50_ms": null,
+          "p95_ms": null,
+          "max_ms": null
+        }
+      }
+    },
+    "co_bh": {
+      "during_avail": 5.0,
+      "before_avail": 100.0,
+      "after_avail": 93.18,
+      "during_req": 120,
+      "during_ok": 6,
+      "p50_before": 195.8,
+      "p95_before": 527.1,
+      "p50_during": 26577.0,
+      "p95_during": 27850.7,
+      "downtime": 86,
+      "outage_s": 60.0,
+      "by_op": {
+        "checkin": {
+          "requests": 0,
+          "succeeded": 0,
+          "availability_pct": null,
+          "p50_ms": null,
+          "p95_ms": null,
+          "max_ms": null
+        },
+        "read_queue": {
+          "requests": 60,
+          "succeeded": 0,
+          "availability_pct": 0.0,
+          "p50_ms": null,
+          "p95_ms": null,
+          "max_ms": null
+        },
+        "record": {
+          "requests": 0,
+          "succeeded": 0,
+          "availability_pct": null,
+          "p50_ms": null,
+          "p95_ms": null,
+          "max_ms": null
+        },
+        "register": {
+          "requests": 60,
+          "succeeded": 6,
+          "availability_pct": 10.0,
+          "p50_ms": 26577.0,
+          "p95_ms": 27850.7,
+          "max_ms": 28109.1
+        }
+      }
+    }
+  },
+  "e2": {
+    "final": [
+      {
+        "visits": 10,
+        "rows": 40,
+        "runs": 3,
+        "recovery_mean": 2.48,
+        "recovery_min": 0.81,
+        "recovery_max": 3.57,
+        "missing": 0,
+        "writes_ok": 90,
+        "writes_total": 90,
+        "offline_p95": 1128.3
+      },
+      {
+        "visits": 50,
+        "rows": 200,
+        "runs": 3,
+        "recovery_mean": 3.42,
+        "recovery_min": 2.33,
+        "recovery_max": 5.33,
+        "missing": 0,
+        "writes_ok": 450,
+        "writes_total": 450,
+        "offline_p95": 882.1
+      },
+      {
+        "visits": 100,
+        "rows": 400,
+        "runs": 3,
+        "recovery_mean": 5.86,
+        "recovery_min": 5.35,
+        "recovery_max": 6.12,
+        "missing": 0,
+        "writes_ok": 900,
+        "writes_total": 900,
+        "offline_p95": 830.7
+      },
+      {
+        "visits": 250,
+        "rows": 1000,
+        "runs": 3,
+        "recovery_mean": 10.75,
+        "recovery_min": 10.0,
+        "recovery_max": 11.77,
+        "missing": 0,
+        "writes_ok": 2250,
+        "writes_total": 2250,
+        "offline_p95": 905.0
+      },
+      {
+        "visits": 500,
+        "rows": 2000,
+        "runs": 3,
+        "recovery_mean": 20.44,
+        "recovery_min": 17.67,
+        "recovery_max": 22.18,
+        "missing": 0,
+        "writes_ok": 4500,
+        "writes_total": 4500,
+        "offline_p95": 927.3
+      }
+    ],
+    "before": [
+      {
+        "visits": 10,
+        "rows": 21,
+        "stranded": 0,
+        "missing": 0,
+        "recovery": 53.57,
+        "writes_ok": 17,
+        "writes_total": 23
+      },
+      {
+        "visits": 50,
+        "rows": 200,
+        "stranded": 25,
+        "missing": 10,
+        "recovery": 102.61,
+        "writes_ok": 150,
+        "writes_total": 150
+      },
+      {
+        "visits": 100,
+        "rows": 425,
+        "stranded": 81,
+        "missing": 25,
+        "recovery": 187.37,
+        "writes_ok": 300,
+        "writes_total": 300
+      }
+    ],
+    "max_visits": 500,
+    "max_recovery": 22.18,
+    "total_missing": 0,
+    "total_writes": 8190,
+    "total_ok": 8190
+  },
+  "e3": {
+    "lat0": {
+      "n": 200,
+      "replicated": 200,
+      "p50_ms": 11.0,
+      "p90_ms": 11.7,
+      "p95_ms": 12.4,
+      "p99_ms": 22.4,
+      "mean_ms": 12.6,
+      "max_ms": 204.2,
+      "p50": 11.0
+    },
+    "lat40": {
+      "n": 200,
+      "replicated": 200,
+      "p50_ms": 1497.4,
+      "p90_ms": 1507.1,
+      "p95_ms": 1516.1,
+      "p99_ms": 1740.0,
+      "mean_ms": 1504.0,
+      "max_ms": 1914.3,
+      "p50": 1497.4
+    }
+  },
+  "rls": {
+    "method": "Two clinic nodes, Melaka and Jasin, were connected to a PostgreSQL cloud node built from migration 002, using the least-privilege role medilink_app through the row-level security policies. A patient was seen at Melaka, then arrived at Jasin. Each check below was made either through the clinics' own interfaces or directly against the database as medilink_app.",
+    "rows": [
+      [
+        "Melaka's record reaches the cloud through RLS (as medilink_app)",
+        "present",
+        "present",
+        "Pass"
+      ],
+      [
+        "Melaka pinned: sees its own records",
+        "more than 0",
+        "1",
+        "Pass"
+      ],
+      [
+        "Jasin pinned: sees Melaka's records",
+        "0",
+        "0",
+        "Pass"
+      ],
+      [
+        "Jasin pinned: sees Melaka's patients",
+        "0",
+        "0",
+        "Pass"
+      ],
+      [
+        "Unpinned connection: sees any record",
+        "0",
+        "0",
+        "Pass"
+      ],
+      [
+        "Jasin writes a row labelled as Melaka's",
+        "refused",
+        "refused",
+        "Pass"
+      ],
+      [
+        "Jasin doctor without consent: told records exist at Melaka",
+        "1 locked entry",
+        "1 entry, no clinical detail",
+        "Pass"
+      ],
+      [
+        "Jasin doctor approves their own access request",
+        "refused (403)",
+        "403",
+        "Pass"
+      ],
+      [
+        "After the patient consents: Jasin doctor reads Melaka's record",
+        "readable",
+        "readable",
+        "Pass"
+      ],
+      [
+        "After the consent expires: records released by the database",
+        "0",
+        "0",
+        "Pass"
+      ]
+    ],
+    "passed": 10,
+    "total": 10
+  }
+}

@@ -1,0 +1,7 @@
+tunnel: 58134bfe-266d-40a8-a0db-2c323753a71c
+credentials-file: /Users/yashhgill/.cloudflared/58134bfe-266d-40a8-a0db-2c323753a71c.json
+
+ingress:
+  - hostname: health.harnova.my
+    service: http://127.0.0.1:8000
+  - service: http_status:404

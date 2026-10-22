@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { fmtDateTime, fmtDate } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,12 +113,12 @@ export default function PharmacyInventory() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
-      <ArrowsClockwise size={28} className="text-[#0B7C8C] animate-spin" />
+      <ArrowsClockwise size={28} className="text-[var(--ml-primary)] animate-spin" />
     </div>
   );
 
   return (
-    <AppShell title="Pharmacy · Inventory" subtitle={user?.name || "Pharmacy"} navItems={[{ label: "Dispense Queue", to: "/pharmacy" }, { label: "Inventory", to: "/pharmacy/inventory" }]}>
+    <AppShell title="Stock" subtitle="Pharmacy" navItems={[{ label: "Dispensing", to: "/pharmacy" }, { label: "Stock", to: "/pharmacy/inventory" }]}>
     <div className="space-y-6">
       {summary && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -125,11 +126,11 @@ export default function PharmacyInventory() {
             { label: "Medicines", value: summary.items },
             { label: "Stock value", value: `RM ${Number(summary.stock_value).toFixed(2)}` },
             { label: "Low stock", value: summary.low_stock, warn: summary.low_stock > 0 },
-            { label: "Expiring ≤30d", value: summary.expiring_soon, warn: summary.expiring_soon > 0 },
+            { label: "Expiring within 30 days", value: summary.expiring_soon, warn: summary.expiring_soon > 0 },
           ].map((c) => (
-            <div key={c.label} className={`rounded-2xl border p-4 ${c.warn ? "border-amber-300 bg-amber-50" : "border-[#DCE8E9] bg-white"}`}>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-[#6B7B6E]">{c.label}</div>
-              <div className={`font-display text-2xl mt-1 ${c.warn ? "text-amber-700" : "text-[#0B7C8C]"}`}>{c.value}</div>
+            <div key={c.label} className={`rounded-2xl border p-4 ${c.warn ? "border-[#EBC9B3] bg-[#FBF1EA]" : "border-[#DAE2DF] bg-white"}`}>
+              <div className="text-[10px] text-[#566663]">{c.label}</div>
+              <div className={`font-display text-2xl mt-1 ${c.warn ? "text-[#7A3410]" : "text-[#10201D]"}`}>{c.value}</div>
             </div>
           ))}
         </div>
@@ -137,18 +138,18 @@ export default function PharmacyInventory() {
 
       {/* Alerts strip */}
       {alerts.length > 0 && (
-        <div className="bg-[#FDE8D8] border border-[#F4A261]/40 rounded-2xl p-4">
+        <div className="bg-[#FBF1EA] border border-[#EBC9B3] rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-2">
             <Warning size={18} className="text-[#854F0B]" weight="fill" />
-            <span className="font-semibold text-[#854F0B] text-sm">{alerts.length} alert{alerts.length > 1 ? "s" : ""} require attention</span>
+            <span className="font-bold text-[#7A3410] text-[15px]">{alerts.length === 1 ? "1 medicine needs attention" : `${alerts.length} medicines need attention`}</span>
           </div>
           <div className="space-y-1">
             {alerts.slice(0, 5).map((a, i) => (
-              <div key={i} className="text-xs text-[#854F0B] flex items-center gap-2">
+              <div key={i} className="text-[15px] text-[#7A3410] flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#854F0B] flex-shrink-0" />
-                {a.alert === "low_stock"
-                  ? `${a.name} — only ${a.stock_qty} ${a.unit}s left (reorder at ${a.reorder_level})`
-                  : `${a.name} — expires in ${a.days_left} days`
+                {(a.alert_type || a.alert) === "low_stock"
+                  ? `${a.name}: only ${a.stock_qty} ${a.unit}s left, reorder at ${a.reorder_level}`
+                  : `${a.name}: expires in ${a.days_left} days`
                 }
               </div>
             ))}
@@ -160,39 +161,25 @@ export default function PharmacyInventory() {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-sm">
-          <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7B6E]" />
+          <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#566663]" />
           <Input
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search medicines…"
-            className="pl-9 rounded-xl border-[#DCE8E9] bg-white"
+            className="pl-9 rounded-xl border-[#DAE2DF] bg-white"
           />
         </div>
-        <Button onClick={openAdd} className="bg-[#0B7C8C] text-white rounded-xl gap-1.5">
-          <Plus size={16} /> Add Medicine
+        <Button onClick={openAdd} className="bg-[var(--ml-primary)] text-white rounded-xl gap-1.5">
+          <Plus size={16} /> Add medicine
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: "Total SKUs", value: items.length, color: "text-[#0B7C8C]" },
-          { label: "Low Stock", value: alerts.filter(a=>a.alert==="low_stock").length, color: "text-[#854F0B]" },
-          { label: "Expiring Soon", value: alerts.filter(a=>a.alert==="expiring_soon").length, color: "text-[#A32D2D]" },
-        ].map(s => (
-          <div key={s.label} className="bg-white rounded-2xl p-4 border border-[#DCE8E9]">
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-[#6B7B6E] mt-0.5">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
       {/* Table */}
-      <div className="bg-white rounded-2xl border border-[#DCE8E9] overflow-hidden">
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 bg-[#EAF5F5] text-xs font-semibold text-[#6B7B6E] uppercase tracking-wider border-b border-[#DCE8E9]">
+      <div className="bg-white rounded-2xl border border-[#DAE2DF] overflow-hidden">
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 bg-[var(--ml-wash)] text-[13px] font-semibold text-[#566663] border-b border-[#DAE2DF]">
           <span>Medicine</span><span>Stock</span><span>Price</span><span>Expiry</span><span>Actions</span>
         </div>
         {filtered.length === 0 ? (
-          <div className="text-center py-12 text-[#6B7B6E]">
+          <div className="text-center py-12 text-[#566663]">
             <Package size={32} className="mx-auto mb-2 opacity-40" />
             <p className="text-sm">No medicines found</p>
           </div>
@@ -202,13 +189,13 @@ export default function PharmacyInventory() {
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.02 }}
-            className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-4 border-b border-[#DCE8E9] last:border-0 items-center hover:bg-[#F4F9F9] transition-colors"
+            className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-4 border-b border-[#DAE2DF] last:border-0 items-center hover:bg-[#EEF2F1] transition-colors"
           >
             <div>
-              <p className="font-medium text-[#0B7C8C] text-sm">{item.name}</p>
-              {item.generic_name && <p className="text-xs text-[#6B7B6E]">{item.generic_name}</p>}
+              <p className="font-medium text-[var(--ml-primary)] text-sm">{item.name}</p>
+              {item.generic_name && <p className="text-xs text-[#566663]">{item.generic_name}</p>}
               {item.category && (
-                <span className={`inline-block text-[10px] px-2 py-0.5 rounded-full mt-1 font-medium ${CATEGORY_COLORS[item.category] || "bg-[#EAF5F5] text-[#6B7B6E]"}`}>
+                <span className={`inline-block text-[10px] px-2 py-0.5 rounded-full mt-1 font-medium ${CATEGORY_COLORS[item.category] || "bg-[var(--ml-wash)] text-[#566663]"}`}>
                   {item.category}
                 </span>
               )}
@@ -218,37 +205,37 @@ export default function PharmacyInventory() {
               <StockBadge qty={item.stock_qty} reorder={item.reorder_level} />
               <div className="flex items-center gap-1">
                 <button onClick={() => handleStockAdjust(item, -1)}
-                  className="w-5 h-5 rounded bg-[#EAF5F5] text-[#6B7B6E] hover:bg-[#DCE8E9] text-xs font-bold flex items-center justify-center">−</button>
-                <span className="text-sm font-semibold text-[#0B7C8C] w-8 text-center">{item.stock_qty}</span>
+                  className="w-5 h-5 rounded bg-[var(--ml-wash)] text-[#566663] hover:bg-[#DAE2DF] text-xs font-bold flex items-center justify-center">−</button>
+                <span className="text-sm font-semibold text-[var(--ml-primary)] w-8 text-center">{item.stock_qty}</span>
                 <button onClick={() => handleStockAdjust(item, 1)}
-                  className="w-5 h-5 rounded bg-[#EAF5F5] text-[#6B7B6E] hover:bg-[#DCE8E9] text-xs font-bold flex items-center justify-center">+</button>
-                <span className="text-xs text-[#6B7B6E]">{item.unit}s</span>
+                  className="w-5 h-5 rounded bg-[var(--ml-wash)] text-[#566663] hover:bg-[#DAE2DF] text-xs font-bold flex items-center justify-center">+</button>
+                <span className="text-xs text-[#566663]">{item.unit}s</span>
                 <button onClick={() => openHistory(item)} title="Stock history"
-                  className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[#EAF5F5] text-[#6B7B6E] hover:bg-[#DCE8E9]">history</button>
+                  className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-[var(--ml-wash)] text-[#566663] hover:bg-[#DAE2DF]">history</button>
               </div>
             </div>
 
-            <div className="text-sm text-[#0B7C8C] font-medium">
+            <div className="text-sm text-[var(--ml-primary)] font-medium">
               RM {Number(item.unit_price).toFixed(2)}
-              <p className="text-xs text-[#6B7B6E] font-normal">per {item.unit}</p>
+              <p className="text-xs text-[#566663] font-normal">per {item.unit}</p>
             </div>
 
-            <div className="text-sm text-[#0B7C8C]">
+            <div className="text-sm text-[var(--ml-primary)]">
               {item.expiry_date ? (
                 (() => {
                   const days = Math.ceil((new Date(item.expiry_date) - new Date()) / 86400000);
                   return (
-                    <span className={days <= 30 ? "text-[#A32D2D] font-medium" : "text-[#6B7B6E]"}>
+                    <span className={days <= 30 ? "text-[#A32D2D] font-medium" : "text-[#566663]"}>
                       {item.expiry_date}
                       {days <= 30 && <span className="block text-xs">({days}d left)</span>}
                     </span>
                   );
                 })()
-              ) : <span className="text-[#6B7B6E] text-xs">—</span>}
+              ) : <span className="text-[#566663] text-xs">—</span>}
             </div>
 
             <Button size="sm" variant="ghost" onClick={() => openEdit(item)}
-              className="text-[#6B7B6E] hover:text-[#0B7C8C] hover:bg-[#EAF5F5] rounded-lg text-xs">
+              className="text-[#566663] hover:text-[var(--ml-primary)] hover:bg-[var(--ml-wash)] rounded-lg text-xs">
               Edit
             </Button>
           </motion.div>
@@ -257,9 +244,9 @@ export default function PharmacyInventory() {
 
       {/* Add / Edit dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="max-w-md rounded-3xl bg-[#F4F9F9] border-0">
+        <DialogContent className="max-w-md rounded-3xl bg-[#EEF2F1] border-0">
           <DialogHeader>
-            <DialogTitle className="text-[#0B7C8C] font-display">
+            <DialogTitle className="text-[var(--ml-primary)] font-display">
               {editItem ? "Edit Medicine" : "Add Medicine"}
             </DialogTitle>
           </DialogHeader>
@@ -277,36 +264,36 @@ export default function PharmacyInventory() {
               ["Supplier", "supplier", "text"],
             ].map(([label, field, type]) => (
               <div key={field} className="space-y-1">
-                <Label className="text-xs text-[#6B7B6E]">{label}</Label>
+                <Label className="text-xs text-[#566663]">{label}</Label>
                 <Input
                   type={type} value={form[field] ?? ""}
                   onChange={e => setForm(f => ({ ...f, [field]: type === "number" ? Number(e.target.value) : e.target.value }))}
-                  className="rounded-xl border-[#DCE8E9] text-sm"
+                  className="rounded-xl border-[#DAE2DF] text-sm"
                 />
               </div>
             ))}
-            <Button onClick={handleSave} className="w-full bg-[#0B7C8C] text-white rounded-xl mt-2">
+            <Button onClick={handleSave} className="w-full bg-[var(--ml-primary)] text-white rounded-xl mt-2">
               {editItem ? "Save Changes" : "Add Medicine"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
       <Dialog open={!!historyFor} onOpenChange={(o) => !o && setHistoryFor(null)}>
-        <DialogContent className="bg-[#F4F9F9] border-[#DCE8E9] max-w-lg">
+        <DialogContent className="bg-[#EEF2F1] border-[#DAE2DF] max-w-lg">
           <DialogHeader>
             <DialogTitle className="font-display text-xl">Stock history — {historyFor?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-1.5 max-h-[360px] overflow-y-auto">
-            {movements.length === 0 && <div className="text-sm text-[#6B7B6E]">No movements recorded yet.</div>}
+            {movements.length === 0 && <div className="text-sm text-[#566663]">No movements recorded yet.</div>}
             {movements.map((mv) => (
-              <div key={mv.id} className="flex items-center justify-between p-2.5 rounded-xl border border-[#DCE8E9] bg-white text-sm">
+              <div key={mv.id} className="flex items-center justify-between p-2.5 rounded-xl border border-[#DAE2DF] bg-white text-sm">
                 <div>
-                  <span className={`font-mono font-semibold ${mv.delta < 0 ? "text-red-600" : "text-emerald-700"}`}>
+                  <span className={`font-mono font-semibold ${mv.delta < 0 ? "text-[#10201D]" : "text-[var(--ml-primary)]"}`}>
                     {mv.delta > 0 ? `+${mv.delta}` : mv.delta}
                   </span>
-                  <span className="ml-2 text-[#6B7B6E]">{mv.reason}</span>
+                  <span className="ml-2 text-[#566663]">{mv.reason}</span>
                 </div>
-                <div className="text-[11px] text-[#6B7B6E] font-mono">{new Date(mv.created_at).toLocaleString()}</div>
+                <div className="text-[11px] text-[#566663] font-mono">{fmtDateTime(mv.created_at)}</div>
               </div>
             ))}
           </div>

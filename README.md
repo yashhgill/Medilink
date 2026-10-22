@@ -1,46 +1,75 @@
 # MediLink
 
-**A local-first clinic operating system.** Patients check in at a kiosk with
-their IC, are AI-triaged on the Malaysian zone system, see the doctor, pay by
-DuitNow QR, and collect medicine — while every record lives on the clinic's own
-server and mirrors to the cloud. The clinic keeps running when the internet
-doesn't.
+**The clinic system that keeps working when the internet doesn't.**
+Kiosk check-in with MyKad, triage, the doctor's console, pharmacy and DuitNow
+payment for Malaysian GP clinics. Each clinic runs MediLink on its own
+computer; a copy of its records follows to the cloud whenever the line is up.
 
-Final Year Project — Universiti Teknikal Malaysia Melaka (UTeM)
-Bachelor of Technology in Cloud Computing and Application
-**Yashpreet Singh Gill** · B032410981
+Website and downloads: **https://medilink.harnova.my**
+Latest desktop builds: [Releases](https://github.com/yashhgill/Medilink/releases/latest)
+
+Final Year Project, Universiti Teknikal Malaysia Melaka (UTeM), by
+Yashpreet Singh Gill · built and supported by HarNova Technology.
 
 ## What's inside
 
-- **Self-service kiosk** — IC check-in, symptom capture, queue tickets with
-  triage zone and an app-download QR, DuitNow payment, medicine chit
-- **AI triage** — Manchester Triage System via Llama 3.3 70B, fail-safe to
-  arrival order; AI gateway enforces no-diagnosis safety rules
-- **Doctor platform** — consultations, prescriptions, AI visit summaries,
-  drug-interaction checks, **Web Bluetooth vitals** (BLE heart-rate /
-  thermometer stream into the record), X-ray/file uploads
-- **Patient app (PWA)** — records, X-rays, bills payable in-app, receipts;
-  works on the LAN and worldwide via Cloudflare Tunnel
-- **Pharmacy** — dispense queue, inventory, low-stock and expiry alerts
-- **Local-first core** — PostgreSQL on the clinic server, write-behind sync to
-  a Supabase mirror, automatic catch-up, self-provisioning cloud schema
+| Part | Where |
+|---|---|
+| Clinic node: FastAPI on SQLite, serves the whole interface | `backend/server.py` |
+| Offline triage rules (Manchester Triage, Malay and English) | `backend/triage_offline.py` |
+| Interface: React (kiosk, reception, doctor, pharmacy, patient app, waiting-room board) | `frontend/` |
+| Desktop app launcher and PyInstaller build for Windows, macOS, Linux | `packaging/` |
+| Cloud node migrations (Supabase Postgres, row-level security, per-clinic logins) | `backend/migrations/002`–`004` |
+| Issue or suspend a trial clinic's cloud key | `tools/provision_clinic.py` |
+| Product website (Cloudflare Pages) | `website/` |
+| Tests: route audit, triage, browser journey, reliability (E1–E3), tenant isolation | `backend/`, `tests/` |
 
-## Quick start
+## Run it
+
+**As a clinic would:** download the build for your computer from the
+[latest release](https://github.com/yashhgill/Medilink/releases/latest), unzip
+it and open MediLink. First run opens a short set-up in the browser.
+
+**Demo with sample patients (macOS):** double-click `Client-Demo.command`. It
+starts Klinik Melaka with a day of patients already in the queue.
+
+**From source:**
 
 ```bash
-git clone https://github.com/yashhgill/medilink.git
-cd medilink
-./setup-macbook.sh          # generates secrets, boots Docker, prints URLs
+cd frontend && npm install --legacy-peer-deps && REACT_APP_KIOSK_TOKEN=demo-kiosk-token npx craco build
+cp -r build ../backend/static
+cd ../backend && pip install -r requirements.txt
+python ../packaging/medilink_app.py
 ```
 
-## Documentation
+## Releasing
 
-- [Architecture](docs/ARCHITECTURE.md) — components, sync engine, failure tiers
-- [Security](docs/SECURITY.md) — auth, RBAC, public/clinic boundary, audit, PDPA
-- [Triage](docs/TRIAGE.md) — MTS methodology and fail-safe design
-- [Testing](docs/TESTING.md) — end-to-end evidence
+Push a tag (`git tag v1.1.0 && git push origin v1.1.0`) or run the **Release**
+workflow by hand. GitHub builds and smoke-tests the app on Windows, both kinds
+of Mac and Linux, and publishes them; the website's download buttons always
+point at the latest release.
 
-## Stack
+## Cloud for trial clinics
 
-React 19 · FastAPI · PostgreSQL 16 · Docker Compose · Cloudflare Tunnel ·
-Supabase (mirror) · Groq Llama 3.3 70B · Web Bluetooth
+1. Apply `backend/migrations/002`, `003` and `004` to the Supabase project, as
+   its owner.
+2. The clinic copies its Clinic ID from **Clinic settings → Cloud backup**.
+3. `CLOUD_ADMIN_URL=… python tools/provision_clinic.py <clinic-id> "<clinic name>"`
+   prints a key starting `mlk1.`; send it privately.
+4. The clinic pastes the key and presses **Connect to cloud**. MediLink checks
+   the key, restarts itself and starts uploading.
+
+Each clinic's login can only ever reach its own rows; the database decides
+which clinic a login belongs to (see `004_per_clinic_logins.sql` and
+`tests/isolation/clinic_logins_test.py`). End a trial with
+`provision_clinic.py --suspend <clinic-id>`.
+
+## Tests
+
+```bash
+cd backend && python audit_standalone.py          # 63 route checks
+cd backend && python -m pytest test_triage_offline.py
+node tests/e2e/journey.mjs http://127.0.0.1:8001 /tmp/shots   # browser: one full visit
+tests/isolation/run_isolation.sh                  # cloud isolation and consent
+python tests/isolation/clinic_logins_test.py      # per-clinic logins and in-app connect
+```

@@ -1,0 +1,815 @@
+{
+  "experiment": "E3",
+  "label": "local-first",
+  "injected_latency_ms": 0,
+  "n": 200,
+  "replicated": 200,
+  "p50_ms": 11.0,
+  "p90_ms": 11.7,
+  "p95_ms": 12.4,
+  "p99_ms": 22.4,
+  "mean_ms": 12.6,
+  "max_ms": 204.2,
+  "samples": [
+    {
+      "record": "b305cb06-5046-4c07-8592-8126794f3212",
+      "ms": 14.2
+    },
+    {
+      "record": "527d29d7-8c15-4531-8452-322a48f2404e",
+      "ms": 12.0
+    },
+    {
+      "record": "92c30f15-d29e-4849-b26d-a2b9274aeb93",
+      "ms": 204.2
+    },
+    {
+      "record": "cda2fa2e-e05e-4f88-83f9-c55bd9e8270a",
+      "ms": 12.3
+    },
+    {
+      "record": "34ac25f9-e4be-4231-a08d-e7e0d5ed7757",
+      "ms": 11.4
+    },
+    {
+      "record": "040b41ca-6ac1-4546-b419-da37215f7452",
+      "ms": 11.1
+    },
+    {
+      "record": "9b2eea42-9bb1-42cc-9a2c-405d234e290b",
+      "ms": 12.0
+    },
+    {
+      "record": "7f63d502-46f1-413d-97e1-945d327a6751",
+      "ms": 11.2
+    },
+    {
+      "record": "b631ac76-e7c7-45da-b4d5-ca58331d8530",
+      "ms": 11.2
+    },
+    {
+      "record": "57ab44ed-80ad-42eb-b681-ac579881c0dd",
+      "ms": 21.6
+    },
+    {
+      "record": "d0180ece-328f-44fb-a910-0ccd731c0560",
+      "ms": 11.1
+    },
+    {
+      "record": "982c059a-e044-4b9b-aa3c-90baaddd338e",
+      "ms": 10.9
+    },
+    {
+      "record": "592c08bd-921e-412c-b746-e3546b72af30",
+      "ms": 11.0
+    },
+    {
+      "record": "08984842-2148-4573-9458-a835deaf2c5c",
+      "ms": 11.5
+    },
+    {
+      "record": "05978a6a-46d2-4e2d-8978-7df27ed007c6",
+      "ms": 10.8
+    },
+    {
+      "record": "9c42e2c8-cb7b-4ecf-a965-5a6e6c4fe06d",
+      "ms": 11.4
+    },
+    {
+      "record": "787bef6c-935c-431e-8371-14a6b0797be7",
+      "ms": 10.9
+    },
+    {
+      "record": "ef2be0b3-f891-48f5-b8bf-57c519fa25de",
+      "ms": 21.8
+    },
+    {
+      "record": "40625d3b-003c-42a0-91fd-316561d19331",
+      "ms": 11.7
+    },
+    {
+      "record": "a083f55c-e278-40d1-b7f4-7fdc621c42a5",
+      "ms": 11.1
+    },
+    {
+      "record": "4387b284-f559-4bc8-8094-406919c06eff",
+      "ms": 10.8
+    },
+    {
+      "record": "8928e76c-6546-4227-bb59-2b9d5c768956",
+      "ms": 10.8
+    },
+    {
+      "record": "164632d1-6793-435d-ab80-826ee106ae74",
+      "ms": 43.3
+    },
+    {
+      "record": "180186b9-5036-477b-add0-ee05c994972d",
+      "ms": 10.8
+    },
+    {
+      "record": "39a6dfe8-a513-4425-bbd4-8b000e0c7b00",
+      "ms": 10.9
+    },
+    {
+      "record": "2f8a4696-2c7e-4fe1-8498-ba6e067c29a9",
+      "ms": 11.3
+    },
+    {
+      "record": "effbea77-afae-4647-ad92-cc09407a5dd3",
+      "ms": 10.9
+    },
+    {
+      "record": "30f4f456-9a4e-4c96-b8ab-482806d74886",
+      "ms": 10.9
+    },
+    {
+      "record": "7023434f-8ed5-41a0-9054-6d6e932d5894",
+      "ms": 11.3
+    },
+    {
+      "record": "5bf30f26-cd25-4f24-9d96-5868dbafb453",
+      "ms": 10.9
+    },
+    {
+      "record": "86e88ba2-3b32-4a93-bbdb-1a7a1dee4c3b",
+      "ms": 11.0
+    },
+    {
+      "record": "6e241341-81d4-46fa-882e-f8c492cecc39",
+      "ms": 11.1
+    },
+    {
+      "record": "7375ad2a-ca79-44f9-898d-9443fb98858f",
+      "ms": 11.0
+    },
+    {
+      "record": "efc44f8c-1a06-455b-a4ac-1c0e936619b7",
+      "ms": 11.0
+    },
+    {
+      "record": "0eb2af53-cbaf-4390-9779-584aa5094d9f",
+      "ms": 12.4
+    },
+    {
+      "record": "d492cbc1-c386-410c-b984-aec45618e2ab",
+      "ms": 11.0
+    },
+    {
+      "record": "12f8427e-e09e-4aef-9def-779f4572dd6c",
+      "ms": 11.1
+    },
+    {
+      "record": "e9581c60-be71-4471-bc7b-3f50a20c15d7",
+      "ms": 11.0
+    },
+    {
+      "record": "517f48da-21c1-4737-8c51-002cbdddcdee",
+      "ms": 11.1
+    },
+    {
+      "record": "8ef947c7-d0a4-44a3-8f3f-86be9fcdb208",
+      "ms": 11.4
+    },
+    {
+      "record": "3cb719fd-fd71-4bb2-8bf4-6641f1716ad2",
+      "ms": 11.1
+    },
+    {
+      "record": "d467dff7-0c67-45c1-92f1-25425e7be100",
+      "ms": 11.1
+    },
+    {
+      "record": "17a7f626-a6af-4cae-9e2a-9b779511c339",
+      "ms": 11.0
+    },
+    {
+      "record": "293dc086-0e48-45c4-83ee-51dc8ad294f7",
+      "ms": 11.0
+    },
+    {
+      "record": "41c37645-fc38-4325-aa8d-b46bbd44f87c",
+      "ms": 11.2
+    },
+    {
+      "record": "17d01d51-895b-4c93-872a-5ab37d18d390",
+      "ms": 11.2
+    },
+    {
+      "record": "79ec9e0a-7846-4dfc-8dbb-8974b2087478",
+      "ms": 10.8
+    },
+    {
+      "record": "7d05252a-3de5-4614-95be-9ad4419b5d96",
+      "ms": 11.2
+    },
+    {
+      "record": "d8f3e169-3ccc-47af-8cb3-72e4c385bfb2",
+      "ms": 10.8
+    },
+    {
+      "record": "21252788-917c-464a-a188-bcd5db033413",
+      "ms": 10.9
+    },
+    {
+      "record": "c4d49a4f-aa3d-4792-93d9-d69d1d938bb7",
+      "ms": 11.4
+    },
+    {
+      "record": "de24061f-534f-405a-b92d-1880deeec4aa",
+      "ms": 11.0
+    },
+    {
+      "record": "15866505-7f0a-44d0-b50e-46ff79d99623",
+      "ms": 10.9
+    },
+    {
+      "record": "4adc9e3c-14b1-4f0a-96f9-2a5389a663b9",
+      "ms": 11.1
+    },
+    {
+      "record": "f3cdd016-0219-4c73-9b9e-140393dad16b",
+      "ms": 22.2
+    },
+    {
+      "record": "d797f227-df50-4151-b2ac-86ec083d2ade",
+      "ms": 10.9
+    },
+    {
+      "record": "c79a9a04-46ea-456a-99c3-7d7c41a96bfd",
+      "ms": 11.3
+    },
+    {
+      "record": "f9a3c1c2-654e-4fe5-9f89-fdc7f193eb8d",
+      "ms": 12.0
+    },
+    {
+      "record": "8ec3518f-ba53-4d07-8444-cee77f0370fc",
+      "ms": 10.9
+    },
+    {
+      "record": "a4527725-1986-44f5-ba69-6b1aecb82976",
+      "ms": 11.4
+    },
+    {
+      "record": "11979787-59da-4e13-9d7b-a7b50a72a248",
+      "ms": 10.8
+    },
+    {
+      "record": "51b4c0b3-e3ca-419b-b6ca-5f21ae44fc6a",
+      "ms": 10.9
+    },
+    {
+      "record": "84927251-0560-4241-931f-dd0728429ce8",
+      "ms": 11.1
+    },
+    {
+      "record": "cbdc29f9-ba5a-43ea-83bb-0e76019ba57a",
+      "ms": 10.9
+    },
+    {
+      "record": "df42dbd7-180a-404a-b7d4-f0ac04909f7c",
+      "ms": 11.2
+    },
+    {
+      "record": "ec767543-c085-4571-b932-cf7f4c95bb2a",
+      "ms": 11.0
+    },
+    {
+      "record": "702676b2-b63f-4735-b07f-a12aea506db2",
+      "ms": 11.0
+    },
+    {
+      "record": "66b4ae69-08be-4ab7-ba2a-8580a0720e04",
+      "ms": 11.2
+    },
+    {
+      "record": "d083afc7-d0ba-4015-a3c8-53aaf98a04e6",
+      "ms": 11.3
+    },
+    {
+      "record": "6cece7ee-1a39-402a-9b26-e3d5ea7acb3c",
+      "ms": 10.9
+    },
+    {
+      "record": "d09951bd-b0ef-42fc-9f52-3190d3ebf7f3",
+      "ms": 10.9
+    },
+    {
+      "record": "eafaaf8b-5b4f-488e-b8b9-b800ad3bbe19",
+      "ms": 10.8
+    },
+    {
+      "record": "e11486cb-3e75-4f23-8d90-19db5d5b020b",
+      "ms": 11.7
+    },
+    {
+      "record": "e19943de-2f0c-4d88-9945-3806d74c06c3",
+      "ms": 11.4
+    },
+    {
+      "record": "46a94f31-d332-4502-8587-abc79a27340d",
+      "ms": 10.9
+    },
+    {
+      "record": "9a168784-e2d2-4815-81e3-596a4b50546e",
+      "ms": 11.0
+    },
+    {
+      "record": "6f125d82-92ee-4059-8cca-d92786f27e1f",
+      "ms": 10.9
+    },
+    {
+      "record": "3f217932-edb2-4c58-b10d-b56aa25a5564",
+      "ms": 10.9
+    },
+    {
+      "record": "de3ad6ff-cef2-4d29-8973-ea7ec0d73c42",
+      "ms": 10.9
+    },
+    {
+      "record": "c68bddff-ef96-4e44-b02f-cde245894440",
+      "ms": 11.0
+    },
+    {
+      "record": "0657b527-5ce4-43d2-b200-e7c2e220cf8f",
+      "ms": 10.8
+    },
+    {
+      "record": "b86ddaae-9221-4d36-8a2e-980c9f2ac97e",
+      "ms": 10.8
+    },
+    {
+      "record": "246a5353-739b-486f-b81b-7aa0e5404442",
+      "ms": 10.9
+    },
+    {
+      "record": "b04b9ce4-3430-4872-83d3-6794c293fcb8",
+      "ms": 11.4
+    },
+    {
+      "record": "c03e535b-fc26-4690-bfe4-19755b0a166c",
+      "ms": 11.1
+    },
+    {
+      "record": "d9daf50d-385d-4491-8fe9-f423cf79f4d8",
+      "ms": 11.0
+    },
+    {
+      "record": "4763401b-97c6-4728-a8ab-418a46cca554",
+      "ms": 10.9
+    },
+    {
+      "record": "903b166a-decb-479f-bf92-f7bf5eccc31b",
+      "ms": 11.1
+    },
+    {
+      "record": "12f008c9-38b2-4938-8474-fef00de50167",
+      "ms": 11.2
+    },
+    {
+      "record": "b8850b65-f491-44b4-82c9-3f90e4f5cd21",
+      "ms": 10.9
+    },
+    {
+      "record": "e1180ada-ecec-49ae-abe5-c33d8796592e",
+      "ms": 10.9
+    },
+    {
+      "record": "5f3e3e77-57df-4ada-b6d0-4d7b194492cc",
+      "ms": 11.1
+    },
+    {
+      "record": "bf300b51-00f9-42f4-b681-deda13bcb183",
+      "ms": 11.0
+    },
+    {
+      "record": "04d004bc-8287-4f8b-a294-286ebe40e9f3",
+      "ms": 10.8
+    },
+    {
+      "record": "0ab48587-d679-422e-ba56-9a28f2848b7c",
+      "ms": 10.8
+    },
+    {
+      "record": "2c1a6d07-8494-49b2-96e8-a5238fe48114",
+      "ms": 11.3
+    },
+    {
+      "record": "a8c8c09e-581a-4172-bde1-cf9465d71365",
+      "ms": 11.1
+    },
+    {
+      "record": "c6f32db3-f425-4740-8cbe-419371934fd3",
+      "ms": 11.5
+    },
+    {
+      "record": "16dbb5a2-8784-4006-940f-17ccf02d425b",
+      "ms": 11.0
+    },
+    {
+      "record": "bf5fdc11-23a8-4ac7-b3ee-ded5cef0ca4a",
+      "ms": 11.6
+    },
+    {
+      "record": "623194d1-06ad-4d1c-a6a1-923afb480d40",
+      "ms": 11.2
+    },
+    {
+      "record": "44038f5c-3f96-48c6-b828-6f9c8f0156a1",
+      "ms": 11.1
+    },
+    {
+      "record": "f8167396-7d9f-42c3-8598-ddd1f4a43c42",
+      "ms": 11.2
+    },
+    {
+      "record": "cef7bc89-5102-4bde-b7a7-5e20f0e0ece2",
+      "ms": 11.5
+    },
+    {
+      "record": "29f8c39e-f7e5-4fc0-8d23-344ffc413d0c",
+      "ms": 10.8
+    },
+    {
+      "record": "2669cbc3-e359-4339-b027-7527b443f42f",
+      "ms": 11.8
+    },
+    {
+      "record": "7d507e07-191a-4bcd-bf0d-20b0c009d7a3",
+      "ms": 11.4
+    },
+    {
+      "record": "4f8d31c2-3600-4012-a108-e4e8c5a8c7a5",
+      "ms": 11.2
+    },
+    {
+      "record": "b6d1fdbb-d3fb-44a7-8dd4-933f10337c48",
+      "ms": 11.0
+    },
+    {
+      "record": "9de374c3-c04a-4877-be67-776beecda784",
+      "ms": 11.0
+    },
+    {
+      "record": "2a438c4b-36f1-4ff8-a478-3f80da198bbe",
+      "ms": 11.0
+    },
+    {
+      "record": "ceeaf225-5093-4eb0-a95d-c65641273896",
+      "ms": 11.3
+    },
+    {
+      "record": "1f267f06-cedb-49dc-a9a1-06813a6e90ee",
+      "ms": 11.1
+    },
+    {
+      "record": "681ff538-7ce8-4959-8dc7-3705c85bc845",
+      "ms": 11.0
+    },
+    {
+      "record": "c738c0b6-a84a-43ec-94b0-732cf5f7e572",
+      "ms": 15.6
+    },
+    {
+      "record": "873d486f-7c8e-4e82-ae17-1d19b393c5fe",
+      "ms": 11.2
+    },
+    {
+      "record": "a6efcf62-0802-425a-a6a8-8c6e2c43a6cc",
+      "ms": 11.0
+    },
+    {
+      "record": "6d24a5ab-2f21-46b6-957f-2ecf402b09a1",
+      "ms": 11.2
+    },
+    {
+      "record": "02bb9edd-e6d9-4631-ba53-ffcfbe41fed1",
+      "ms": 11.0
+    },
+    {
+      "record": "5e68fb55-d859-4494-96dd-660a04e66eb0",
+      "ms": 11.0
+    },
+    {
+      "record": "4abfb7bc-ce78-4479-ae52-ba8a17eaa033",
+      "ms": 10.8
+    },
+    {
+      "record": "845532c3-4c4c-4bd2-b749-f671ea245ef2",
+      "ms": 10.9
+    },
+    {
+      "record": "20679fef-fa1e-4fa6-b133-3f2a3565aab2",
+      "ms": 10.8
+    },
+    {
+      "record": "095ec67e-6001-4c0e-a626-00fb624051b4",
+      "ms": 12.4
+    },
+    {
+      "record": "200fb9f4-1575-4b8e-8067-9199b104a4c7",
+      "ms": 21.6
+    },
+    {
+      "record": "ae69a93d-8acb-4a35-8752-9aed5c82c407",
+      "ms": 11.1
+    },
+    {
+      "record": "dd33bcd2-8562-4c5a-a226-d3c2b0a41f70",
+      "ms": 11.0
+    },
+    {
+      "record": "cd05a353-d395-4719-b57f-7719e561e579",
+      "ms": 11.2
+    },
+    {
+      "record": "8b1cb395-2103-4968-a501-a8e8ddae58fa",
+      "ms": 10.9
+    },
+    {
+      "record": "a1cdf442-d640-4a2d-98a2-c3894a9ce78e",
+      "ms": 11.0
+    },
+    {
+      "record": "dccaa3b8-53fa-4557-9498-89f888b81617",
+      "ms": 11.0
+    },
+    {
+      "record": "8200dc21-383d-4dee-8aef-3e134ac431f1",
+      "ms": 11.4
+    },
+    {
+      "record": "2d803bba-f7d7-468f-b735-64d83a480710",
+      "ms": 10.9
+    },
+    {
+      "record": "385e7106-c35c-4ec6-9490-132075444bfa",
+      "ms": 11.0
+    },
+    {
+      "record": "0656bcd3-a1e0-43ba-af85-492109682e71",
+      "ms": 11.0
+    },
+    {
+      "record": "854cac78-b639-42b6-9c3b-1080dfc58c31",
+      "ms": 11.4
+    },
+    {
+      "record": "8c2eb515-996d-4acc-8c66-7caacce7ae60",
+      "ms": 11.0
+    },
+    {
+      "record": "a57da41a-76e6-4b71-b673-d37a5e95363e",
+      "ms": 10.9
+    },
+    {
+      "record": "a7196b0b-5a18-47a1-81a8-d008b15e6c6b",
+      "ms": 11.1
+    },
+    {
+      "record": "034c63b6-df80-43b0-b719-9781d5d5085e",
+      "ms": 11.2
+    },
+    {
+      "record": "c892083e-8ae9-455c-984f-6a93b2f708e0",
+      "ms": 11.4
+    },
+    {
+      "record": "c621cb68-03a8-4e6c-aab5-b14316d8fdcd",
+      "ms": 11.4
+    },
+    {
+      "record": "74feeb28-146e-4cf1-861b-33a53795040e",
+      "ms": 10.9
+    },
+    {
+      "record": "e5fc867a-33e9-4aab-8ba9-31ac59b79a28",
+      "ms": 11.0
+    },
+    {
+      "record": "59e22055-bf9a-487d-b040-4b06bacbfce1",
+      "ms": 11.8
+    },
+    {
+      "record": "c4a02067-68b2-4637-af21-28e3008b1784",
+      "ms": 11.0
+    },
+    {
+      "record": "3119e3d4-b36d-4b4e-b015-004fa5deb717",
+      "ms": 11.0
+    },
+    {
+      "record": "0d6b8ecd-c64f-4731-b68e-c101bd209b80",
+      "ms": 22.1
+    },
+    {
+      "record": "72db83be-74ed-4190-be43-96dda418fc4f",
+      "ms": 10.8
+    },
+    {
+      "record": "9ba2d4c1-216a-464b-b25c-9a9d7ab5529d",
+      "ms": 11.2
+    },
+    {
+      "record": "46c8d708-6ce8-46e1-8a95-99da23158f65",
+      "ms": 10.8
+    },
+    {
+      "record": "4329b91c-3e95-42b6-8b08-a8b29524db59",
+      "ms": 10.8
+    },
+    {
+      "record": "d53c26a9-45ff-4ed3-b08a-98a70e86d392",
+      "ms": 10.9
+    },
+    {
+      "record": "a337e175-7c95-4fa0-b1b3-25055ca523bb",
+      "ms": 10.8
+    },
+    {
+      "record": "19a22b86-4b58-4d58-8280-e8b782792092",
+      "ms": 11.3
+    },
+    {
+      "record": "1ffa76c8-0689-4f4b-bbe5-3d87dcfafda4",
+      "ms": 12.1
+    },
+    {
+      "record": "4c8a6d5c-0031-471d-ac70-cab382136a0b",
+      "ms": 11.2
+    },
+    {
+      "record": "64fd25af-4291-4d29-a0ea-caa60ce4532a",
+      "ms": 11.0
+    },
+    {
+      "record": "b88316f4-9956-4b26-b8c6-c0f7b0dff73d",
+      "ms": 10.9
+    },
+    {
+      "record": "81cadd0b-64b5-4660-8224-c647cfc7c35f",
+      "ms": 10.9
+    },
+    {
+      "record": "3fd3ce9b-7306-47a5-a11f-cc2b6e9d108f",
+      "ms": 10.8
+    },
+    {
+      "record": "1cc3fa9e-24f2-4316-930a-f78333e21d2b",
+      "ms": 11.0
+    },
+    {
+      "record": "128a0cf8-2d38-452d-a92f-1c2f79b5e22c",
+      "ms": 10.9
+    },
+    {
+      "record": "79642d3d-3420-4200-bf18-3d894293a758",
+      "ms": 10.8
+    },
+    {
+      "record": "bc514a9a-d700-4c79-83c4-e4b849b4cb2e",
+      "ms": 11.1
+    },
+    {
+      "record": "16b12629-1db7-4f93-9d35-2019b7123d71",
+      "ms": 10.9
+    },
+    {
+      "record": "041de9fc-3a3c-4e9b-84a1-3e57ddcf1ba4",
+      "ms": 11.5
+    },
+    {
+      "record": "4ae7dbee-6e3e-4619-acae-054f695229d0",
+      "ms": 11.1
+    },
+    {
+      "record": "0acdfe44-68e4-4d79-a6c7-4049fb863d8a",
+      "ms": 11.0
+    },
+    {
+      "record": "2790ed3e-6b3a-4b01-b2bc-b8c439e273b7",
+      "ms": 11.1
+    },
+    {
+      "record": "b23fc521-9c24-4422-9661-457ce61de3ce",
+      "ms": 11.0
+    },
+    {
+      "record": "c49748b6-89f0-4445-8950-320360c037f5",
+      "ms": 11.3
+    },
+    {
+      "record": "ff4e95f1-c545-49ee-a458-f59d363bb8bc",
+      "ms": 11.4
+    },
+    {
+      "record": "bf0678ea-a6ac-41ab-9e3e-fe1e6bba109b",
+      "ms": 11.4
+    },
+    {
+      "record": "eaedcd4c-e623-4116-9d26-584d178b57f1",
+      "ms": 11.1
+    },
+    {
+      "record": "d1ab4587-f162-44dd-869a-76d917de735a",
+      "ms": 10.8
+    },
+    {
+      "record": "5ce8c1b8-6d85-48e5-9091-165463d64ce8",
+      "ms": 11.3
+    },
+    {
+      "record": "907728b6-9139-451f-8697-8d60c85ee45e",
+      "ms": 10.8
+    },
+    {
+      "record": "a44ddf0d-11fc-4763-b8e5-caf093fbe7ef",
+      "ms": 10.9
+    },
+    {
+      "record": "8097e9e9-731b-4040-9ab4-462702f28e3a",
+      "ms": 11.6
+    },
+    {
+      "record": "5548c3fb-79d0-47ba-9477-14371436d6f8",
+      "ms": 10.9
+    },
+    {
+      "record": "1f304f47-f594-4822-9d47-bae52820d90c",
+      "ms": 10.8
+    },
+    {
+      "record": "a363a29d-f280-485f-a9d1-16f66d9f7339",
+      "ms": 11.4
+    },
+    {
+      "record": "cec3f336-7424-4c79-ba38-c0f8fb5d868c",
+      "ms": 10.9
+    },
+    {
+      "record": "edfaf34a-4c2c-4aa5-be2d-98a2daa9f06a",
+      "ms": 10.8
+    },
+    {
+      "record": "c0cd5114-ca4a-49ed-8059-bce279399945",
+      "ms": 11.5
+    },
+    {
+      "record": "5e1e1636-ef79-4d51-881a-b81bda2d88d1",
+      "ms": 11.0
+    },
+    {
+      "record": "a42fe9a5-404f-4479-86e7-0466f0ec903b",
+      "ms": 10.8
+    },
+    {
+      "record": "42a0ecd9-0272-40e2-a26c-f98af97500b9",
+      "ms": 11.7
+    },
+    {
+      "record": "548a8c35-67d4-456a-829e-2de3949fc702",
+      "ms": 10.7
+    },
+    {
+      "record": "4eaacaa6-1ed4-458d-90dc-25e296664881",
+      "ms": 11.2
+    },
+    {
+      "record": "727241aa-428a-4dbf-a84f-55ba01c54e71",
+      "ms": 11.3
+    },
+    {
+      "record": "34063477-1704-4ca9-8a5a-e12a85d1dbdc",
+      "ms": 11.0
+    },
+    {
+      "record": "86521fe3-849c-4ad3-a48f-8ea9e8200cac",
+      "ms": 12.0
+    },
+    {
+      "record": "15c5e2b0-80b5-499d-adef-231f006181af",
+      "ms": 11.0
+    },
+    {
+      "record": "2cbe13b8-779a-4383-a1fe-a636639920f5",
+      "ms": 11.2
+    },
+    {
+      "record": "4f515528-052e-4019-a3a7-fff291dcf61a",
+      "ms": 11.0
+    },
+    {
+      "record": "6395c7df-bf19-4e5f-81f5-114bfafe878c",
+      "ms": 10.9
+    },
+    {
+      "record": "8c14bab2-516e-43f4-9592-779d0307af42",
+      "ms": 11.1
+    },
+    {
+      "record": "9001c265-a4f7-4f2e-90f2-7054239bb408",
+      "ms": 11.7
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Heartbeat, ArrowRight } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { redirectFor } from "./Login";
+import { PRODUCT } from "@/brand";
 
 export default function Register() {
   const { register } = useAuth();
@@ -42,47 +43,35 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F9F9] flex items-center justify-center p-6">
-      <div className="w-full max-w-2xl bg-white border border-[#DCE8E9] rounded-3xl p-8 md:p-10">
+    <div className="min-h-screen bg-[#EEF2F1] flex items-center justify-center p-6">
+      <div className="w-full max-w-2xl bg-white border border-[#DAE2DF] rounded-3xl p-8 md:p-10">
         <Link to="/" className="flex items-center gap-2.5 mb-8" data-testid="brand-home">
-          <div className="w-9 h-9 rounded-xl bg-[#0B7C8C] flex items-center justify-center">
-            <Heartbeat size={20} color="#F4F9F9" weight="duotone" />
-          </div>
-          <div className="font-display text-lg">MediLink</div>
+          <img src={PRODUCT.logo} alt={PRODUCT.name} className="w-9 h-9 rounded-xl object-cover" />
+          <div className="font-display text-lg">{PRODUCT.name}</div>
         </Link>
 
-        <div className="overline mb-3">Create account</div>
-        <h2 className="font-display text-3xl tracking-tight mb-1">Join MediLink</h2>
-        <p className="text-sm text-[#5A6B70] mb-8">Select your role and fill in the details.</p>
+        
+        <h2 className="font-display text-3xl tracking-tight mb-1">Create a patient account</h2>
+        <p className="text-sm text-[#566663] mb-8">For patients of this clinic. Staff accounts are created by the clinic administrator.</p>
 
         <form onSubmit={submit} className="grid sm:grid-cols-2 gap-4">
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label>Role</Label>
-            <Select value={form.role} onValueChange={set("role")}>
-              <SelectTrigger data-testid="reg-role" className="border-[#DCE8E9]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="patient">Patient</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          
 
           <div className="space-y-1.5">
             <Label>Full name</Label>
-            <Input data-testid="reg-name" value={form.name} onChange={set("name")} className="border-[#DCE8E9]" required />
+            <Input data-testid="reg-name" value={form.name} onChange={set("name")} className="border-[#DAE2DF]" required />
           </div>
           <div className="space-y-1.5">
             <Label>Email</Label>
-            <Input data-testid="reg-email" type="email" value={form.email} onChange={set("email")} className="border-[#DCE8E9]" required />
+            <Input data-testid="reg-email" type="email" value={form.email} onChange={set("email")} className="border-[#DAE2DF]" required />
           </div>
           <div className="space-y-1.5">
             <Label>Password</Label>
-            <Input data-testid="reg-password" type="password" value={form.password} onChange={set("password")} className="border-[#DCE8E9]" required />
+            <Input data-testid="reg-password" type="password" value={form.password} onChange={set("password")} className="border-[#DAE2DF]" required />
           </div>
           <div className="space-y-1.5">
             <Label>Phone</Label>
-            <Input data-testid="reg-phone" value={form.phone} onChange={set("phone")} className="border-[#DCE8E9]" />
+            <Input data-testid="reg-phone" value={form.phone} onChange={set("phone")} className="border-[#DAE2DF]" />
           </div>
 
           {form.role === "patient" && (
@@ -91,20 +80,20 @@ export default function Register() {
                 <Label>IC Number</Label>
                 <Input
                   data-testid="reg-ic"
-                  placeholder="IC-YYMMDD-XX-NNNN"
+                  placeholder="000000-00-0000"
                   value={form.ic_number}
                   onChange={set("ic_number")}
-                  className="border-[#DCE8E9] font-mono"
+                  className="border-[#DAE2DF] font-mono"
                 />
               </div>
               <div className="space-y-1.5">
                 <Label>Date of Birth</Label>
-                <Input type="date" data-testid="reg-dob" value={form.dob} onChange={set("dob")} className="border-[#DCE8E9]" />
+                <Input type="date" data-testid="reg-dob" value={form.dob} onChange={set("dob")} className="border-[#DAE2DF]" />
               </div>
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>Gender</Label>
                 <Select value={form.gender} onValueChange={set("gender")}>
-                  <SelectTrigger data-testid="reg-gender" className="border-[#DCE8E9]">
+                  <SelectTrigger data-testid="reg-gender" className="border-[#DAE2DF]">
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
@@ -121,11 +110,11 @@ export default function Register() {
             <>
               <div className="space-y-1.5">
                 <Label>Specialty</Label>
-                <Input data-testid="reg-specialty" value={form.specialty} onChange={set("specialty")} className="border-[#DCE8E9]" />
+                <Input data-testid="reg-specialty" value={form.specialty} onChange={set("specialty")} className="border-[#DAE2DF]" />
               </div>
               <div className="space-y-1.5">
                 <Label>License No.</Label>
-                <Input data-testid="reg-license" value={form.license_no} onChange={set("license_no")} className="border-[#DCE8E9] font-mono" />
+                <Input data-testid="reg-license" value={form.license_no} onChange={set("license_no")} className="border-[#DAE2DF] font-mono" />
               </div>
             </>
           )}
@@ -134,15 +123,15 @@ export default function Register() {
             data-testid="reg-submit"
             type="submit"
             disabled={loading}
-            className="sm:col-span-2 h-11 bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9] rounded-full lift-on-hover"
+            className="sm:col-span-2 h-11 bg-[var(--ml-primary)] hover:bg-[var(--ml-primary-soft)] text-[#EEF2F1] rounded-full lift-on-hover"
           >
             {loading ? "Creating account…" : (<>Create account <ArrowRight size={16} className="ml-1.5" /></>)}
           </Button>
         </form>
 
-        <p className="text-sm text-[#5A6B70] mt-8 text-center">
+        <p className="text-sm text-[#566663] mt-8 text-center">
           Already have an account?{" "}
-          <Link to="/login" className="text-[#0B7C8C] font-medium underline-offset-2 hover:underline" data-testid="goto-login">
+          <Link to="/login" className="text-[var(--ml-primary)] font-medium underline-offset-2 hover:underline" data-testid="goto-login">
             Sign in
           </Link>
         </p>

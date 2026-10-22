@@ -1,0 +1,79 @@
+{
+  "experiment": "E1",
+  "label": "cloud-only",
+  "outage_mode": "blackhole",
+  "outage_s": 60.0,
+  "rate_visits_per_s": 1.0,
+  "phases": {
+    "before": {
+      "requests": 120,
+      "succeeded": 120,
+      "availability_pct": 100.0,
+      "p50_ms": 195.8,
+      "p95_ms": 527.1,
+      "max_ms": 575.8
+    },
+    "during": {
+      "requests": 120,
+      "succeeded": 6,
+      "availability_pct": 5.0,
+      "p50_ms": 26577.0,
+      "p95_ms": 27850.7,
+      "max_ms": 28109.1
+    },
+    "after": {
+      "requests": 132,
+      "succeeded": 123,
+      "availability_pct": 93.18,
+      "p50_ms": 3363.5,
+      "p95_ms": 25500.1,
+      "max_ms": 28737.0
+    }
+  },
+  "downtime_s": 98.1,
+  "by_op_during": {
+    "checkin": {
+      "requests": 0,
+      "succeeded": 0,
+      "availability_pct": null,
+      "p50_ms": null,
+      "p95_ms": null,
+      "max_ms": null
+    },
+    "read_queue": {
+      "requests": 60,
+      "succeeded": 0,
+      "availability_pct": 0.0,
+      "p50_ms": null,
+      "p95_ms": null,
+      "max_ms": null
+    },
+    "record": {
+      "requests": 0,
+      "succeeded": 0,
+      "availability_pct": null,
+      "p50_ms": null,
+      "p95_ms": null,
+      "max_ms": null
+    },
+    "register": {
+      "requests": 60,
+      "succeeded": 6,
+      "availability_pct": 10.0,
+      "p50_ms": 26577.0,
+      "p95_ms": 27850.7,
+      "max_ms": 28109.1
+    }
+  },
+  "events": [
+    {
+      "t": 1791551033.3380423,
+      "event": "link blackhole"
+    },
+    {
+      "t": 1791551093.3901882,
+      "event": "link up"
+    }
+  ],
+  "t_start": 1791551003.3372238
+}
