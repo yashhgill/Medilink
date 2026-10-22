@@ -43,9 +43,9 @@ export default function Landing() {
       <section className="relative bg-[#10262E] text-white px-6 sm:px-10 lg:px-14 py-8 lg:py-12 flex flex-col overflow-hidden" style={{ paddingTop: "max(2rem, env(safe-area-inset-top))" }}>
         <div className="flex items-center gap-3">
           {brand?.logo ? (
-            <img src={brand.logo} alt="" className="w-10 h-10 rounded-xl object-contain bg-white p-0.5" />
+            <img src={brand.logo} alt="" className="w-12 h-12 rounded-xl object-contain bg-white p-0.5" />
           ) : (
-            <img src={PRODUCT.logo} alt="" className="w-10 h-10 rounded-xl object-cover" />
+            <img src={PRODUCT.logo} alt="" className="w-12 h-12 rounded-xl object-cover" />
           )}
           <span className="text-white/70 text-[15px]">{brand?.clinic_address || "Welcome"}</span>
         </div>

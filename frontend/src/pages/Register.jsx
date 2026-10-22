@@ -46,7 +46,7 @@ export default function Register() {
     <div className="min-h-screen bg-[#EEF2F1] flex items-center justify-center p-6">
       <div className="w-full max-w-2xl bg-white border border-[#DAE2DF] rounded-3xl p-8 md:p-10">
         <Link to="/" className="flex items-center gap-2.5 mb-8" data-testid="brand-home">
-          <img src={PRODUCT.logo} alt={PRODUCT.name} className="w-9 h-9 rounded-xl object-cover" />
+          <img src={PRODUCT.logo} alt={PRODUCT.name} className="w-11 h-11 rounded-xl object-cover" />
           <div className="font-display text-lg">{PRODUCT.name}</div>
         </Link>
 

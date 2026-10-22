@@ -125,7 +125,7 @@ export default function AppShell({ children, title, subtitle, navItems = [], sec
 
   const Brand = ({ dark }) => (
     <Link to="/" className="flex items-center gap-2.5 shrink-0" data-testid="brand-home">
-      <img src={PRODUCT.logo} alt="" className="w-8 h-8 rounded-lg object-cover" />
+      <img src={PRODUCT.logo} alt="" className="w-10 h-10 rounded-[10px] object-cover" />
       <span className={`font-display text-[19px] leading-none ${dark ? "text-white" : "text-[#10201D]"}`}>{PRODUCT.name}</span>
     </Link>
   );
