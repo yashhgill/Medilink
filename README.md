@@ -51,18 +51,23 @@ point at the latest release.
 
 ## Cloud for trial clinics
 
-1. Apply `backend/migrations/002`, `003` and `004` to the Supabase project, as
-   its owner.
-2. The clinic copies its Clinic ID from **Clinic settings → Cloud backup**.
-3. `CLOUD_ADMIN_URL=… python tools/provision_clinic.py <clinic-id> "<clinic name>"`
-   prints a key starting `mlk1.`; send it privately.
-4. The clinic pastes the key and presses **Connect to cloud**. MediLink checks
+The cloud is the Supabase project `medilink-cloud`. It was set up with
+`backend/migrations/cloud_setup_supabase.sql` (tables, row-level security,
+per-clinic logins) and `005_issue_clinic_key.sql`.
+
+1. The clinic copies its Clinic ID from **Clinic settings → Cloud backup**.
+2. In the Supabase SQL editor:
+   `select medilink.issue_clinic_key('<clinic-id>', '<clinic name>');`
+   It returns a key starting `mlk1.`. Send it to the clinic privately.
+3. The clinic pastes the key and presses **Connect to cloud**. MediLink checks
    the key, restarts itself and starts uploading.
 
 Each clinic's login can only ever reach its own rows; the database decides
 which clinic a login belongs to (see `004_per_clinic_logins.sql` and
 `tests/isolation/clinic_logins_test.py`). End a trial with
-`provision_clinic.py --suspend <clinic-id>`.
+`select medilink.suspend_clinic('<clinic-id>');`. Issuing a key again for the
+same clinic replaces the old one. (`tools/provision_clinic.py` does the same
+from a terminal with the owner's connection string.)
 
 ## Tests
 
