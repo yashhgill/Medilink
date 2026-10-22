@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { PaperPlaneTilt, Sparkle, Stethoscope } from "@phosphor-icons/react";
 import { BACKEND_URL } from "@/lib/api";
+import { PRODUCT } from "@/brand";
 
 /**
  * Streaming AI symptom assistant.
@@ -15,7 +16,7 @@ export default function AIChat({ open, onOpenChange }) {
     {
       role: "assistant",
       content:
-        "Hi, I'm MediLink AI. Tell me what symptoms you're experiencing and I'll help you understand if it's urgent. (This is not a diagnosis.)",
+        `Hi, I'm ${PRODUCT.aiName}. Tell me what symptoms you're experiencing and I'll help you understand if it's urgent. (This is not a diagnosis.)`,
     },
   ]);
   const [input, setInput] = useState("");
@@ -109,14 +110,14 @@ export default function AIChat({ open, onOpenChange }) {
         side="right"
         className="glass !w-full sm:!max-w-[460px] p-0 flex flex-col border-l border-white/40"
       >
-        <SheetHeader className="px-6 pt-6 pb-3 border-b border-[#DCE8E9]/60" style={{ paddingTop: "calc(1.5rem + env(safe-area-inset-top))" }}>
+        <SheetHeader className="px-6 pt-6 pb-3 border-b border-[#DAE2DF]/60" style={{ paddingTop: "calc(1.5rem + env(safe-area-inset-top))" }}>
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-[#0B7C8C] flex items-center justify-center">
-              <Stethoscope size={18} color="#F4F9F9" weight="duotone" />
+            <div className="w-9 h-9 rounded-full bg-[var(--ml-primary)] flex items-center justify-center">
+              <Stethoscope size={18} color="#EEF2F1" weight="duotone" />
             </div>
             <div>
               <SheetTitle className="font-display text-lg leading-tight">
-                MediLink AI
+                {PRODUCT.aiName}
               </SheetTitle>
               <SheetDescription className="text-xs">
                 Symptom triage assistant
@@ -138,12 +139,12 @@ export default function AIChat({ open, onOpenChange }) {
                   data-testid={`chat-msg-${m.role}`}
                   className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
                     m.role === "user"
-                      ? "bg-[#0B7C8C] text-[#F4F9F9] rounded-br-md"
-                      : "bg-white border border-[#DCE8E9] text-[#12262B] rounded-bl-md"
+                      ? "bg-[var(--ml-primary)] text-[#EEF2F1] rounded-br-md"
+                      : "bg-white border border-[#DAE2DF] text-[#10201D] rounded-bl-md"
                   }`}
                 >
                   {m.content || (
-                    <span className="inline-flex items-center gap-1 text-[#5A6B70]">
+                    <span className="inline-flex items-center gap-1 text-[#566663]">
                       <Sparkle size={12} weight="fill" className="animate-pulse" />
                       thinking…
                     </span>
@@ -154,14 +155,14 @@ export default function AIChat({ open, onOpenChange }) {
           </AnimatePresence>
         </div>
 
-        <div className="border-t border-[#DCE8E9]/60 p-4 bg-white/40 backdrop-blur-md">
+        <div className="border-t border-[#DAE2DF]/60 p-4 bg-white/40 backdrop-blur-md">
           <div className="flex flex-wrap gap-1.5 mb-3">
             {["Fever","Cough","Headache","Sore throat","Stomach pain","Body aches","Runny nose","Dizziness","2 days","1 week"].map((chip) => (
               <button
                 key={chip}
                 type="button"
                 onClick={() => setInput((v) => (v ? v + ", " + chip.toLowerCase() : chip))}
-                className="text-xs px-3 py-1.5 rounded-full border border-[#DCE8E9] bg-white text-[#0B7C8C] hover:bg-[#EAF5F5] active:scale-95 transition-transform"
+                className="text-xs px-3 py-1.5 rounded-full border border-[#DAE2DF] bg-white text-[var(--ml-primary)] hover:bg-[var(--ml-wash)] active:scale-95 transition-transform"
               >
                 {chip}
               </button>
@@ -179,18 +180,18 @@ export default function AIChat({ open, onOpenChange }) {
                 }
               }}
               placeholder="Describe your symptoms…"
-              className="resize-none min-h-[52px] max-h-32 bg-white border-[#DCE8E9] focus-visible:ring-[#0B7C8C]"
+              className="resize-none min-h-[52px] max-h-32 bg-white border-[#DAE2DF] focus-visible:ring-[var(--ml-primary)]"
             />
             <Button
               data-testid="ai-chat-send"
               onClick={send}
               disabled={streaming || !input.trim()}
-              className="h-[52px] bg-[#0A3D62] hover:bg-[#083150] text-[#F4F9F9]"
+              className="h-[52px] bg-[#10262E] hover:bg-[#0A1A20] text-[#EEF2F1]"
             >
               <PaperPlaneTilt size={18} weight="fill" />
             </Button>
           </div>
-          <div className="text-[10px] text-[#5A6B70] mt-2 font-mono text-center">
+          <div className="text-[10px] text-[#566663] mt-2 font-mono text-center">
             Not a substitute for professional medical advice.
           </div>
         </div>

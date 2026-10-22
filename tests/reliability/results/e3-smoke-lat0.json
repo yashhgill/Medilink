@@ -1,0 +1,55 @@
+{
+  "experiment": "E3",
+  "label": "smoke",
+  "injected_latency_ms": 0,
+  "n": 10,
+  "replicated": 10,
+  "p50_ms": 21.8,
+  "p90_ms": 23.8,
+  "p95_ms": 24.4,
+  "p99_ms": 24.8,
+  "mean_ms": 20.2,
+  "max_ms": 24.9,
+  "samples": [
+    {
+      "record": "d3d750b8-2bce-41ef-8e48-c5844a04dba4",
+      "ms": 23.7
+    },
+    {
+      "record": "5febe421-12aa-4e6c-ba60-36ff70003f91",
+      "ms": 22.2
+    },
+    {
+      "record": "f85d0db6-4303-471d-a948-845592da0bec",
+      "ms": 21.9
+    },
+    {
+      "record": "0a159f15-15ac-4147-a116-9f663fb23756",
+      "ms": 22.3
+    },
+    {
+      "record": "fc08a342-572a-4df2-9ffe-6be5dec5fc74",
+      "ms": 11.7
+    },
+    {
+      "record": "7bffbf0e-3f75-4fc8-ac74-753f622e7d79",
+      "ms": 24.9
+    },
+    {
+      "record": "54ff4584-665a-42fa-a1ed-91b3e1417ec0",
+      "ms": 11.1
+    },
+    {
+      "record": "7dd61c24-40cb-45d3-ab20-f71d8c78634b",
+      "ms": 21.4
+    },
+    {
+      "record": "094fb4cf-b30d-4906-a8cb-5c786b6da402",
+      "ms": 21.6
+    },
+    {
+      "record": "684ed05e-c072-4554-bda1-24844896243b",
+      "ms": 21.7
+    }
+  ]
+}

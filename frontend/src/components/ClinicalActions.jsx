@@ -94,9 +94,9 @@ export default function ClinicalActions({ patientId, recordId }) {
   if (!patientId) return null;
 
   return (
-    <div className="rounded-xl border border-[#DCE8E9] bg-white p-4 space-y-3">
+    <div className="rounded-xl border border-[#DAE2DF] bg-white p-4 space-y-3">
       <div className="flex items-center gap-2">
-        <Flask size={16} weight="duotone" color="#0B7C8C" />
+        <Flask size={16} weight="duotone" color="#0A6E62" />
         <div className="overline">Investigations &amp; referral</div>
       </div>
 
@@ -105,13 +105,13 @@ export default function ClinicalActions({ patientId, recordId }) {
         <div className="flex-1">
           <Label className="text-[10px] overline">Order lab test</Label>
           <Select value={testCode} onValueChange={setTestCode}>
-            <SelectTrigger className="border-[#DCE8E9] h-9"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="border-[#DAE2DF] h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
               {catalog.map((t) => <SelectItem key={t.code} value={t.code}>{t.name}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
-        <Button size="sm" onClick={orderTest} disabled={busy} className="bg-[#0B7C8C] hover:bg-[#075F6C] text-white h-9">
+        <Button size="sm" onClick={orderTest} disabled={busy} className="bg-[var(--ml-primary)] hover:bg-[var(--ml-primary-soft)] text-white h-9">
           <TestTube size={14} className="mr-1" /> Order
         </Button>
       </div>
@@ -120,30 +120,30 @@ export default function ClinicalActions({ patientId, recordId }) {
       {orders.length > 0 && (
         <div className="space-y-1.5">
           {orders.map((o) => (
-            <div key={o.id} className="flex items-center justify-between text-xs border border-[#DCE8E9] rounded-lg px-2.5 py-1.5">
+            <div key={o.id} className="flex items-center justify-between text-xs border border-[#DAE2DF] rounded-lg px-2.5 py-1.5">
               <div>
-                <span className="font-medium text-[#0A3D62]">{o.test_name}</span>
+                <span className="font-medium text-[#10262E]">{o.test_name}</span>
                 {o.status === "resulted" ? (
-                  <span className={o.abnormal ? "ml-2 text-[#B55B49] font-mono" : "ml-2 text-[#2D6A4F] font-mono"}>
+                  <span className={o.abnormal ? "ml-2 text-[#B4442F] font-mono" : "ml-2 text-[var(--ml-primary)] font-mono"}>
                     {o.result_value} {o.result_unit} {o.abnormal ? "· ABNORMAL" : "· normal"}
                   </span>
                 ) : (
-                  <span className="ml-2 text-[#5A6B70]">ordered</span>
+                  <span className="ml-2 text-[#566663]">ordered</span>
                 )}
               </div>
               {o.status !== "resulted" && (
-                <button onClick={() => enterResult(o)} className="text-[#0B7C8C] hover:underline">enter result</button>
+                <button onClick={() => enterResult(o)} className="text-[var(--ml-primary)] hover:underline">enter result</button>
               )}
             </div>
           ))}
           <button
             onClick={() => downloadPdf(`/api/lab/patient/${patientId}/report/pdf`, "lab-report.pdf")}
-            className="text-[11px] text-[#0B7C8C] hover:underline">Download lab report (PDF)</button>
+            className="text-[11px] text-[var(--ml-primary)] hover:underline">Download lab report (PDF)</button>
         </div>
       )}
 
       {/* Referral */}
-      <Button size="sm" variant="outline" onClick={() => setReferOpen(true)} className="border-[#0A3D62] text-[#0A3D62] w-full">
+      <Button size="sm" variant="outline" onClick={() => setReferOpen(true)} className="border-[#10262E] text-[#10262E] w-full">
         <PaperPlaneTilt size={14} className="mr-1.5" /> Refer patient
       </Button>
 
@@ -156,16 +156,16 @@ export default function ClinicalActions({ patientId, recordId }) {
           <div className="space-y-3">
             <div><Label>Refer to</Label>
               <Input value={refer.refer_to} onChange={(e) => setRefer({ ...refer, refer_to: e.target.value })}
-                     placeholder="Cardiology, Hospital Melaka" className="border-[#DCE8E9]" /></div>
+                     placeholder="Cardiology, Hospital Melaka" className="border-[#DAE2DF]" /></div>
             <div><Label>Reason</Label>
               <Input value={refer.reason} onChange={(e) => setRefer({ ...refer, reason: e.target.value })}
-                     placeholder="Chest pain, abnormal ECG" className="border-[#DCE8E9]" /></div>
+                     placeholder="Chest pain, abnormal ECG" className="border-[#DAE2DF]" /></div>
             <div><Label>Clinical summary (optional)</Label>
               <Textarea value={refer.clinical_summary} onChange={(e) => setRefer({ ...refer, clinical_summary: e.target.value })}
-                        className="border-[#DCE8E9]" rows={3} /></div>
+                        className="border-[#DAE2DF]" rows={3} /></div>
           </div>
           <DialogFooter>
-            <Button onClick={sendReferral} className="bg-[#0A3D62] hover:bg-[#082E4A] text-white">Generate PDF</Button>
+            <Button onClick={sendReferral} className="bg-[#10262E] hover:bg-[#0A1A20] text-white">Generate PDF</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

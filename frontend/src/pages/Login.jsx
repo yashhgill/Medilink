@@ -1,12 +1,12 @@
-import React, { useState } from "react";
-import { IS_PUBLIC } from "@/lib/api";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import api, { IS_PUBLIC } from "@/lib/api";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Heartbeat, ArrowRight } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { PRODUCT } from "@/brand";
 
 export default function Login() {
   const { login } = useAuth();
@@ -14,6 +14,8 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [brand, setBrand] = useState(null);
+  useEffect(() => { api.get("/branding").then((r) => setBrand(r.data)).catch(() => {}); }, []);
 
   const submit = async (e) => {
     e?.preventDefault();
@@ -30,113 +32,89 @@ export default function Login() {
     }
   };
 
+  const loc = useLocation();
+  const asPatient = new URLSearchParams(loc.search).get("as") === "patient";
+
   return (
-    <div className="min-h-screen grid lg:grid-cols-2 bg-[#F4F9F9]">
-      {/* Left visual */}
-      <div className="relative hidden lg:block overflow-hidden">
-        <img
-          src="https://images.pexels.com/photos/7789616/pexels-photo-7789616.jpeg"
-          alt="Clinic"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-[#0B7C8C]/70" />
-        <div className="relative h-full p-12 flex flex-col justify-between text-[#F4F9F9]">
-          <Link to="/" className="flex items-center gap-2.5" data-testid="brand-home">
-            <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center backdrop-blur">
-              <Heartbeat size={20} color="#F4F9F9" weight="duotone" />
-            </div>
-            <div>
-              <div className="font-display text-lg leading-none">MediLink</div>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-white/70">
-                Health Systems
-              </div>
-            </div>
-          </Link>
-          <div>
-            <div className="text-xs uppercase tracking-[0.25em] text-white/60 mb-3">
-              MediLink Health Systems
-            </div>
-            <div className="font-display text-4xl lg:text-5xl leading-tight max-w-md">
-              Check in. Triage.<br />Treat.
-            </div>
-            <div className="text-white/70 mt-4 max-w-md">
-              One system for the whole clinic — check-in, consultation, dispensing and records. Built for Malaysian clinics.
-            </div>
-          </div>
+    <div className="min-h-screen bg-[#EEF2F1] grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <aside className="hidden lg:flex flex-col bg-[#10262E] text-white px-14 py-12">
+        <Link to="/" className="flex items-center gap-3" data-testid="brand-home">
+          {brand?.logo ? <img src={brand.logo} alt="" className="w-10 h-10 rounded-xl object-contain bg-white p-0.5" />
+            : <img src={PRODUCT.logo} alt="" className="w-10 h-10 rounded-xl object-cover" />}
+          <span className="text-white/70 text-[15px]">Back to the front door</span>
+        </Link>
+        <div className="mt-auto">
+          <h2 className="text-white text-[52px] leading-[1]">{brand?.clinic_name || PRODUCT.name}</h2>
+          <p className="mt-4 text-white/65 text-[18px] max-w-[34ch]">
+            {asPatient ? "Your visits, results, bills and medical certificates from this clinic."
+              : "Queue, consultations, payments and pharmacy, kept on this clinic's own computer."}
+          </p>
         </div>
-      </div>
-
-      {/* Right form */}
-      <div className="flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
-          <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-9 h-9 rounded-xl bg-[#0B7C8C] flex items-center justify-center">
-              <Heartbeat size={20} color="#F4F9F9" weight="duotone" />
-            </div>
-            <div className="font-display text-lg">MediLink</div>
-          </div>
-
-          <div className="overline mb-3">Sign in</div>
-          <h2 className="font-display text-3xl sm:text-4xl tracking-tight mb-1">
-            Welcome back
-          </h2>
-          <p className="text-sm text-[#5A6B70] mb-8">
-            Sign in to view your records and bills.
+      </aside>
+      <main className="flex flex-col px-6 sm:px-10 py-8">
+        <Link to="/" className="lg:hidden flex items-center gap-2.5 mb-10" data-testid="brand-home-mobile">
+          <img src={PRODUCT.logo} alt="" className="w-9 h-9 rounded-lg object-cover" />
+          <span className="font-display text-[19px]">{brand?.clinic_name || PRODUCT.name}</span>
+        </Link>
+        <div className="w-full max-w-[420px] m-auto">
+          <h1 className="text-[40px] leading-tight">{asPatient ? "Patient sign in" : "Staff sign in"}</h1>
+          <p className="text-[16px] text-[#566663] mt-1 mb-8">
+            {asPatient ? "Use the IC number on your MyKad." : "Doctors, reception, pharmacy and administrators."}
           </p>
 
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-[15px]">{asPatient ? "IC number" : "Email"}</Label>
               <Input
                 id="email"
                 data-testid="login-email"
-                type="text" autoComplete="username" inputMode="text"
-                placeholder="you@email.com or 000000-00-0000"
+                type="text" autoComplete="username" inputMode={asPatient ? "numeric" : "email"}
+                placeholder={asPatient ? "000000-00-0000" : "name@clinic.my"}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="border-[#DCE8E9] focus-visible:ring-[#0B7C8C]"
+                className={`h-12 text-[17px] border-[#C8D3CF] ${asPatient ? "font-mono" : ""}`}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-[15px]">Password</Label>
               <Input
                 id="password"
                 data-testid="login-password"
                 type="password"
-                placeholder="••••••••"
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="border-[#DCE8E9] focus-visible:ring-[#0B7C8C]"
+                className="h-12 text-[17px] border-[#C8D3CF]"
               />
             </div>
             <Button
               data-testid="login-submit"
               type="submit"
               disabled={loading}
-              className="w-full h-11 bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9] rounded-full lift-on-hover"
+              className="w-full h-12 text-[17px] font-semibold bg-[var(--ml-primary)] hover:bg-[var(--ml-primary-soft)] text-white rounded-xl"
             >
-              {loading ? "Signing in…" : (<>Sign in <ArrowRight size={16} className="ml-1.5" /></>)}
+              {loading ? "Signing in…" : "Sign in"}
             </Button>
           </form>
 
-          <p className="text-sm text-[#5A6B70] mt-6 text-center">
-            Forgot your password? Get a reset code at the clinic kiosk, then use{" "}
-            <Link to="/activate" className="text-[#0B7C8C] font-medium underline-offset-2 hover:underline">Activate</Link>. First visit?{" "}
-            <Link to="/activate" className="text-[#0B7C8C] font-medium underline-offset-2 hover:underline" data-testid="goto-activate">
-              Activate your account
-            </Link>{" "}
-            with the code on your clinic slip.
-          </p>
-          {!IS_PUBLIC && (
-          <p className="text-sm text-[#5A6B70] mt-2 text-center">
-            New here?{" "}
-            <Link to="/register" className="text-[#0B7C8C] font-medium underline-offset-2 hover:underline" data-testid="goto-register">
-              Create an account
-            </Link>
-          </p>
+          {asPatient ? (
+            <p className="text-[15px] text-[#566663] mt-6">
+              First time, or forgot your password? Ask the counter or kiosk for a code, then{" "}
+              <Link to="/activate" className="text-[var(--ml-primary)] font-semibold hover:underline" data-testid="goto-activate">set your password</Link>.
+            </p>
+          ) : (
+            <p className="text-[15px] text-[#566663] mt-6">
+              Forgot your password? Your clinic administrator can reset it.{" "}
+              <Link to="/login?as=patient" className="text-[var(--ml-primary)] font-semibold hover:underline">I'm a patient</Link>
+            </p>
+          )}
+          {asPatient && !IS_PUBLIC && (
+            <p className="text-[15px] text-[#566663] mt-2">
+              No account yet? <Link to="/register" className="text-[var(--ml-primary)] font-semibold hover:underline" data-testid="goto-register">Register</Link>
+            </p>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

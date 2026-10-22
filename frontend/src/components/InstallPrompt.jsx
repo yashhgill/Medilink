@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { DownloadSimple, X } from "@phosphor-icons/react";
+import { PRODUCT } from "@/brand";
 
 /* App-install nudge. Chrome/Android: uses beforeinstallprompt.
    iOS Safari: shows a one-time "Add to Home Screen" hint. */
@@ -33,22 +34,22 @@ export default function InstallPrompt() {
   if (!show) return null;
   return (
     <div style={{ bottom: "calc(1rem + env(safe-area-inset-bottom))" }}
-      className="fixed inset-x-4 z-[60] max-w-md mx-auto rounded-2xl shadow-2xl border border-[#DCE8E9] bg-white p-4 flex items-center gap-3">
-      <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#0B7C8C" }}>
+      className="fixed inset-x-4 z-[60] max-w-md mx-auto rounded-2xl shadow-2xl border border-[#DAE2DF] bg-white p-4 flex items-center gap-3">
+      <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#0A6E62" }}>
         <DownloadSimple size={22} color="#fff" weight="duotone" />
       </div>
       <div className="flex-1">
-        <div className="text-sm font-semibold text-[#0A3D62]">Install MediLink</div>
-        <div className="text-xs text-[#5A6B70]">
+        <div className="text-sm font-semibold text-[#10262E]">Install {PRODUCT.name}</div>
+        <div className="text-xs text-[#566663]">
           {iosHint ? "Tap Share, then “Add to Home Screen”." : "Add to your home screen for quick, app-like access."}
         </div>
       </div>
       {!iosHint && (
-        <button onClick={install} className="px-3 py-2 rounded-full text-sm font-semibold text-white" style={{ background: "#0B7C8C" }}>
+        <button onClick={install} className="px-3 py-2 rounded-full text-sm font-semibold text-white" style={{ background: "#0A6E62" }}>
           Install
         </button>
       )}
-      <button onClick={dismiss} className="w-8 h-8 rounded-lg hover:bg-[#EAF5F5] flex items-center justify-center text-[#5A6B70]">
+      <button onClick={dismiss} className="w-8 h-8 rounded-lg hover:bg-[var(--ml-wash)] flex items-center justify-center text-[#566663]">
         <X size={16} />
       </button>
     </div>

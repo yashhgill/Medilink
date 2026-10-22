@@ -1,0 +1,104 @@
+====================================================
+  MediLink — Windows Installation Guide
+====================================================
+
+WHAT'S IN THIS FOLDER
+----------------------
+  medilink-clinic\    — Clinic server executable (no Python needed)
+  medilink-gateway\   — Gateway executable (no Python needed)
+  run-clinic-A.bat    — Launch script for Clinic A (Klinik Melaka)
+  run-clinic-B.bat    — Launch script for Clinic B (Klinik Jasin)
+  run-gateway.bat     — Launch script for the Gateway
+  static\             — Pre-built React frontend
+
+
+NETWORK SETUP (multi-PC)
+-------------------------
+  PC 1 (Gateway)   → runs run-gateway.bat           → port 8000
+  PC 2 (Clinic A)  → runs run-clinic-A.bat          → port 8001
+  PC 3 (Clinic B)  → runs run-clinic-B.bat          → port 8002
+
+  All PCs must be on the same LAN (or VPN).
+  Find each PC's IP: open CMD and run   ipconfig
+
+
+STEP-BY-STEP
+------------
+
+1. CLINIC A PC
+   a. Copy this entire MediLink-Windows\ folder to the PC.
+   b. Open run-clinic-A.bat in Notepad.
+   c. Set GATEWAY_URL to   http://<Gateway-PC-IP>:8000
+   d. If using cloud sync, set CLOUD_DATABASE_URL.
+   e. If using AI triage, set GROQ_API_KEY.
+   f. Save and close Notepad.
+   g. Double-click run-clinic-A.bat — a console window opens.
+   h. Open Chrome on that PC and go to  http://localhost:8001
+   i. First launch: complete the Setup page to create the admin account.
+
+2. CLINIC B PC
+   Repeat steps a-i using run-clinic-B.bat and http://localhost:8002
+
+3. GATEWAY PC
+   a. Open run-gateway.bat in Notepad.
+   b. Set CLINIC_A_URL to  http://<Clinic-A-IP>:8001
+   c. Set CLINIC_B_URL to  http://<Clinic-B-IP>:8002
+   d. Save, close, double-click run-gateway.bat.
+   e. Access gateway from any PC:  http://<Gateway-IP>:8000
+
+
+BRANDING / DUITNOW QR
+---------------------
+  After logging in as admin, go to Settings → Branding.
+  Upload your clinic logo and your bank-issued DuitNow QR image.
+  The DuitNow QR must be downloaded from your bank's merchant portal
+  (CIMB Clicks, Maybank2u Business, etc.) — it contains YOUR
+  account details so payments reach YOUR account.
+
+
+FIREWALL
+--------
+  Windows Firewall may block incoming connections.
+  For each port (8000, 8001, 8002), run in an Admin CMD:
+    netsh advfirewall firewall add rule name="MediLink-800X" ^
+      dir=in action=allow protocol=TCP localport=800X
+
+  Or go to: Control Panel → Windows Defender Firewall
+            → Advanced Settings → Inbound Rules → New Rule
+            → Port → TCP → 8000,8001,8002 → Allow
+
+
+DATA LOCATION
+-------------
+  Each clinic's data is stored in:
+    C:\Users\<username>\medilink-data\<facility_id>\
+      medilink.db   — local SQLite database
+      uploads\      — medical file attachments
+      branding\     — logo, DuitNow QR, letterhead
+
+
+SHARED SECRETS
+--------------
+  JWT_SECRET, IC_ENCRYPTION_KEY, and IC_INDEX_KEY in the .bat files
+  MUST be identical across all clinics and the gateway.
+  Change them before going live — never use the demo values in production.
+
+
+FIRST LOGIN
+-----------
+  After setup, the demo staff accounts are:
+    Doctor:       dr.tan@medilink.io     / Doctor@123
+    Receptionist: receptionist@medilink  / Recept@123
+    Admin:        admin@<facility>.medilink / Admin@123
+
+  Patient login uses their MyKad number + registered password
+  at  http://<gateway-or-clinic>/kiosk
+
+
+SUPPORT / LOGS
+--------------
+  Logs appear in the console window. To save them:
+    run-clinic-A.bat > clinic-a.log 2>&1
+  Or check Windows Event Viewer if running as a service.
+
+====================================================

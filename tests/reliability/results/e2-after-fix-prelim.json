@@ -1,0 +1,1551 @@
+{
+  "experiment": "E2",
+  "label": "after-fix",
+  "runs": [
+    {
+      "label": "after-fix",
+      "visits_offline": 10,
+      "repeat": 0,
+      "writes_ok": 30,
+      "writes_total": 30,
+      "offline_write_p95_ms": 2858.5,
+      "queue_at_reconnect": 40,
+      "stranded_at_reconnect": 0,
+      "recovery_s": 17.89,
+      "stranded_after": 0,
+      "integrity": {
+        "users": {
+          "created": 10,
+          "in_cloud": 10,
+          "missing": 0
+        },
+        "appointments": {
+          "created": 10,
+          "in_cloud": 10,
+          "missing": 0
+        },
+        "medical_records": {
+          "created": 10,
+          "in_cloud": 10,
+          "missing": 0
+        }
+      },
+      "write_failures": [],
+      "missing_total": 0,
+      "curve": [
+        {
+          "t": 0.04,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 0.29,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 0.55,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 0.8,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 1.05,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 1.3,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 1.55,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 1.8,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 2.05,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 2.3,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 2.56,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 2.81,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 3.06,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 3.31,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 3.56,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 3.81,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 4.06,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 4.32,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 4.57,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 4.82,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 5.07,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 5.32,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 5.57,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 5.82,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 6.08,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 6.33,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 6.58,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 6.83,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 7.08,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 7.33,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 7.58,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 7.83,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 8.08,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 8.34,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 8.59,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 8.84,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 9.09,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 9.34,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 9.59,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 9.84,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 10.09,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 10.35,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 10.6,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 10.85,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 11.1,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 11.35,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 11.6,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 11.85,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 12.11,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 12.36,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 12.61,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 12.86,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 13.11,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 13.36,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 13.61,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 13.86,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 14.12,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 14.37,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 14.62,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 14.87,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 15.12,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 15.37,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 15.62,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 15.88,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 16.13,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 16.38,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 16.63,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 16.88,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 17.13,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 17.38,
+          "pending": 40,
+          "stranded": 0
+        },
+        {
+          "t": 17.64,
+          "pending": 31,
+          "stranded": 0
+        },
+        {
+          "t": 17.89,
+          "pending": 0,
+          "stranded": 0
+        }
+      ]
+    },
+    {
+      "label": "after-fix",
+      "visits_offline": 50,
+      "repeat": 0,
+      "writes_ok": 150,
+      "writes_total": 150,
+      "offline_write_p95_ms": 1738.7,
+      "queue_at_reconnect": 200,
+      "stranded_at_reconnect": 0,
+      "recovery_s": 13.87,
+      "stranded_after": 0,
+      "integrity": {
+        "users": {
+          "created": 50,
+          "in_cloud": 50,
+          "missing": 0
+        },
+        "appointments": {
+          "created": 50,
+          "in_cloud": 50,
+          "missing": 0
+        },
+        "medical_records": {
+          "created": 50,
+          "in_cloud": 50,
+          "missing": 0
+        }
+      },
+      "write_failures": [],
+      "missing_total": 0,
+      "curve": [
+        {
+          "t": 0.04,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 0.29,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 0.54,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 0.79,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 1.04,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 1.29,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 1.55,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 1.8,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 2.05,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 2.3,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 2.55,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 2.8,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 3.06,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 3.31,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 3.56,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 3.81,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 4.06,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 4.31,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 4.56,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 4.82,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 5.07,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 5.32,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 5.57,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 5.82,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 6.07,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 6.33,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 6.58,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 6.83,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 7.08,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 7.33,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 7.58,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 7.84,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 8.09,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 8.34,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 8.59,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 8.84,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 9.09,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 9.34,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 9.6,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 9.85,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 10.1,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 10.35,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 10.6,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 10.85,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 11.1,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 11.36,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 11.61,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 11.86,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 12.11,
+          "pending": 200,
+          "stranded": 0
+        },
+        {
+          "t": 12.36,
+          "pending": 182,
+          "stranded": 0
+        },
+        {
+          "t": 12.61,
+          "pending": 152,
+          "stranded": 0
+        },
+        {
+          "t": 12.86,
+          "pending": 124,
+          "stranded": 0
+        },
+        {
+          "t": 13.11,
+          "pending": 91,
+          "stranded": 0
+        },
+        {
+          "t": 13.37,
+          "pending": 61,
+          "stranded": 0
+        },
+        {
+          "t": 13.62,
+          "pending": 29,
+          "stranded": 0
+        },
+        {
+          "t": 13.87,
+          "pending": 0,
+          "stranded": 0
+        }
+      ]
+    },
+    {
+      "label": "after-fix",
+      "visits_offline": 100,
+      "repeat": 0,
+      "writes_ok": 300,
+      "writes_total": 300,
+      "offline_write_p95_ms": 1659.5,
+      "queue_at_reconnect": 400,
+      "stranded_at_reconnect": 0,
+      "recovery_s": 8.86,
+      "stranded_after": 0,
+      "integrity": {
+        "users": {
+          "created": 100,
+          "in_cloud": 100,
+          "missing": 0
+        },
+        "appointments": {
+          "created": 100,
+          "in_cloud": 100,
+          "missing": 0
+        },
+        "medical_records": {
+          "created": 100,
+          "in_cloud": 100,
+          "missing": 0
+        }
+      },
+      "write_failures": [],
+      "missing_total": 0,
+      "curve": [
+        {
+          "t": 0.04,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 0.29,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 0.54,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 0.79,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 1.05,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 1.3,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 1.55,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 1.8,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 2.06,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 2.31,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 2.56,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 2.81,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 3.06,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 3.31,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 3.57,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 3.82,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 4.07,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 4.32,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 4.58,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 4.83,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 5.08,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 5.33,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 5.58,
+          "pending": 400,
+          "stranded": 0
+        },
+        {
+          "t": 5.83,
+          "pending": 377,
+          "stranded": 0
+        },
+        {
+          "t": 6.09,
+          "pending": 346,
+          "stranded": 0
+        },
+        {
+          "t": 6.34,
+          "pending": 321,
+          "stranded": 0
+        },
+        {
+          "t": 6.59,
+          "pending": 289,
+          "stranded": 0
+        },
+        {
+          "t": 6.84,
+          "pending": 257,
+          "stranded": 0
+        },
+        {
+          "t": 7.09,
+          "pending": 225,
+          "stranded": 0
+        },
+        {
+          "t": 7.35,
+          "pending": 194,
+          "stranded": 0
+        },
+        {
+          "t": 7.6,
+          "pending": 160,
+          "stranded": 0
+        },
+        {
+          "t": 7.85,
+          "pending": 131,
+          "stranded": 0
+        },
+        {
+          "t": 8.1,
+          "pending": 98,
+          "stranded": 0
+        },
+        {
+          "t": 8.35,
+          "pending": 66,
+          "stranded": 0
+        },
+        {
+          "t": 8.61,
+          "pending": 33,
+          "stranded": 0
+        },
+        {
+          "t": 8.86,
+          "pending": 0,
+          "stranded": 0
+        }
+      ]
+    },
+    {
+      "label": "after-fix",
+      "visits_offline": 250,
+      "repeat": 0,
+      "writes_ok": 750,
+      "writes_total": 750,
+      "offline_write_p95_ms": 1848.6,
+      "queue_at_reconnect": 1000,
+      "stranded_at_reconnect": 0,
+      "recovery_s": 9.96,
+      "stranded_after": 0,
+      "integrity": {
+        "users": {
+          "created": 250,
+          "in_cloud": 250,
+          "missing": 0
+        },
+        "appointments": {
+          "created": 250,
+          "in_cloud": 250,
+          "missing": 0
+        },
+        "medical_records": {
+          "created": 250,
+          "in_cloud": 250,
+          "missing": 0
+        }
+      },
+      "write_failures": [],
+      "missing_total": 0,
+      "curve": [
+        {
+          "t": 0.04,
+          "pending": 1000,
+          "stranded": 0
+        },
+        {
+          "t": 0.3,
+          "pending": 1000,
+          "stranded": 0
+        },
+        {
+          "t": 0.55,
+          "pending": 1000,
+          "stranded": 0
+        },
+        {
+          "t": 0.8,
+          "pending": 1000,
+          "stranded": 0
+        },
+        {
+          "t": 1.05,
+          "pending": 1000,
+          "stranded": 0
+        },
+        {
+          "t": 1.31,
+          "pending": 1000,
+          "stranded": 0
+        },
+        {
+          "t": 1.56,
+          "pending": 1000,
+          "stranded": 0
+        },
+        {
+          "t": 1.81,
+          "pending": 992,
+          "stranded": 0
+        },
+        {
+          "t": 2.06,
+          "pending": 960,
+          "stranded": 0
+        },
+        {
+          "t": 2.32,
+          "pending": 929,
+          "stranded": 0
+        },
+        {
+          "t": 2.57,
+          "pending": 898,
+          "stranded": 0
+        },
+        {
+          "t": 2.83,
+          "pending": 867,
+          "stranded": 0
+        },
+        {
+          "t": 3.08,
+          "pending": 839,
+          "stranded": 0
+        },
+        {
+          "t": 3.34,
+          "pending": 808,
+          "stranded": 0
+        },
+        {
+          "t": 3.59,
+          "pending": 777,
+          "stranded": 0
+        },
+        {
+          "t": 3.84,
+          "pending": 743,
+          "stranded": 0
+        },
+        {
+          "t": 4.1,
+          "pending": 711,
+          "stranded": 0
+        },
+        {
+          "t": 4.38,
+          "pending": 673,
+          "stranded": 0
+        },
+        {
+          "t": 4.63,
+          "pending": 643,
+          "stranded": 0
+        },
+        {
+          "t": 4.89,
+          "pending": 612,
+          "stranded": 0
+        },
+        {
+          "t": 5.14,
+          "pending": 582,
+          "stranded": 0
+        },
+        {
+          "t": 5.39,
+          "pending": 551,
+          "stranded": 0
+        },
+        {
+          "t": 5.64,
+          "pending": 520,
+          "stranded": 0
+        },
+        {
+          "t": 5.9,
+          "pending": 487,
+          "stranded": 0
+        },
+        {
+          "t": 6.15,
+          "pending": 456,
+          "stranded": 0
+        },
+        {
+          "t": 6.4,
+          "pending": 424,
+          "stranded": 0
+        },
+        {
+          "t": 6.65,
+          "pending": 395,
+          "stranded": 0
+        },
+        {
+          "t": 6.92,
+          "pending": 361,
+          "stranded": 0
+        },
+        {
+          "t": 7.18,
+          "pending": 330,
+          "stranded": 0
+        },
+        {
+          "t": 7.43,
+          "pending": 298,
+          "stranded": 0
+        },
+        {
+          "t": 7.68,
+          "pending": 264,
+          "stranded": 0
+        },
+        {
+          "t": 7.94,
+          "pending": 234,
+          "stranded": 0
+        },
+        {
+          "t": 8.19,
+          "pending": 201,
+          "stranded": 0
+        },
+        {
+          "t": 8.45,
+          "pending": 171,
+          "stranded": 0
+        },
+        {
+          "t": 8.7,
+          "pending": 141,
+          "stranded": 0
+        },
+        {
+          "t": 8.95,
+          "pending": 107,
+          "stranded": 0
+        },
+        {
+          "t": 9.21,
+          "pending": 74,
+          "stranded": 0
+        },
+        {
+          "t": 9.46,
+          "pending": 43,
+          "stranded": 0
+        },
+        {
+          "t": 9.71,
+          "pending": 19,
+          "stranded": 0
+        },
+        {
+          "t": 9.96,
+          "pending": 0,
+          "stranded": 0
+        }
+      ]
+    },
+    {
+      "label": "after-fix",
+      "visits_offline": 500,
+      "repeat": 0,
+      "writes_ok": 1500,
+      "writes_total": 1500,
+      "offline_write_p95_ms": 1721.5,
+      "queue_at_reconnect": 2000,
+      "stranded_at_reconnect": 0,
+      "recovery_s": 18.08,
+      "stranded_after": 0,
+      "integrity": {
+        "users": {
+          "created": 500,
+          "in_cloud": 500,
+          "missing": 0
+        },
+        "appointments": {
+          "created": 500,
+          "in_cloud": 500,
+          "missing": 0
+        },
+        "medical_records": {
+          "created": 500,
+          "in_cloud": 500,
+          "missing": 0
+        }
+      },
+      "write_failures": [],
+      "missing_total": 0,
+      "curve": [
+        {
+          "t": 0.04,
+          "pending": 2000,
+          "stranded": 0
+        },
+        {
+          "t": 0.3,
+          "pending": 2000,
+          "stranded": 0
+        },
+        {
+          "t": 0.55,
+          "pending": 2000,
+          "stranded": 0
+        },
+        {
+          "t": 0.8,
+          "pending": 2000,
+          "stranded": 0
+        },
+        {
+          "t": 1.06,
+          "pending": 2000,
+          "stranded": 0
+        },
+        {
+          "t": 1.31,
+          "pending": 2000,
+          "stranded": 0
+        },
+        {
+          "t": 1.57,
+          "pending": 2000,
+          "stranded": 0
+        },
+        {
+          "t": 1.82,
+          "pending": 2000,
+          "stranded": 0
+        },
+        {
+          "t": 2.07,
+          "pending": 1993,
+          "stranded": 0
+        },
+        {
+          "t": 2.33,
+          "pending": 1960,
+          "stranded": 0
+        },
+        {
+          "t": 2.58,
+          "pending": 1926,
+          "stranded": 0
+        },
+        {
+          "t": 2.83,
+          "pending": 1893,
+          "stranded": 0
+        },
+        {
+          "t": 3.09,
+          "pending": 1863,
+          "stranded": 0
+        },
+        {
+          "t": 3.34,
+          "pending": 1831,
+          "stranded": 0
+        },
+        {
+          "t": 3.6,
+          "pending": 1800,
+          "stranded": 0
+        },
+        {
+          "t": 3.85,
+          "pending": 1765,
+          "stranded": 0
+        },
+        {
+          "t": 4.1,
+          "pending": 1733,
+          "stranded": 0
+        },
+        {
+          "t": 4.36,
+          "pending": 1701,
+          "stranded": 0
+        },
+        {
+          "t": 4.61,
+          "pending": 1668,
+          "stranded": 0
+        },
+        {
+          "t": 4.87,
+          "pending": 1635,
+          "stranded": 0
+        },
+        {
+          "t": 5.12,
+          "pending": 1602,
+          "stranded": 0
+        },
+        {
+          "t": 5.38,
+          "pending": 1571,
+          "stranded": 0
+        },
+        {
+          "t": 5.64,
+          "pending": 1537,
+          "stranded": 0
+        },
+        {
+          "t": 5.89,
+          "pending": 1504,
+          "stranded": 0
+        },
+        {
+          "t": 6.14,
+          "pending": 1471,
+          "stranded": 0
+        },
+        {
+          "t": 6.4,
+          "pending": 1437,
+          "stranded": 0
+        },
+        {
+          "t": 6.65,
+          "pending": 1403,
+          "stranded": 0
+        },
+        {
+          "t": 6.9,
+          "pending": 1370,
+          "stranded": 0
+        },
+        {
+          "t": 7.16,
+          "pending": 1338,
+          "stranded": 0
+        },
+        {
+          "t": 7.41,
+          "pending": 1313,
+          "stranded": 0
+        },
+        {
+          "t": 7.67,
+          "pending": 1279,
+          "stranded": 0
+        },
+        {
+          "t": 7.92,
+          "pending": 1246,
+          "stranded": 0
+        },
+        {
+          "t": 8.17,
+          "pending": 1212,
+          "stranded": 0
+        },
+        {
+          "t": 8.43,
+          "pending": 1180,
+          "stranded": 0
+        },
+        {
+          "t": 8.68,
+          "pending": 1147,
+          "stranded": 0
+        },
+        {
+          "t": 8.94,
+          "pending": 1115,
+          "stranded": 0
+        },
+        {
+          "t": 9.19,
+          "pending": 1083,
+          "stranded": 0
+        },
+        {
+          "t": 9.45,
+          "pending": 1051,
+          "stranded": 0
+        },
+        {
+          "t": 9.7,
+          "pending": 1018,
+          "stranded": 0
+        },
+        {
+          "t": 9.95,
+          "pending": 987,
+          "stranded": 0
+        },
+        {
+          "t": 10.21,
+          "pending": 959,
+          "stranded": 0
+        },
+        {
+          "t": 10.46,
+          "pending": 932,
+          "stranded": 0
+        },
+        {
+          "t": 10.71,
+          "pending": 899,
+          "stranded": 0
+        },
+        {
+          "t": 10.97,
+          "pending": 866,
+          "stranded": 0
+        },
+        {
+          "t": 11.22,
+          "pending": 833,
+          "stranded": 0
+        },
+        {
+          "t": 11.48,
+          "pending": 800,
+          "stranded": 0
+        },
+        {
+          "t": 11.73,
+          "pending": 769,
+          "stranded": 0
+        },
+        {
+          "t": 11.98,
+          "pending": 737,
+          "stranded": 0
+        },
+        {
+          "t": 12.24,
+          "pending": 704,
+          "stranded": 0
+        },
+        {
+          "t": 12.49,
+          "pending": 671,
+          "stranded": 0
+        },
+        {
+          "t": 12.74,
+          "pending": 637,
+          "stranded": 0
+        },
+        {
+          "t": 13.0,
+          "pending": 610,
+          "stranded": 0
+        },
+        {
+          "t": 13.25,
+          "pending": 579,
+          "stranded": 0
+        },
+        {
+          "t": 13.51,
+          "pending": 548,
+          "stranded": 0
+        },
+        {
+          "t": 13.76,
+          "pending": 518,
+          "stranded": 0
+        },
+        {
+          "t": 14.01,
+          "pending": 485,
+          "stranded": 0
+        },
+        {
+          "t": 14.27,
+          "pending": 453,
+          "stranded": 0
+        },
+        {
+          "t": 14.52,
+          "pending": 419,
+          "stranded": 0
+        },
+        {
+          "t": 14.77,
+          "pending": 387,
+          "stranded": 0
+        },
+        {
+          "t": 15.03,
+          "pending": 355,
+          "stranded": 0
+        },
+        {
+          "t": 15.28,
+          "pending": 322,
+          "stranded": 0
+        },
+        {
+          "t": 15.53,
+          "pending": 289,
+          "stranded": 0
+        },
+        {
+          "t": 15.79,
+          "pending": 256,
+          "stranded": 0
+        },
+        {
+          "t": 16.04,
+          "pending": 224,
+          "stranded": 0
+        },
+        {
+          "t": 16.3,
+          "pending": 195,
+          "stranded": 0
+        },
+        {
+          "t": 16.55,
+          "pending": 163,
+          "stranded": 0
+        },
+        {
+          "t": 16.81,
+          "pending": 132,
+          "stranded": 0
+        },
+        {
+          "t": 17.06,
+          "pending": 105,
+          "stranded": 0
+        },
+        {
+          "t": 17.32,
+          "pending": 76,
+          "stranded": 0
+        },
+        {
+          "t": 17.57,
+          "pending": 47,
+          "stranded": 0
+        },
+        {
+          "t": 17.82,
+          "pending": 15,
+          "stranded": 0
+        },
+        {
+          "t": 18.08,
+          "pending": 0,
+          "stranded": 0
+        }
+      ]
+    }
+  ]
+}

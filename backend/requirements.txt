@@ -1,7 +1,10 @@
 fastapi==0.110.1
-uvicorn==0.25.0
+uvicorn[standard]==0.25.0
 asyncpg==0.29.0
-databases[asyncpg]==0.9.0
+# The clinic node's own database is SQLite and is the system of record, so this
+# driver is not optional: without it a clinic cannot start at all.
+aiosqlite>=0.19.0
+databases[asyncpg,aiosqlite]==0.9.0
 psycopg2-binary>=2.9.9
 sqlalchemy==2.0.30
 pydantic>=2.6.4

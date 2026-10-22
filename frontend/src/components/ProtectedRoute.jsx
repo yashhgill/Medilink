@@ -7,7 +7,7 @@ export default function ProtectedRoute({ roles, children }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-[#5A6B70]">
+      <div className="min-h-screen flex items-center justify-center text-[#566663]">
         <span className="font-mono text-sm">Initializing…</span>
       </div>
     );

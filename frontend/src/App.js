@@ -1,7 +1,9 @@
 import "@/App.css";
 import "@/index.css";
+import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import api from "@/lib/api";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { IS_PUBLIC } from "@/lib/api";
 import Landing from "@/pages/Landing";
@@ -13,21 +15,37 @@ import Monitoring from "@/pages/Monitoring";
 import InstallPrompt from "@/components/InstallPrompt";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Register from "@/pages/Register";
+import Setup from "@/pages/Setup";
+import Branding from "@/pages/Branding";
+import Licence from "@/pages/Licence";
 import PatientDashboard from "@/pages/PatientDashboard";
 import DoctorDashboard from "@/pages/DoctorDashboard";
 import ReceptionDashboard from "@/pages/ReceptionDashboard";
 import PharmacyDashboard from "@/pages/PharmacyDashboard";
 import Kiosk from "@/pages/Kiosk";
+import Board from "@/pages/Board";
+import { useBrandTheme } from "@/lib/theme";
 import { Toaster } from "@/components/ui/sonner";
 
 function HomeGate() {
   const { user, loading } = useAuth();
-  if (loading) return null;
+  // Fresh standalone install (empty DB) → send to the first-run setup wizard.
+  const [needsSetup, setNeedsSetup] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    api.get("/setup/status")
+      .then((r) => { if (alive) setNeedsSetup(!!r.data.needs_setup); })
+      .catch(() => { if (alive) setNeedsSetup(false); });
+    return () => { alive = false; };
+  }, []);
+  if (loading || needsSetup === null) return null;
+  if (needsSetup && !user) return <Navigate to="/setup" replace />;
   if (!user) return <Landing />;
   return <Navigate to={redirectFor(user.role)} replace />;
 }
 
 function App() {
+  useBrandTheme();
   return (
     <div className="App">
       <AuthProvider>
@@ -36,9 +54,11 @@ function App() {
           <Routes>
             <Route path="/" element={<HomeGate />} />
             <Route path="/kiosk" element={IS_PUBLIC ? <Navigate to="/" replace /> : <Kiosk />} />
+            <Route path="/board" element={<Board />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/activate" element={<Activate />} />
+            <Route path="/setup" element={<Setup />} />
             <Route
               path="/patient/*"
               element={
@@ -68,6 +88,22 @@ function App() {
               element={
                 <ProtectedRoute roles={["admin"]}>
                   <Monitoring />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/branding"
+              element={
+                <ProtectedRoute roles={["admin"]}>
+                  <Branding />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/licence"
+              element={
+                <ProtectedRoute roles={["admin"]}>
+                  <Licence />
                 </ProtectedRoute>
               }
             />

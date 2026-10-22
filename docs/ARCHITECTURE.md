@@ -17,7 +17,7 @@ replication); the patient never waits on a WAN round-trip.
 | `medilink_web` | React 19, CRA + craco, TLS dev server | Serves all UIs: kiosk, patient PWA, doctor, pharmacy, reception, admin. Proxies `/api` + WebSockets to the backend (same-origin — no CORS/mixed-content in production paths) |
 | `medilink_api` | FastAPI (Python 3.11), uvicorn ×2 workers | Auth, RBAC, business logic, AI gateway, sync engine, file store |
 | `medilink_db` | PostgreSQL 16 | Source of truth, lives on local NVMe |
-| `medilink_tunnel` | cloudflared | Outbound-only tunnel exposing the patient experience at `medilink.harnova.my` with edge TLS |
+| `medilink_tunnel` | cloudflared | Outbound-only tunnel exposing the patient experience at `medilink.medilink.local` with edge TLS |
 | Cloud mirror | Supabase PostgreSQL (`medilink-cloud`) | Cross-clinic record sharing + disaster recovery |
 | AI | Groq — Llama 3.3 70B | Triage (MTS), visit summaries, drug-interaction checks |
 

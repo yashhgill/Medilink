@@ -8,23 +8,26 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import SyncIndicator from "@/components/SyncIndicator";
+import LicenceBanner from "@/components/LicenceBanner";
 import AIChat from "@/components/AIChat";
 import useQueueSocket from "@/hooks/useQueueSocket";
 import { Heartbeat, SignOut, Sparkle, Broadcast, List, X, Lock, House, User } from "@phosphor-icons/react";
+import { PRODUCT } from "@/brand";
+import { useMode } from "@/lib/mode";
 
 const roleAccent = {
-  patient: "#0B7C8C",      // teal
-  doctor: "#086788",       // medical blue
-  admin: "#0A3D62",        // navy
-  super_admin: "#0A3D62",
-  clinic_admin: "#086788",
-  receptionist: "#0A3D62",
-  pharmacist: "#2D6A4F",   // green
+  patient: "#0A6E62",      // teal
+  doctor: "#0A6E62",       // medical blue
+  admin: "#10262E",        // navy
+  super_admin: "#10262E",
+  clinic_admin: "#0A6E62",
+  receptionist: "#10262E",
+  pharmacist: "#0A6E62",   // green
 };
 
 const roleLabel = {
   patient: "Patient", doctor: "Doctor",
-  admin: "Super-Admin", super_admin: "Super-Admin", clinic_admin: "Clinic-Admin",
+  admin: "Administrator", super_admin: "Network administrator", clinic_admin: "Clinic administrator",
   pharmacist: "Pharmacy", receptionist: "Reception",
 };
 
@@ -37,6 +40,7 @@ export default function AppShell({ children, title, subtitle, navItems = [], sec
   const [pwForm, setPwForm] = useState({ old_password: "", new_password: "" });
   const [live, setLive] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [userMenu, setUserMenu] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [pf, setPf] = useState({ name: "", email: "", phone: "", address: "" });
   const openProfile = () => {
@@ -70,138 +74,196 @@ export default function AppShell({ children, title, subtitle, navItems = [], sec
   };
   const doLogout = () => { logout(); nav("/login"); };
 
-  return (
-    <div className="min-h-screen bg-[#F4F9F9]">
-      <header className="sticky top-0 z-30 backdrop-blur-md bg-[#F4F9F9]/85 border-b" style={{ borderColor: "var(--ml-border)", paddingTop: "env(safe-area-inset-top)" }}>
-        <div className="h-1 w-full" style={{ background: roleAccent[user?.role] || "#0B7C8C" }} />
-        <div className="max-w-[1400px] mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button onClick={() => setMenuOpen(true)} data-testid="menu-open"
-              className="w-9 h-9 rounded-xl border border-[#DCE8E9] bg-white flex items-center justify-center hover:bg-[#EAF5F5]" title="Menu">
-              <List size={18} />
-            </button>
-            <Link to="/" className="flex items-center gap-2.5" data-testid="brand-home">
-              <div className="w-9 h-9 rounded-xl bg-[#0B7C8C] flex items-center justify-center">
-                <Heartbeat size={20} color="#F4F9F9" weight="duotone" />
-              </div>
-              <div className="hidden sm:block">
-                <div className="font-display text-lg leading-none">MediLink</div>
-                <div className="text-[10px] uppercase tracking-[0.18em] text-[#5A6B70]">Health Systems</div>
-              </div>
+  const isStaff = user && user.role !== "patient";
+  const { isAdmin, isSuperAdmin } = useAuth();
+  const { isNetworked } = useMode();
+  // Admins get one consistent menu on every admin page.
+  if (isAdmin) {
+    navItems = [
+      { label: "Today's queue", to: "/reception" },
+      { label: "Patients", to: "/reception/patients" },
+      { label: isSuperAdmin && isNetworked ? "Clinics and staff" : "Clinic and staff", to: "/facilities" },
+      { label: "Clinic settings", to: "/branding" },
+      ...(isNetworked ? [{ label: "Sync and cloud health", to: "/monitoring" }] : []),
+    ];
+  }
+  const role = roleLabel[user?.role] || user?.role;
+
+  const NavList = ({ onPick }) => (
+    <>
+      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5" aria-label="Main">
+        {navItems.map((it) => {
+          const active = loc.pathname === it.to;
+          return (
+            <Link key={it.to} to={it.to} onClick={onPick} aria-current={active ? "page" : undefined}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-[15px] font-semibold transition-colors ${active ? "bg-[var(--ml-primary)] text-white" : "text-[#10201D] hover:bg-[var(--ml-wash)]"}`}>
+              {it.label}
             </Link>
-          </div>
-          <div className="flex items-center gap-2 md:gap-3">
-            {user?.role !== "patient" && (
-              <>
-                <div data-testid="ws-status"
-                  className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full border bg-white text-xs font-mono ${live ? "text-[#2D6A4F]" : "text-[#5A6B70]"}`}
-                  style={{ borderColor: "var(--ml-border)" }}>
-                  <Broadcast size={12} weight={live ? "fill" : "regular"} className={live ? "breathe" : ""} />
-                  {live ? "Live" : "Sync"}
-                </div>
-                <SyncIndicator compact />
-              </>
-            )}
-            {user?.role === "patient" && (
-              <Button data-testid="open-ai-chat" onClick={() => setAiOpen(true)} size="sm"
-                className="bg-[#0A3D62] hover:bg-[#083150] text-[#F4F9F9] rounded-full">
-                <Sparkle size={14} weight="fill" className="mr-1" /> AI Triage
-              </Button>
-            )}
-            <div className="hidden sm:flex flex-col items-end">
-              <div className="text-sm font-medium leading-tight" data-testid="header-user-name">{user?.name}</div>
-              <div className="text-[10px] uppercase tracking-[0.18em] font-semibold" style={{ color: roleAccent[user?.role] || "#5A6B70" }}>{roleLabel[user?.role] || user?.role}</div>
+          );
+        })}
+        {sections.length > 0 && <div className="pt-4 pb-1 px-3 text-[13px] font-semibold text-[#566663]">On this page</div>}
+        {sections.map((sec) => (
+          <button key={sec.id} onClick={() => { onPick && onPick(); goSection(sec.id); }}
+            className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg text-[15px] text-[#10201D] hover:bg-[var(--ml-wash)]">
+            <span className="text-[var(--ml-primary)]">{sec.icon}</span> {sec.label}
+          </button>
+        ))}
+      </nav>
+      <div className="px-3 py-3 border-t border-[#DAE2DF] space-y-0.5">
+        <button onClick={openProfile} className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--ml-wash)] text-[15px]">
+          <User size={18} /> My profile
+        </button>
+        <button onClick={() => { setMenuOpen(false); setPwOpen(true); }} className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--ml-wash)] text-[15px]">
+          <Lock size={18} /> Change password
+        </button>
+        <button onClick={doLogout} data-testid="logout-btn" className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--ml-wash)] text-[15px]">
+          <SignOut size={18} /> Sign out
+        </button>
+      </div>
+    </>
+  );
+
+  const Brand = ({ dark }) => (
+    <Link to="/" className="flex items-center gap-2.5 shrink-0" data-testid="brand-home">
+      <img src={PRODUCT.logo} alt="" className="w-8 h-8 rounded-lg object-cover" />
+      <span className={`font-display text-[19px] leading-none ${dark ? "text-white" : "text-[#10201D]"}`}>{PRODUCT.name}</span>
+    </Link>
+  );
+  const initials = (user?.name || "?").replace(/^(Dr\.?|Pn\.?|En\.?|Cik)\s+/i, "").split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  const today = new Date().toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long" });
+
+  return (
+    <div className="min-h-screen bg-[#EEF2F1]">
+      {isStaff ? (
+        <header className="sticky top-0 z-30 bg-[#10262E] text-white" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+          <div className="max-w-[1440px] mx-auto px-4 md:px-8 h-16 flex items-center gap-6">
+            <button onClick={() => setMenuOpen(true)} data-testid="menu-open" aria-label="Open menu"
+              className="lg:hidden w-10 h-10 -ml-2 rounded-lg flex items-center justify-center hover:bg-white/10">
+              <List size={22} />
+            </button>
+            <Brand dark />
+            <nav className="hidden lg:flex items-center gap-1 h-full" aria-label="Main">
+              {navItems.map((it) => {
+                const active = loc.pathname === it.to;
+                return (
+                  <Link key={it.to} to={it.to} aria-current={active ? "page" : undefined}
+                    className={`relative h-full flex items-center px-3 text-[15px] font-semibold transition-colors ${active ? "text-white" : "text-white/65 hover:text-white"}`}>
+                    {it.label}
+                    {active && <span className="absolute left-3 right-3 bottom-0 h-[3px] rounded-t bg-[#5FD3A8]" />}
+                  </Link>
+                );
+              })}
+            </nav>
+            <div className="ml-auto flex items-center gap-2">
+              <div data-testid="ws-status" title={live ? "Screens update instantly" : "Reconnecting to live updates"}
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 text-[13px] font-semibold text-white/85">
+                <Broadcast size={14} weight={live ? "fill" : "regular"} className={live ? "breathe text-[#5FD3A8]" : ""} />
+                {live ? "Live" : "Reconnecting"}
+              </div>
+              <div className="hidden md:block"><SyncIndicator compact /></div>
+              <div className="relative">
+                <button onClick={() => setUserMenu((v) => !v)} data-testid="user-menu" aria-haspopup="menu" aria-expanded={userMenu}
+                  className="flex items-center gap-2.5 pl-1.5 pr-2 py-1 rounded-full hover:bg-white/10">
+                  <span className="w-8 h-8 rounded-full bg-[#5FD3A8] text-[#10262E] text-[13px] font-bold flex items-center justify-center">{initials}</span>
+                  <span className="hidden xl:flex flex-col items-start leading-tight">
+                    <span className="text-[14px] font-semibold" data-testid="header-user-name">{user?.name}</span>
+                    <span className="text-[12px] text-white/60">{role}</span>
+                  </span>
+                </button>
+                {userMenu && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setUserMenu(false)} />
+                    <div role="menu" className="absolute right-0 mt-2 w-60 z-50 rounded-xl bg-white text-[#10201D] shadow-xl border border-[#DAE2DF] py-1.5">
+                      <div className="px-4 py-2.5 border-b border-[#E8EEEC]">
+                        <div className="font-semibold text-[15px]">{user?.name}</div>
+                        <div className="text-[13px] text-[#566663]">{role}</div>
+                      </div>
+                      <button role="menuitem" onClick={() => { setUserMenu(false); openProfile(); }} className="w-full text-left flex items-center gap-3 px-4 py-2.5 hover:bg-[#EEF2F1] text-[15px]"><User size={18} /> My profile</button>
+                      <button role="menuitem" onClick={() => { setUserMenu(false); setPwOpen(true); }} className="w-full text-left flex items-center gap-3 px-4 py-2.5 hover:bg-[#EEF2F1] text-[15px]"><Lock size={18} /> Change password</button>
+                      <button role="menuitem" onClick={doLogout} data-testid="logout-btn" className="w-full text-left flex items-center gap-3 px-4 py-2.5 hover:bg-[#EEF2F1] text-[15px] text-[#B4231C]"><SignOut size={18} /> Sign out</button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
+      ) : (
+        <header className="sticky top-0 z-20 bg-[#EEF2F1]/95 backdrop-blur border-b border-[#DAE2DF]" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+          <div className="max-w-[1440px] mx-auto px-4 md:px-8 h-16 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <button onClick={() => setMenuOpen(true)} data-testid="menu-open" aria-label="Open menu"
+                className="w-10 h-10 rounded-lg border border-[#DAE2DF] bg-white flex items-center justify-center hover:bg-[var(--ml-wash)]">
+                <List size={20} />
+              </button>
+              <Brand />
+            </div>
+            {user?.role === "patient" && (
+              <Button data-testid="open-ai-chat" onClick={() => setAiOpen(true)} size="sm"
+                className="bg-[#10262E] hover:bg-[#0A1A20] text-white rounded-full">
+                <Sparkle size={14} weight="fill" className="mr-1" /> Check symptoms
+              </Button>
+            )}
+          </div>
+        </header>
+      )}
 
       {menuOpen && (
         <div className="fixed inset-0 z-50" data-testid="nav-drawer">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} />
-          <aside className="absolute left-0 top-0 h-full w-72 max-w-[80vw] bg-[#F4F9F9] shadow-2xl flex flex-col" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-            <div className="p-5 border-b border-[#DCE8E9] flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#0B7C8C] flex items-center justify-center">
-                  <Heartbeat size={20} color="#F4F9F9" weight="duotone" />
-                </div>
-                <div>
-                  <div className="font-display text-lg leading-none">MediLink</div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] font-semibold" style={{ color: roleAccent[user?.role] || "#5A6B70" }}>{roleLabel[user?.role] || user?.role}</div>
-                </div>
-              </div>
-              <button onClick={() => setMenuOpen(false)} className="w-8 h-8 rounded-lg hover:bg-[#EAF5F5] flex items-center justify-center">
+          <div className="absolute inset-0 bg-[#10201D]/40" onClick={() => setMenuOpen(false)} />
+          <aside className="absolute left-0 top-0 h-full w-72 max-w-[85vw] bg-white shadow-xl flex flex-col" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+            <div className="h-16 px-5 border-b border-[#DAE2DF] flex items-center justify-between">
+              <Brand />
+              <button onClick={() => setMenuOpen(false)} aria-label="Close menu" className="w-9 h-9 rounded-lg hover:bg-[var(--ml-wash)] flex items-center justify-center">
                 <X size={18} />
               </button>
             </div>
-            <div className="px-5 py-4 border-b border-[#DCE8E9]">
-              <div className="text-sm font-medium">{user?.name}</div>
-              {user?.ic_number && <div className="text-[11px] font-mono text-[#5A6B70]">{user.ic_number}</div>}
+            <div className="px-5 py-4 border-b border-[#DAE2DF]">
+              <div className="text-[15px] font-semibold">{user?.name}</div>
+              <div className="text-[13px] text-[#566663]">{role}{user?.ic_number ? <span className="font-mono"> · {user.ic_number}</span> : null}</div>
             </div>
-            <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-              <button onClick={() => goSection("__top")} className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#EAF5F5] text-[#0B7C8C]">
-                <House size={18} weight="duotone" /> <span className="text-sm font-medium">Home</span>
-              </button>
-              {navItems.map((it) => (
-                <Link key={it.to} to={it.to} onClick={() => setMenuOpen(false)}
-                  className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium ${loc.pathname === it.to ? "bg-[#0B7C8C] text-[#F4F9F9]" : "hover:bg-[#EAF5F5] text-[#0B7C8C]"}`}>
-                  {it.label}
-                </Link>
-              ))}
-              {sections.map((sec) => (
-                <button key={sec.id} onClick={() => goSection(sec.id)}
-                  className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#EAF5F5] text-[#0B7C8C]">
-                  {sec.icon} <span className="text-sm font-medium">{sec.label}</span>
-                </button>
-              ))}
-            </nav>
-            <div className="p-3 border-t border-[#DCE8E9] space-y-1">
-              <button onClick={openProfile} className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#EAF5F5] text-[#0B7C8C]">
-                <User size={18} weight="duotone" /> <span className="text-sm font-medium">My profile</span>
-              </button>
-              <button onClick={() => { setMenuOpen(false); setPwOpen(true); }} className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#EAF5F5] text-[#0B7C8C]">
-                <Lock size={18} weight="duotone" /> <span className="text-sm font-medium">Change password</span>
-              </button>
-              <button onClick={doLogout} data-testid="logout-btn" className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-[#0A3D62]/10 text-[#0A3D62]">
-                <SignOut size={18} /> <span className="text-sm font-medium">Log out</span>
-              </button>
-            </div>
+            <NavList onPick={() => setMenuOpen(false)} />
           </aside>
         </div>
       )}
 
-      <div id="__top" className="max-w-[1400px] mx-auto px-4 md:px-8 pt-8 pb-6">
-        <div className="overline mb-3">{subtitle}</div>
-        <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl tracking-tight font-semibold text-[#12262B]">{title}</h1>
+      <LicenceBanner />
+
+      <div id="__top" className="max-w-[1440px] mx-auto px-4 md:px-8 pt-7 pb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+        <div className="min-w-0">
+          {subtitle && <div className="text-[15px] text-[#566663] mb-1">{subtitle}</div>}
+          <h1 className="text-[30px] sm:text-[38px] leading-[1.05] text-[#10201D]">{title}</h1>
+        </div>
+        {isStaff && <div className="text-[15px] text-[#566663] pb-1">{today}</div>}
       </div>
-      <main className="max-w-[1400px] mx-auto px-4 md:px-8 pb-16 fade-in">{children}</main>
+      <main className="max-w-[1440px] mx-auto px-4 md:px-8 pb-16">{children}</main>
 
       <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
-        <DialogContent className="bg-[#F4F9F9] border-[#DCE8E9]">
+        <DialogContent className="bg-[#EEF2F1] border-[#DAE2DF]">
           <DialogHeader><DialogTitle className="font-display text-xl">My profile</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5"><Label>Full name</Label>
-              <Input value={pf.name} onChange={(e) => setPf({ ...pf, name: e.target.value })} className="border-[#DCE8E9]" /></div>
+              <Input value={pf.name} onChange={(e) => setPf({ ...pf, name: e.target.value })} className="border-[#DAE2DF]" /></div>
             <div className="space-y-1.5"><Label>Email</Label>
-              <Input type="email" value={pf.email} onChange={(e) => setPf({ ...pf, email: e.target.value })} placeholder="you@email.com" className="border-[#DCE8E9]" /></div>
+              <Input type="email" value={pf.email} onChange={(e) => setPf({ ...pf, email: e.target.value })} placeholder="you@email.com" className="border-[#DAE2DF]" /></div>
             <div className="space-y-1.5"><Label>Phone</Label>
-              <Input value={pf.phone} onChange={(e) => setPf({ ...pf, phone: e.target.value })} placeholder="012-345 6789" className="border-[#DCE8E9]" /></div>
+              <Input value={pf.phone} onChange={(e) => setPf({ ...pf, phone: e.target.value })} placeholder="012-345 6789" className="border-[#DAE2DF]" /></div>
             <div className="space-y-1.5"><Label>Home address</Label>
-              <Input value={pf.address} onChange={(e) => setPf({ ...pf, address: e.target.value })} placeholder="No. 1, Jalan Sehat, 47500 Subang Jaya" className="border-[#DCE8E9]" /></div>
+              <Input value={pf.address} onChange={(e) => setPf({ ...pf, address: e.target.value })} placeholder="No. 1, Jalan Sehat, 47500 Subang Jaya" className="border-[#DAE2DF]" /></div>
           </div>
-          {user?.ic_number && <p className="text-[11px] text-[#5A6B70] mt-1">You sign in with your IC ({user.ic_number}). Your IC cannot be changed here.</p>}
-          <DialogFooter><Button onClick={saveProfile} className="bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9]">Save</Button></DialogFooter>
+          {user?.ic_number && <p className="text-[11px] text-[#566663] mt-1">You sign in with your IC ({user.ic_number}). Your IC cannot be changed here.</p>}
+          <DialogFooter><Button onClick={saveProfile} className="bg-[var(--ml-primary)] hover:bg-[var(--ml-primary-soft)] text-[#EEF2F1]">Save</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={pwOpen} onOpenChange={setPwOpen}>
-        <DialogContent className="bg-[#F4F9F9] border-[#DCE8E9]">
+        <DialogContent className="bg-[#EEF2F1] border-[#DAE2DF]">
           <DialogHeader><DialogTitle className="font-display text-xl">Change password</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5"><Label>Current password</Label>
-              <Input type="password" value={pwForm.old_password} onChange={(e) => setPwForm({ ...pwForm, old_password: e.target.value })} className="border-[#DCE8E9]" /></div>
+              <Input type="password" value={pwForm.old_password} onChange={(e) => setPwForm({ ...pwForm, old_password: e.target.value })} className="border-[#DAE2DF]" /></div>
             <div className="space-y-1.5"><Label>New password (min 8 chars)</Label>
-              <Input type="password" value={pwForm.new_password} onChange={(e) => setPwForm({ ...pwForm, new_password: e.target.value })} className="border-[#DCE8E9]" /></div>
+              <Input type="password" value={pwForm.new_password} onChange={(e) => setPwForm({ ...pwForm, new_password: e.target.value })} className="border-[#DAE2DF]" /></div>
           </div>
           <DialogFooter>
             <Button onClick={async () => {
@@ -213,7 +275,7 @@ export default function AppShell({ children, title, subtitle, navItems = [], sec
                 const d = e?.response?.data?.detail;
                 toast.error(typeof d === "string" ? d : "Could not change password");
               }
-            }} className="bg-[#0B7C8C] hover:bg-[#075F6C] text-[#F4F9F9]">Save</Button>
+            }} className="bg-[var(--ml-primary)] hover:bg-[var(--ml-primary-soft)] text-[#EEF2F1]">Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,0 +1,79 @@
+{
+  "experiment": "E1",
+  "label": "local-first",
+  "outage_mode": "down",
+  "outage_s": 60.0,
+  "rate_visits_per_s": 1.0,
+  "phases": {
+    "before": {
+      "requests": 120,
+      "succeeded": 120,
+      "availability_pct": 100.0,
+      "p50_ms": 117.2,
+      "p95_ms": 500.5,
+      "max_ms": 540.8
+    },
+    "during": {
+      "requests": 240,
+      "succeeded": 240,
+      "availability_pct": 100.0,
+      "p50_ms": 190.8,
+      "p95_ms": 624.7,
+      "max_ms": 729.4
+    },
+    "after": {
+      "requests": 120,
+      "succeeded": 120,
+      "availability_pct": 100.0,
+      "p50_ms": 221.7,
+      "p95_ms": 968.4,
+      "max_ms": 1968.1
+    }
+  },
+  "downtime_s": 0.0,
+  "by_op_during": {
+    "checkin": {
+      "requests": 60,
+      "succeeded": 60,
+      "availability_pct": 100.0,
+      "p50_ms": 39.8,
+      "p95_ms": 48.5,
+      "max_ms": 53.5
+    },
+    "read_queue": {
+      "requests": 60,
+      "succeeded": 60,
+      "availability_pct": 100.0,
+      "p50_ms": 563.2,
+      "p95_ms": 669.0,
+      "max_ms": 729.4
+    },
+    "record": {
+      "requests": 60,
+      "succeeded": 60,
+      "availability_pct": 100.0,
+      "p50_ms": 29.4,
+      "p95_ms": 37.4,
+      "max_ms": 41.8
+    },
+    "register": {
+      "requests": 60,
+      "succeeded": 60,
+      "availability_pct": 100.0,
+      "p50_ms": 335.6,
+      "p95_ms": 349.6,
+      "max_ms": 380.3
+    }
+  },
+  "events": [
+    {
+      "t": 1791550538.7299051,
+      "event": "link down"
+    },
+    {
+      "t": 1791550598.7924364,
+      "event": "link up"
+    }
+  ],
+  "t_start": 1791550508.7286468
+}
