@@ -99,7 +99,7 @@ export default function Kiosk() {
     <div className="min-h-screen bg-[#10262E] relative">
       <header className="relative z-10 max-w-5xl mx-auto px-6 pt-6 flex items-center justify-between">
         <div className="flex items-center gap-3 text-white">
-          <img src={PRODUCT.logo} alt="" className="w-10 h-10 rounded-lg object-cover" />
+          <img src={PRODUCT.logo} alt="" className="w-14 h-14 rounded-xl object-cover" />
           <div className="text-xl font-bold leading-none">{PRODUCT.name}</div>
         </div>
         <Button

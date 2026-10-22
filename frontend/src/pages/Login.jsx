@@ -39,8 +39,8 @@ export default function Login() {
     <div className="min-h-screen bg-[#EEF2F1] grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
       <aside className="hidden lg:flex flex-col bg-[#10262E] text-white px-14 py-12">
         <Link to="/" className="flex items-center gap-3" data-testid="brand-home">
-          {brand?.logo ? <img src={brand.logo} alt="" className="w-10 h-10 rounded-xl object-contain bg-white p-0.5" />
-            : <img src={PRODUCT.logo} alt="" className="w-10 h-10 rounded-xl object-cover" />}
+          {brand?.logo ? <img src={brand.logo} alt="" className="w-12 h-12 rounded-xl object-contain bg-white p-0.5" />
+            : <img src={PRODUCT.logo} alt="" className="w-12 h-12 rounded-xl object-cover" />}
           <span className="text-white/70 text-[15px]">Back to the front door</span>
         </Link>
         <div className="mt-auto">
@@ -53,7 +53,7 @@ export default function Login() {
       </aside>
       <main className="flex flex-col px-6 sm:px-10 py-8">
         <Link to="/" className="lg:hidden flex items-center gap-2.5 mb-10" data-testid="brand-home-mobile">
-          <img src={PRODUCT.logo} alt="" className="w-9 h-9 rounded-lg object-cover" />
+          <img src={PRODUCT.logo} alt="" className="w-11 h-11 rounded-[10px] object-cover" />
           <span className="font-display text-[19px]">{brand?.clinic_name || PRODUCT.name}</span>
         </Link>
         <div className="w-full max-w-[420px] m-auto">
