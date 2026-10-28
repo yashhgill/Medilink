@@ -123,8 +123,8 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.version || github.ref_name }}
           name: MediLink ${{ github.event.inputs.version || github.ref_name }}
-          make_latest: "true"
+          draft: true          # downloads are by request: HarNova shares the files with approved clinics
           body: |
             MediLink desktop for clinics. Download the file for your computer, unzip it and open MediLink.
-            First run opens a short set-up in your browser. Full guide: https://medilink.harnova.my/#install
+            First run opens a short set-up in your browser. Full guide: https://medilink.harnova.my/setup.html
           files: out/*
