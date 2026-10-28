@@ -102,7 +102,7 @@ export default function Facilities() {
 
   return (
     <AppShell
-      title={!isNetworked ? "Staff & Clinic settings" : isSuperAdmin ? "Network administration" : "My clinic"}
+      title={!isNetworked ? "Clinic and staff" : isSuperAdmin ? "Network administration" : "My clinic"}
       subtitle={!isNetworked ? "Manage your clinic" : isSuperAdmin ? "Network" : "Clinic"}
       navItems={navItems}>
 

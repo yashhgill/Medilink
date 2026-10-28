@@ -3,10 +3,15 @@ Run inside the backend container:  python demo_seed.py
 """
 import asyncio, random
 from server import (database, users_t, appointments_t, records_t, payments_t, ic_store, ic_index,
-                    vaccinations_t, hash_pw, uid, now_iso, next_q, FACILITY_ID)
+                    vaccinations_t, hash_pw, uid, now_iso, next_q, FACILITY_ID,
+                    is_today, today_bounds)
 from datetime import datetime, timezone, timedelta
 
 now = datetime.now(timezone.utc)
+
+def _clinic_midnight():
+    start, _ = today_bounds()
+    return datetime.fromisoformat(str(start).replace("Z", "+00:00")) if isinstance(start, str) else start
 
 DOCTORS = [
     ("dr.aisyah@medilink.io", "Doctor@123", "Dr. Nur Aisyah binti Rahman", "Family Medicine", "MMC-61204"),
@@ -90,14 +95,17 @@ async def main():
             existing_appt = await database.fetch_one(
                 appointments_t.select().where(
                     (appointments_t.c.patient_id == pid) &
-                    (appointments_t.c.scheduled_at.like(now.strftime("%Y-%m-%d") + "%"))))
+                    is_today(appointments_t.c.scheduled_at)))
             if existing_appt:
                 continue
             complaint, colour, cat, mins = COMPLAINTS[i % len(COMPLAINTS)]
             status = ["checked_in", "checked_in", "completed", "ready_for_pharmacy",
                       "dispensed", "checked_in", "completed", "dispensed"][i]
             q = await next_q(); aid = uid()
-            t = (now - timedelta(minutes=random.randint(10, 300))).isoformat()
+            # Earlier today by the clinic's clock, so the demo queue is never empty
+            # after midnight (UTC is still "yesterday" until 8 am in Malaysia).
+            since_midnight = int((now - _clinic_midnight()).total_seconds() // 60)
+            t = (now - timedelta(minutes=random.randint(1, max(2, min(300, since_midnight - 1))))).isoformat()
             doc = doctor_ids[i % len(doctor_ids)]
             paid = status in ("ready_for_pharmacy", "dispensed")
             await database.execute(appointments_t.insert().values(

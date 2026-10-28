@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Setup guide, MediLink</title>
+<meta name="description" content="Step-by-step guide for clinics: install MediLink, set up the clinic, add staff, open the kiosk and waiting-room screens, and turn on cloud backup.">
+<link rel="icon" href="img/icon-96.png">
+<link rel="apple-touch-icon" href="img/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<style>
+.intro{padding-block:64px 40px;border-bottom:1px solid var(--line)}
+.intro .wrap{display:grid;gap:18px}
+.intro h1{font-size:clamp(38px,5.4vw,60px)}
+.facts{display:flex;flex-wrap:wrap;gap:10px 28px;font-size:16px;color:var(--muted);margin-top:4px}
+.facts b{color:var(--ink);font-weight:700}
+
+.layout{display:grid;grid-template-columns:250px minmax(0,1fr);gap:64px;padding-block:48px 96px}
+@media (max-width:980px){.layout{grid-template-columns:minmax(0,1fr);gap:24px}}
+
+/* Contents */
+.toc{position:sticky;top:96px;align-self:start}
+.toc p{font-weight:700;font-size:15px;margin-bottom:10px;font-variation-settings:"wdth" 90}
+.toc ol{list-style:none;margin:0;padding:0;display:grid;gap:2px;border-left:2px solid var(--line)}
+.toc a{display:flex;gap:10px;padding:6px 12px;margin-left:-2px;border-left:2px solid transparent;color:var(--muted);text-decoration:none;font-size:15px;line-height:1.35;font-variation-settings:"wdth" 92}
+.toc a span{font-weight:700;min-width:16px;font-variant-numeric:tabular-nums}
+.toc a:hover{color:var(--ink)}
+.toc a.here{color:var(--ink);border-left-color:var(--teal);font-weight:600}
+@media (max-width:980px){.toc{position:static;border:1px solid var(--line);border-radius:8px;padding:16px}.toc ol{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}}
+
+/* Steps */
+.step{padding-bottom:64px;margin-bottom:64px;border-bottom:1px solid var(--line);max-width:860px}
+.step:last-child{border-bottom:0;margin-bottom:0}
+.step-head{display:flex;gap:18px;align-items:center;margin-bottom:22px}
+.step-head .plate{width:52px;height:52px;font-size:26px}
+.step-head h2{font-size:clamp(28px,3.4vw,38px)}
+.step > p,.step .text p{max-width:66ch}
+.step > p + p,.step .text p + p{margin-top:14px}
+.step h3{margin:36px 0 12px}
+.step ol.do,.step ul.do{margin:16px 0 0;padding-left:24px;display:grid;gap:10px;max-width:66ch}
+.step ol.do li::marker{font-weight:800;color:var(--teal)}
+.step ul.do li::marker{color:var(--teal)}
+figure{margin:28px 0 0}
+figcaption{margin-top:10px;font-size:15px;color:var(--muted);max-width:66ch}
+.pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+@media (max-width:700px){.pair{grid-template-columns:1fr}}
+
+.note{margin-top:22px;padding:16px 18px;border-left:4px solid var(--teal);background:var(--floor);max-width:66ch;font-size:17px}
+.note.warn{border-left-color:#E5A800;background:#FFF8E1}
+
+/* The MediLink window, as it appears */
+.term{background:var(--board);color:#DCE8E5;border-radius:10px;padding:22px 24px;font-size:15px;line-height:1.75;font-variation-settings:"wdth" 88;overflow-x:auto}
+.term .row{display:grid;grid-template-columns:150px auto;gap:12px;white-space:nowrap}
+.term .k{color:rgba(220,232,229,.6)}
+.term .v{color:var(--mint);font-weight:600}
+.term .gap{height:14px}
+
+/* Install tabs */
+.tabs{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:max-content;max-width:100%;margin-top:8px}
+.tab{all:unset;cursor:pointer;padding:10px 20px;font-weight:700;font-size:16px;font-variation-settings:"wdth" 100;border-right:1px solid var(--line)}
+.tab:last-child{border-right:0}
+.tab[aria-selected=true]{background:var(--ink);color:#fff}
+.tab:focus-visible{outline:3px solid var(--teal);outline-offset:-3px}
+
+/* Address table */
+.addr{width:100%;border-collapse:collapse;margin-top:18px;font-size:17px}
+.addr th,.addr td{text-align:left;padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+.addr th{font-size:14px;font-weight:700;color:var(--muted);font-variation-settings:"wdth" 88;border-bottom:2px solid var(--ink)}
+.addr td:first-child{font-weight:700;white-space:nowrap}
+.scroll{overflow-x:auto}
+@media (max-width:640px){.addr thead{display:none}.addr tr{display:block;padding-block:12px;border-bottom:1px solid var(--line)}.addr td{display:block;border:0;padding:2px 0}.addr td:first-child{white-space:normal}.addr code{white-space:normal;overflow-wrap:anywhere}}
+
+.day{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:0;max-width:720px}
+.day li{display:grid;grid-template-columns:110px minmax(0,1fr);gap:16px;padding-block:14px;border-bottom:1px solid var(--line)}
+.day time{font-weight:800;font-variation-settings:"wdth" 80;font-size:20px;font-variant-numeric:tabular-nums}
+
+.qa{margin-top:10px}
+.qa dt{font-weight:700;margin-top:22px;font-size:18px}
+.qa dd{margin:6px 0 0;color:var(--muted);max-width:66ch}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="img/icon-96.png" alt="" width="38" height="38">MediLink <span>by HarNova</span></a>
+    <nav aria-label="Main">
+      <a href="./#visit">How it works</a>
+      <a href="setup.html" aria-current="page">Setup guide</a>
+      <a href="./#download">Download</a>
+      <a href="./#trial">Free trial</a>
+      <a href="./#faq">Questions</a>
+    </nav>
+    <a class="btn btn-main btn-sm" href="./#download">Download</a>
+  </div>
+</header>
+
+<main>
+  <div class="intro">
+    <div class="wrap">
+      <h1>Setting up MediLink at your clinic</h1>
+      <p class="lead">Follow these steps in order. Most clinics finish in an afternoon, and nothing here needs an IT person.</p>
+      <div class="facts">
+        <span><b>Time</b> about 1 to 2 hours</span>
+        <span><b>Who</b> the clinic manager or owner</span>
+        <span><b>Help</b> <a href="mailto:hello@harnova.my">hello@harnova.my</a></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap layout">
+    <nav class="toc" aria-label="Steps in this guide">
+      <p>In this guide</p>
+      <ol>
+        <li><a href="#before"><span>1</span>Before you start</a></li>
+        <li><a href="#install"><span>2</span>Install MediLink</a></li>
+        <li><a href="#first-run"><span>3</span>Name your clinic</a></li>
+        <li><a href="#staff"><span>4</span>Add your staff</a></li>
+        <li><a href="#settings"><span>5</span>Make it yours</a></li>
+        <li><a href="#screens"><span>6</span>Open the other screens</a></li>
+        <li><a href="#cloud"><span>7</span>Turn on cloud backup</a></li>
+        <li><a href="#day"><span>8</span>A normal clinic day</a></li>
+        <li><a href="#backup"><span>9</span>Backups and problems</a></li>
+      </ol>
+    </nav>
+
+    <div>
+      <!-- 1 -->
+      <section class="step" id="before" style="padding-top:0">
+        <div class="step-head"><span class="plate">1</span><h2>Before you start</h2></div>
+        <p>MediLink runs on one computer at the clinic, usually the one at reception. Every other screen connects to it over the clinic's Wi-Fi, so that computer needs to stay on during opening hours.</p>
+        <h3>What you need</h3>
+        <ul class="do">
+          <li><b>One computer</b> with Windows 10 or 11, macOS 12 or newer, or Ubuntu 22.04 or newer. 4 GB of memory and 1 GB of free space is enough.</li>
+          <li><b>Clinic Wi-Fi</b> that the kiosk tablet, the doctor's computer and the TV can all join.</li>
+          <li><b>Optional:</b> a tablet for the kiosk, a TV or spare monitor for the waiting room, and your DuitNow QR image from your bank's merchant portal.</li>
+          <li><b>A list of your staff</b> with the email address each person will sign in with.</li>
+        </ul>
+        <p class="note">The internet only matters for cloud backup. The clinic runs normally without it.</p>
+      </section>
+
+      <!-- 2 -->
+      <section class="step" id="install">
+        <div class="step-head"><span class="plate">2</span><h2>Install MediLink</h2></div>
+        <p>Download the file for your computer from the <a href="./#download">download section</a>, then follow the steps for your system.</p>
+        <div class="tabs" role="tablist" aria-label="Your computer">
+          <button class="tab" role="tab" id="t-win" aria-controls="i-win" aria-selected="true">Windows</button>
+          <button class="tab" role="tab" id="t-mac" aria-controls="i-mac" aria-selected="false" tabindex="-1">Mac</button>
+          <button class="tab" role="tab" id="t-linux" aria-controls="i-linux" aria-selected="false" tabindex="-1">Linux</button>
+        </div>
+        <div id="i-win" role="tabpanel" aria-labelledby="t-win">
+          <ol class="do">
+            <li>Right-click <b>MediLink-Windows-x64.zip</b>, choose <b>Extract All</b>, and move the MediLink folder somewhere permanent, such as Documents.</li>
+            <li>Open the folder and double-click <b>MediLink.exe</b>.</li>
+            <li>If a blue "Windows protected your PC" box appears, click <b>More info</b>, then <b>Run anyway</b>. This trial build isn't signed with a Microsoft certificate yet, so Windows asks once.</li>
+            <li>If Windows Firewall asks, tick <b>Private networks</b> and click <b>Allow access</b>. Without this, the kiosk tablet and other screens can't connect.</li>
+          </ol>
+        </div>
+        <div id="i-mac" role="tabpanel" aria-labelledby="t-mac" hidden>
+          <ol class="do">
+            <li>Double-click the zip file and move the <b>MediLink</b> folder into Applications or Documents.</li>
+            <li>Open the folder, <b>right-click MediLink</b> and choose <b>Open</b>, then <b>Open</b> again. This trial build isn't notarised by Apple yet, so the Mac asks once.</li>
+            <li>If it still won't open, go to <b>System Settings</b>, <b>Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b>.</li>
+            <li>If the Mac asks whether MediLink may accept incoming connections, click <b>Allow</b> so other screens can connect.</li>
+          </ol>
+        </div>
+        <div id="i-linux" role="tabpanel" aria-labelledby="t-linux" hidden>
+          <ol class="do">
+            <li>Unpack it: <code>tar xzf MediLink-Linux-x64.tar.gz</code></li>
+            <li>Start it: <code>./MediLink/MediLink</code></li>
+            <li>To choose the port yourself, add <code>--port 8001</code>.</li>
+          </ol>
+        </div>
+
+        <h3>The MediLink window</h3>
+        <p>When MediLink starts, a small window opens with the clinic's addresses, and your browser opens by itself. <b>Keep this window open while the clinic is working.</b> Closing it stops MediLink for every screen.</p>
+        <figure>
+          <div class="term" role="img" aria-label="The MediLink window listing the address on this computer, the kiosk address, the address for other devices and the clinic data folder.">
+            <div>MediLink is starting…</div>
+            <div class="gap"></div>
+            <div class="row"><span class="k">On this computer</span><span class="v">http://127.0.0.1:8001</span></div>
+            <div class="row"><span class="k">Kiosk</span><span class="v">http://127.0.0.1:8001/kiosk</span></div>
+            <div class="row"><span class="k">Other devices</span><span><span class="v">http://192.168.1.20:8001</span> <span class="k">(same Wi-Fi or network)</span></span></div>
+            <div class="gap"></div>
+            <div class="row"><span class="k">Clinic data</span><span>C:\Users\Reception\AppData\Local\MediLink</span></div>
+            <div>Back up this folder, including keys.json, to keep your records safe.</div>
+          </div>
+          <figcaption>Your numbers will differ. Write down the <b>Other devices</b> address: you'll use it in step 6.</figcaption>
+        </figure>
+      </section>
+
+      <!-- 3 -->
+      <section class="step" id="first-run">
+        <div class="step-head"><span class="plate">3</span><h2>Name your clinic</h2></div>
+        <p>The first time MediLink opens, the browser shows a two-screen setup.</p>
+        <ol class="do">
+          <li><b>Clinic details.</b> Enter the clinic's name, address and phone number. These appear on receipts, medicine labels and MCs.</li>
+          <li><b>Administrator account.</b> Enter your name, the email you'll sign in with and a password of at least 8 characters. This account can add staff and change settings, so keep the password safe.</li>
+        </ol>
+        <div class="pair">
+          <figure><div class="frame"><img src="img/guide-setup-clinic.webp" loading="lazy" width="1200" height="1076" alt="Setup, step 1 of 2: clinic name Klinik Sejahtera, address and phone filled in."></div><figcaption>Step 1 of 2: your clinic.</figcaption></figure>
+          <figure><div class="frame"><img src="img/guide-setup-admin.webp" loading="lazy" width="1200" height="1076" alt="Setup, step 2 of 2: administrator name and login email."></div><figcaption>Step 2 of 2: your administrator login.</figcaption></figure>
+        </div>
+      </section>
+
+      <!-- 4 -->
+      <section class="step" id="staff">
+        <div class="step-head"><span class="plate">4</span><h2>Add your staff</h2></div>
+        <p>Signed in as the administrator, open <b>Clinic and staff</b> from the top bar. Add each person with their name, sign-in email, a temporary password and their role.</p>
+        <ul class="do">
+          <li><b>Doctor</b> uses the consultation screen. Add their specialty if you like.</li>
+          <li><b>Reception</b> runs the queue, bookings and payments.</li>
+          <li><b>Pharmacy</b> dispenses paid prescriptions and manages stock.</li>
+        </ul>
+        <p class="note">Give each person their own sign-in rather than sharing one. When someone leaves, you can switch off their access without touching anyone else's.</p>
+        <figure><div class="frame"><img src="img/guide-staff.webp" loading="lazy" width="1600" height="1000" alt="Clinic and staff page with the Add staff form and the list of current staff."></div></figure>
+      </section>
+
+      <!-- 5 -->
+      <section class="step" id="settings">
+        <div class="step-head"><span class="plate">5</span><h2>Make it yours</h2></div>
+        <p>Open <b>Clinic settings</b>. Everything you set here appears on the kiosk, the waiting-room screen, receipts, MCs and the patient app. Press <b>Save settings</b> when you're done.</p>
+        <div class="scroll">
+          <table class="addr">
+            <thead><tr><th>Section</th><th>What to fill in</th></tr></thead>
+            <tbody>
+              <tr><td>Look</td><td>Your logo (PNG or JPG, square works best) and brand colour. Triage colours never change, whatever you pick.</td></tr>
+              <tr><td>Fees and payment</td><td>Standard consultation fee in RM, a payment note for the kiosk, and your DuitNow QR. Without the QR, patients can only pay at the counter.</td></tr>
+              <tr><td>Front door</td><td>Clinic name, phone, address, welcome message and opening hours.</td></tr>
+              <tr><td>Documents</td><td>Registration number, email, two letterhead lines and the receipt footer.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <figure><div class="frame"><img src="img/guide-settings.webp" loading="lazy" width="1600" height="1000" alt="Clinic settings: logo upload, brand colour swatches with a preview, and the consultation fee."></div></figure>
+      </section>
+
+      <!-- 6 -->
+      <section class="step" id="screens">
+        <div class="step-head"><span class="plate">6</span><h2>Open the other screens</h2></div>
+        <p>On each device, connect to the clinic Wi-Fi, open a web browser and type the <b>Other devices</b> address from the MediLink window, with the ending below. Then bookmark it, or add it to the home screen on a tablet.</p>
+        <div class="scroll">
+          <table class="addr">
+            <thead><tr><th>Where</th><th>Address (example)</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr><td>Kiosk tablet</td><td><code>http://192.168.1.20:8001/kiosk</code></td><td>Patients check in here. No sign-in needed.</td></tr>
+              <tr><td>Waiting-room TV</td><td><code>http://192.168.1.20:8001/board</code></td><td>Shows queue numbers only. Put the browser in full screen.</td></tr>
+              <tr><td>Doctor's room, pharmacy</td><td><code>http://192.168.1.20:8001</code></td><td>Each person signs in with their own account.</td></tr>
+              <tr><td>Patients' phones</td><td><code>http://192.168.1.20:8001</code></td><td>Patients sign in with their IC number while on the clinic Wi-Fi.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pair">
+          <figure><div class="frame"><img src="img/guide-kiosk.webp" loading="lazy" width="1600" height="1112" alt="The kiosk screen asking for an IC number."></div><figcaption>The kiosk.</figcaption></figure>
+          <figure><div class="frame"><img src="img/guide-board.webp" loading="lazy" width="1600" height="900" alt="The waiting-room screen with queue numbers."></div><figcaption>The waiting-room screen.</figcaption></figure>
+        </div>
+        <p class="note">If a device can't open the address, check it's on the same Wi-Fi as the reception computer, and that MediLink was allowed through the firewall in step 2.</p>
+      </section>
+
+      <!-- 7 -->
+      <section class="step" id="cloud">
+        <div class="step-head"><span class="plate">7</span><h2>Turn on cloud backup</h2></div>
+        <p>Cloud backup keeps a copy of your records off-site. It's optional, but we recommend it: if the reception computer is lost or breaks, your records are still safe. The clinic keeps working offline either way.</p>
+        <ol class="do">
+          <li>Open <b>Clinic settings</b> and scroll to <b>Cloud backup</b>. It shows <b>Not connected</b> and your <b>Clinic ID</b>.</li>
+          <li>Press <b>Copy</b> and send the Clinic ID to <a href="mailto:hello@harnova.my?subject=MediLink%20cloud%20key">hello@harnova.my</a>.</li>
+          <li>HarNova replies with your <b>cloud key</b>, a long code that starts with <code>mlk1.</code></li>
+          <li>Paste the key into the <b>Cloud key</b> box and press <b>Connect to cloud</b>.</li>
+          <li>MediLink checks the key and restarts itself once. The page reloads after a few seconds and shows <b>Connected</b>. Your existing records start uploading straight away.</li>
+        </ol>
+        <figure><div class="frame"><img src="img/guide-cloud.webp" loading="lazy" width="1600" height="525" alt="The Cloud backup section: status Not connected, the Clinic ID with a Copy button, the Cloud key box and the Connect to cloud button."></div><figcaption>Cloud backup before connecting.</figcaption></figure>
+        <h3>What the status means</h3>
+        <ul class="do">
+          <li><b>Connected, Everything uploaded:</b> the cloud copy matches the clinic.</li>
+          <li><b>Connected, cloud unreachable right now:</b> the internet is down. Keep working; changes upload by themselves when it's back.</li>
+          <li><b>Not connected:</b> records are kept on this computer only.</li>
+        </ul>
+        <p class="note warn">Treat the cloud key like a password. Anyone with it can upload to your clinic's backup. If it leaks, ask HarNova for a new one; the old key stops working.</p>
+      </section>
+
+      <!-- 8 -->
+      <section class="step" id="day">
+        <div class="step-head"><span class="plate">8</span><h2>A normal clinic day</h2></div>
+        <ol class="day">
+          <li><time>Opening</time><span>Turn on the reception computer and open MediLink. Open the kiosk and the waiting-room screen if they were closed.</span></li>
+          <li><time>Arrival</time><span>Patients check in at the kiosk, or reception adds them. Each gets a queue number and a triage colour.</span></li>
+          <li><time>Consult</time><span>The doctor opens the next patient, writes the record and prescription, and prints an MC if needed.</span></li>
+          <li><time>Payment</time><span>The patient pays by DuitNow QR or at the counter. Reception confirms the payment.</span></li>
+          <li><time>Pharmacy</time><span>The paid prescription appears at the pharmacy. Check it, hand it over, press Dispense.</span></li>
+          <li><time>Closing</time><span>Reception checks the day's cash report. Leave MediLink running until everyone has finished, then close its window.</span></li>
+        </ol>
+      </section>
+
+      <!-- 9 -->
+      <section class="step" id="backup">
+        <div class="step-head"><span class="plate">9</span><h2>Backups and problems</h2></div>
+        <h3 style="margin-top:0">Keep your own backup too</h3>
+        <p>Once a week, copy MediLink's data folder to an external drive. Copy the whole folder, including <b>keys.json</b>: without it, the identity card numbers stored in the records can't be read.</p>
+        <div class="scroll">
+          <table class="addr">
+            <thead><tr><th>Computer</th><th>Data folder</th></tr></thead>
+            <tbody>
+              <tr><td>Windows</td><td><code>%LOCALAPPDATA%\MediLink</code></td></tr>
+              <tr><td>Mac</td><td><code>~/Library/Application Support/MediLink</code></td></tr>
+              <tr><td>Linux</td><td><code>~/.local/share/medilink</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>If something isn't working</h3>
+        <dl class="qa">
+          <dt>The kiosk or TV says it can't reach the site.</dt>
+          <dd>Check the MediLink window is still open on the reception computer, the device is on the same Wi-Fi, and the address matches the <b>Other devices</b> line exactly.</dd>
+          <dt>The address changed after a restart.</dt>
+          <dd>Routers sometimes give the computer a new address. Read the new one from the MediLink window and update the bookmarks. Asking your router to always give the reception computer the same address stops this.</dd>
+          <dt>Windows or the Mac won't open MediLink.</dt>
+          <dd>Follow the warning steps in <a href="#install">step 2</a>. They are needed once per computer.</dd>
+          <dt>Connect to cloud says the key isn't valid.</dt>
+          <dd>Copy the whole key, starting from <code>mlk1.</code>, with no spaces at either end. A key only works for the Clinic ID it was issued for.</dd>
+          <dt>Anything else.</dt>
+          <dd>Email <a href="mailto:hello@harnova.my">hello@harnova.my</a> with your Clinic ID and a photo of the screen. During the trial we'll help you directly.</dd>
+        </dl>
+      </section>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="img/icon-96.png" alt="" width="32" height="32">MediLink</a>
+    <span>Made in Melaka by <a href="https://harnova.my">HarNova Technology</a></span>
+    <a href="./#download">Download</a>
+    <a href="https://github.com/yashhgill/Medilink/releases/latest">Latest release</a>
+    <span class="right">© 2026 HarNova Technology</span>
+  </div>
+</footer>
+
+<script>
+// Install tabs, opening on this computer's system.
+(function () {
+  var tabs = [].slice.call(document.querySelectorAll(".tab"));
+  function pick(t, focus) {
+    tabs.forEach(function (x) {
+      var on = x === t; x.setAttribute("aria-selected", on); x.tabIndex = on ? 0 : -1;
+      document.getElementById(x.getAttribute("aria-controls")).hidden = !on;
+    });
+    if (focus) t.focus();
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener("click", function () { pick(t); });
+    t.addEventListener("keydown", function (e) {
+      var d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      if (d) { e.preventDefault(); pick(tabs[(i + d + tabs.length) % tabs.length], true); }
+    });
+  });
+  var p = ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "") + navigator.userAgent;
+  if (/Mac/i.test(p) && !/iPhone|iPad/.test(p)) pick(document.getElementById("t-mac"));
+  else if (/Linux|X11/i.test(p) && !/Android/i.test(p)) pick(document.getElementById("t-linux"));
+})();
+
+// Highlight the step being read in the contents list.
+(function () {
+  if (!("IntersectionObserver" in window)) return;
+  var links = {};
+  [].forEach.call(document.querySelectorAll(".toc a"), function (a) { links[a.getAttribute("href").slice(1)] = a; });
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      for (var k in links) links[k].classList.toggle("here", k === e.target.id);
+    });
+  }, { rootMargin: "-30% 0px -60% 0px" });
+  [].forEach.call(document.querySelectorAll(".step"), function (s) { io.observe(s); });
+})();
+</script>
+</body>
+</html>

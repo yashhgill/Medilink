@@ -3,443 +3,431 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>MediLink · Clinic system for Malaysian GPs</title>
-<meta name="description" content="Queue, triage, consultations, pharmacy and DuitNow payment for Malaysian GP clinics. Runs on the clinic's own computer and keeps working when the internet is down. Free one-month trial.">
-<meta property="og:title" content="MediLink · The clinic system that keeps working offline">
-<meta property="og:description" content="Kiosk check-in with MyKad, triage, doctor console, pharmacy and DuitNow payment. Free one-month trial for clinics.">
-<meta property="og:image" content="https://medilink.harnova.my/img/reception-hero.webp">
-<link rel="icon" href="img/icon-512.png">
+<title>MediLink, clinic software for Malaysian GPs</title>
+<meta name="description" content="Check-in, queue, consultations, pharmacy and DuitNow payment for GP clinics in Malaysia. Runs on the clinic's own computer, keeps working without internet, backs up to the cloud. Free for one month.">
+<meta property="og:title" content="MediLink: clinic software that runs on your own computer">
+<meta property="og:description" content="Check-in, queue, consultations, pharmacy and payment for Malaysian GP clinics. Free for one month.">
+<meta property="og:image" content="https://medilink.harnova.my/img/guide-reception.webp">
+<link rel="icon" href="img/icon-96.png">
+<link rel="apple-touch-icon" href="img/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
 <style>
-:root{
-  --ink:#10201D; --muted:#566663; --floor:#EEF2F1; --surface:#fff; --line:#DAE2DF;
-  --teal:#0A6E62; --teal-dark:#08564D; --wash:#E1F0EC; --board:#10262E; --board-deep:#0B1D24; --mint:#5FD3A8;
-  --red:#C0352B; --yellow:#E5A800; --green:#2F7D45;
-  --sans:"Atkinson Hyperlegible Next",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --display:"Bricolage Grotesque","Atkinson Hyperlegible Next",system-ui,sans-serif;
-}
-*{box-sizing:border-box}
-[hidden]{display:none!important}
-html{scroll-behavior:smooth}
-body{margin:0;background:var(--floor);color:var(--ink);font:17px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
-img{max-width:100%;height:auto;display:block}
-a{color:inherit}
-.wrap{max-width:1200px;margin:0 auto;padding-inline:20px}
-h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:-.025em;line-height:1.05;margin:0;text-wrap:balance}
-h2{font-size:clamp(32px,4.4vw,48px)}
-h3{font-size:24px;letter-spacing:-.015em}
-p{margin:0}
-.lead{font-size:clamp(18px,2vw,21px);color:var(--muted);max-width:56ch}
-.btn{display:inline-flex;align-items:center;gap:10px;height:52px;padding:0 24px;border-radius:999px;font-weight:700;font-size:17px;text-decoration:none;border:2px solid transparent;cursor:pointer}
-.btn-primary{background:var(--mint);color:var(--board-deep)}
-.btn-primary:hover{background:#7ADDB8}
-.btn-ghost{border-color:rgba(255,255,255,.3);color:#fff}
-.btn-ghost:hover{border-color:#fff}
-.btn-teal{background:var(--teal);color:#fff}
-.btn-teal:hover{background:var(--teal-dark)}
-:focus-visible{outline:3px solid var(--mint);outline-offset:3px;border-radius:8px}
-
-/* Nav */
-.nav{position:sticky;top:0;z-index:20;background:rgba(16,38,46,.96);backdrop-filter:blur(8px);color:#fff;padding-top:env(safe-area-inset-top)}
-.nav .wrap{height:64px;display:flex;align-items:center;gap:28px}
-.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-family:var(--display);font-size:21px;font-weight:700}
-.brand img{width:40px;height:40px;border-radius:10px}
-.brand small{font-family:var(--sans);font-size:13px;font-weight:600;color:rgba(255,255,255,.55);letter-spacing:0}
-.nav nav{display:flex;gap:22px;font-size:15px;font-weight:600}
-.nav nav a{text-decoration:none;color:rgba(255,255,255,.7)}
-.nav nav a:hover{color:#fff}
-.nav .cta{margin-left:auto;height:40px;font-size:15px;padding:0 18px}
-@media (max-width:860px){.nav nav{display:none}}
-@media (max-width:420px){.brand small{display:none}}
-
 /* Hero */
-.hero{background:var(--board);color:#fff;padding:72px 0 0;overflow:hidden}
-.hero h1{font-size:clamp(40px,6.4vw,76px);max-width:15ch;color:#fff}
-.hero .lead{color:rgba(255,255,255,.72);margin-top:22px}
-.hero-actions{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:34px}
-.hero-note{margin-top:14px;font-size:14px;color:rgba(255,255,255,.55)}
-.hero-note a{color:rgba(255,255,255,.8)}
-.shot{border-radius:16px;border:1px solid var(--line);box-shadow:0 24px 60px -24px rgba(16,38,46,.35);background:#fff;overflow:hidden}
-.hero .shot{margin-top:56px;border-color:rgba(255,255,255,.12);border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom:0}
+.hero{padding-block:72px 0}
+.hero h1{font-size:clamp(40px,6.4vw,86px);max-width:19ch}
+.hero-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px 56px;align-items:end;margin-top:28px}
+.hero-actions{display:flex;flex-wrap:wrap;gap:12px}
+.hero-note{font-size:16px;color:var(--muted);margin-top:14px}
+@media (max-width:900px){.hero-row{grid-template-columns:minmax(0,1fr)}}
+.hero .frame{margin-top:40px}
 
-/* Measured facts */
-.facts{background:var(--surface);border-bottom:1px solid var(--line)}
-.facts .wrap{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
-.fact{padding:30px 28px 30px 0}
-.fact+.fact{padding-left:28px;border-left:1px solid var(--line)}
-.fact b{display:block;font-family:var(--display);font-size:40px;line-height:1;letter-spacing:-.03em}
-.fact span{display:block;margin-top:8px;font-size:15px;color:var(--muted);max-width:30ch}
-.facts-note{font-size:13px;color:var(--muted);padding-bottom:22px}
-@media (max-width:760px){.facts .wrap{grid-template-columns:1fr}.fact,.fact+.fact{padding:22px 0;border-left:0;border-top:1px solid var(--line)}.fact:first-child{border-top:0}}
+/* The visit: stops along a corridor */
+.stops{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.stop{all:unset;box-sizing:border-box;cursor:pointer;display:flex;gap:12px;align-items:center;padding:14px 16px;border-right:1px solid var(--line);min-width:0}
+.stop:last-child{border-right:0}
+.stop .plate{background:var(--floor);color:var(--ink);width:40px;height:40px;font-size:20px}
+.stop b{display:block;font-size:17px;line-height:1.2;font-variation-settings:"wdth" 105}
+.stop i{display:block;font-style:normal;font-size:14px;color:var(--muted);font-variation-settings:"wdth" 85}
+.stop[aria-selected=true]{background:var(--board);color:#fff}
+.stop[aria-selected=true] i{color:rgba(255,255,255,.65)}
+.stop[aria-selected=true] .plate{background:var(--mint);color:var(--board)}
+.stop:hover:not([aria-selected=true]){background:var(--floor)}
+.stop:focus-visible{outline:3px solid var(--teal);outline-offset:-3px;border-radius:0}
+@media (max-width:980px){.stops{grid-template-columns:repeat(2,minmax(0,1fr))}.stop{border-bottom:1px solid var(--line)}.stop:nth-child(2n){border-right:0}.stop:last-child{grid-column:1/-1;border-bottom:0}}
+@media (max-width:480px){.stop b{font-size:15px}.stop{padding:12px}.stop .plate{width:34px;height:34px;font-size:17px}}
+.panel{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,8fr);gap:48px;align-items:start;margin-top:36px}
+.panel .copy{display:grid;gap:14px;padding-top:8px}
+.panel .copy p{color:var(--muted)}
+.panel ul{margin:4px 0 0;padding:0;list-style:none;display:grid;gap:10px;font-size:17px}
+.panel li{padding-left:20px;position:relative}
+.panel li::before{content:"";position:absolute;left:0;top:.6em;width:8px;height:8px;background:var(--teal)}
+@media (max-width:900px){.panel{grid-template-columns:1fr;gap:24px}}
+.js .panel:not(.on){display:none}
+.no-js .stops{display:none}
+.no-js .panel{margin-top:64px}
+.triage{display:flex;flex-wrap:wrap;gap:6px;font-size:14px;font-weight:700;font-variation-settings:"wdth" 90}
+.triage span{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:4px;border:1px solid}
+.triage span::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor}
+.t-red{color:#8E1F17;background:#FBE7E5;border-color:#F1BDB7}
+.t-yel{color:#6B4E00;background:#FFF4CC;border-color:#F0D77A}
+.t-grn{color:#1F5A30;background:#E3F2E6;border-color:#B4D9BD}
 
-/* Sections */
-section{padding:96px 0}
-.section-head{max-width:760px;margin-bottom:48px}
-.section-head .lead{margin-top:14px}
-.feature{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:56px;align-items:center;padding:40px 0}
-.feature.flip{grid-template-columns:minmax(0,7fr) minmax(0,5fr)}
-.feature.flip .copy{order:2}
-.feature .copy p{margin-top:12px;color:var(--muted)}
-.feature ul{margin:16px 0 0;padding:0;list-style:none;display:grid;gap:8px}
-.feature li{padding-left:22px;position:relative}
-.feature li::before{content:"";position:absolute;left:0;top:.62em;width:10px;height:10px;border-radius:3px;background:var(--teal)}
-@media (max-width:900px){.feature,.feature.flip{grid-template-columns:1fr;gap:24px}.feature.flip .copy{order:0}}
-.triage-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
-.chip{display:inline-flex;align-items:center;gap:7px;padding:3px 11px;border-radius:999px;font-size:14px;font-weight:700;border:1px solid}
-.chip::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor}
-.chip.r{color:#8E1F17;background:#FBE7E5;border-color:#F1BDB7}.chip.y{color:#6B4E00;background:#FFF4CC;border-color:#F0D77A}.chip.g{color:#1F5A30;background:#E3F2E6;border-color:#B4D9BD}
+/* Reasons */
+.reasons{display:grid;gap:0;border-top:2px solid var(--ink)}
+.reason{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:40px;padding-block:32px;border-bottom:1px solid var(--line)}
+.reason p{color:var(--muted);max-width:62ch}
+.reason p+p{margin-top:12px}
+.reason strong{color:var(--ink);font-weight:700}
+@media (max-width:820px){.reason{grid-template-columns:1fr;gap:10px}}
 
-/* Board section */
-.dark{background:var(--board-deep);color:#fff}
-.dark h2{color:#fff}.dark .lead{color:rgba(255,255,255,.7)}
-.dark .shot{border-color:rgba(255,255,255,.12)}
+/* Waiting-room band */
+.tv{background:var(--board);color:#fff}
+.tv h2{color:#fff}
+.tv .lead{color:rgba(255,255,255,.72)}
+.tv code{background:rgba(255,255,255,.12);color:var(--mint)}
+.tv .frame{border-color:rgba(255,255,255,.14);box-shadow:none}
+.tv-grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:48px;align-items:center}
+@media (max-width:900px){.tv-grid{grid-template-columns:1fr}}
 
-/* Downloads */
-#download{background:var(--surface);border-block:1px solid var(--line)}
-.dl-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
-@media (max-width:980px){.dl-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:520px){.dl-grid{grid-template-columns:1fr}}
-.dl{border:1px solid var(--line);border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:6px;background:var(--floor)}
-.dl.me{background:var(--wash);border-color:var(--teal);box-shadow:0 0 0 1px var(--teal)}
-.dl h3{font-size:21px}
-.dl .req{font-size:14px;color:var(--muted)}
-.dl .file{font-size:13px;color:var(--muted);word-break:break-all}
-.dl .btn{margin-top:auto;height:46px;justify-content:center;font-size:16px}
-.dl .mine{font-size:13px;font-weight:700;color:var(--teal-dark);min-height:20px}
-.dl-meta{margin-top:20px;font-size:15px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px 24px}
+/* Setup preview */
+.route{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 48px}
+.route li{display:flex;gap:16px;align-items:flex-start;padding-block:18px;border-bottom:1px solid var(--line)}
+.route b{display:block;font-size:19px;font-variation-settings:"wdth" 108}
+.route b+span{display:block;color:var(--muted);font-size:16px}
+@media (max-width:820px){.route{grid-template-columns:1fr}}
 
-/* Install steps */
-.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px}
-.tab{height:42px;padding:0 18px;border-radius:999px;border:1px solid var(--line);background:#fff;font:700 15px var(--sans);color:var(--ink);cursor:pointer}
-.tab[aria-selected=true]{background:var(--ink);border-color:var(--ink);color:#fff}
-.steps{counter-reset:s;list-style:none;margin:0;padding:0;display:grid;gap:14px;max-width:760px}
-.steps li{counter-increment:s;background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px 18px 64px;position:relative}
-.steps li::before{content:counter(s);position:absolute;left:18px;top:16px;width:32px;height:32px;border-radius:50%;background:var(--board);color:#fff;font:700 16px/32px var(--display);text-align:center}
-.steps b{display:block}
-.steps span{color:var(--muted);font-size:16px}
-code{font-size:.92em;background:var(--wash);padding:1px 6px;border-radius:6px}
+/* Downloads as rows, the way a release list reads */
+.dl{border-top:2px solid var(--ink)}
+.dl-row{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,4fr) minmax(0,3fr) auto;gap:20px;align-items:center;padding:20px 16px;border-bottom:1px solid var(--line)}
+.dl-row h3{font-size:21px}
+.dl-row .req{color:var(--muted);font-size:16px}
+.dl-row .file{font-size:14px;color:var(--muted);font-variation-settings:"wdth" 82;overflow-wrap:anywhere}
+.dl-row .yours{display:none;font-size:14px;font-weight:700;color:var(--teal-dark);margin-top:4px;font-variation-settings:"wdth" 90}
+.dl-row .btn{min-width:210px}
+.dl-row.me{background:var(--wash)}
+.dl-row.me .yours{display:block}
+@media (max-width:820px){.dl-row{grid-template-columns:1fr auto;gap:6px 16px}.dl-row .req,.dl-row .file{grid-column:1}.dl-row .btn{grid-row:1/span 3;grid-column:2}}
+.dl-more{display:flex;flex-wrap:wrap;gap:8px 28px;margin-top:18px;font-size:16px;color:var(--muted)}
 
 /* Trial */
-.trial{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px}
-@media (max-width:860px){.trial{grid-template-columns:1fr}}
-.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:28px}
-.card h3{margin-bottom:12px}
-.card ul{margin:0;padding-left:20px;display:grid;gap:6px}
-.card p+p{margin-top:10px}
+.trial{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:56px}
+.trial ul,.trial ol{margin:14px 0 0;padding-left:22px;display:grid;gap:8px}
+.trial li::marker{color:var(--teal);font-weight:700}
+.contact{margin-top:22px;padding:20px;border-left:4px solid var(--teal);background:var(--floor);display:grid;gap:6px}
+.contact b{font-size:20px;font-variation-settings:"wdth" 105}
+@media (max-width:820px){.trial{grid-template-columns:1fr;gap:36px}}
 
 /* FAQ */
-details{border-bottom:1px solid var(--line);padding:18px 0}
-summary{font-weight:700;font-size:19px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:16px}
-summary::after{content:"+";font-family:var(--display);font-size:26px;line-height:1;color:var(--teal)}
-details[open] summary::after{content:"–"}
-details p{margin-top:10px;color:var(--muted);max-width:70ch}
-
-footer{background:var(--board);color:rgba(255,255,255,.7);padding:40px 0 calc(40px + env(safe-area-inset-bottom));font-size:15px}
-footer .wrap{display:flex;flex-wrap:wrap;gap:12px 32px;align-items:center}
-footer a{color:#fff}
-@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+.faq > *{max-width:840px}
+details{border-bottom:1px solid var(--line)}
+summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;gap:20px;padding-block:20px;font-weight:700;font-size:19px;font-variation-settings:"wdth" 104}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"";flex:none;width:12px;height:12px;margin-top:6px;border-right:2.5px solid var(--teal);border-bottom:2.5px solid var(--teal);transform:rotate(45deg);transition:transform .15s}
+details[open] summary::after{transform:rotate(-135deg);margin-top:11px}
+details p{padding-bottom:22px;color:var(--muted);max-width:68ch}
 </style>
 </head>
-<body>
+<body class="no-js">
+<script>document.body.className = "js";</script>
 
-<header class="nav">
+<header class="top">
   <div class="wrap">
-    <a class="brand" href="#top"><img src="img/icon-512.png" alt="">MediLink <small>by HarNova</small></a>
-    <nav aria-label="Sections">
-      <a href="#features">Features</a>
+    <a class="brand" href="./"><img src="img/icon-96.png" alt="" width="38" height="38">MediLink <span>by HarNova</span></a>
+    <nav aria-label="Main">
+      <a href="#visit">How it works</a>
+      <a href="setup.html">Setup guide</a>
       <a href="#download">Download</a>
-      <a href="#install">Install</a>
       <a href="#trial">Free trial</a>
       <a href="#faq">Questions</a>
     </nav>
-    <a class="btn btn-primary cta" href="#download">Download</a>
+    <a class="btn btn-main btn-sm" href="#download">Download</a>
   </div>
 </header>
 
-<main id="top">
+<main>
   <div class="hero">
     <div class="wrap">
-      <h1>The clinic system that keeps working when the internet doesn't.</h1>
-      <p class="lead">Kiosk check-in with MyKad, triage, the doctor's console, pharmacy and DuitNow payment for Malaysian GP clinics. It runs on the clinic's own computer and backs up to the cloud whenever the line is up.</p>
-      <div class="hero-actions">
-        <a class="btn btn-primary" id="hero-dl" href="#download">Download MediLink</a>
-        <a class="btn btn-ghost" href="#trial">Start a free one-month trial</a>
+      <h1>Clinic software that runs on your own computer.</h1>
+      <div class="hero-row">
+        <p class="lead">MediLink handles check-in, the queue, consultations, pharmacy and payment for GP clinics in Malaysia. It keeps working when the internet drops, and backs up to the cloud when it's back.</p>
+        <div>
+          <div class="hero-actions">
+            <a class="btn btn-main" id="hero-dl" href="#download">Download MediLink</a>
+            <a class="btn btn-line" href="setup.html">Read the setup guide</a>
+          </div>
+          <p class="hero-note" id="hero-note">Free for one month. For Windows, Mac and Linux.</p>
+        </div>
       </div>
-      <p class="hero-note" id="hero-note">Windows, macOS and Linux · <a href="#download">All downloads</a></p>
-      <div class="shot"><img src="img/reception-hero.webp" width="1600" height="1000" alt="MediLink reception screen: the queue board shows the next patient, who is waiting, and today's counts, above a list of every patient sorted by triage colour."></div>
+      <div class="frame"><img src="img/guide-reception.webp" width="1600" height="1000" alt="MediLink's reception screen. The next patient, number 001, is shown large with a yellow triage label, beside counts of who is waiting, with the doctor, waiting to pay and paid. Below is a list of everyone checked in today."></div>
     </div>
   </div>
 
-  <div class="facts">
+  <section id="visit">
     <div class="wrap">
-      <div class="fact"><b>100%</b><span>of clinic requests served during a 60-second internet outage</span></div>
-      <div class="fact"><b>0 lost</b><span>records across 8,190 writes made offline, every one uploaded after reconnection</span></div>
-      <div class="fact"><b>11 ms</b><span>median time for a saved record to reach the cloud backup</span></div>
-    </div>
-    <div class="wrap facts-note">Measured in MediLink's reliability tests (UTeM final-year project, 2026), on a test network with the cloud link cut deliberately.</div>
-  </div>
-
-  <section id="features">
-    <div class="wrap">
-      <div class="section-head">
-        <h2>One system for the whole visit</h2>
-        <p class="lead">From the moment a patient taps their MyKad to the moment they collect their medicine, everyone at the clinic works from the same live queue.</p>
+      <div class="head">
+        <h2>A patient's visit, start to finish</h2>
+        <p class="lead">Everyone at the clinic works from the same live queue. Pick a stop to see the screen your staff use there.</p>
       </div>
 
-      <div class="feature">
+      <div class="stops" role="tablist" aria-label="Stops in a visit">
+        <button class="stop" role="tab" id="s1" aria-controls="p1" aria-selected="true"><span class="plate">1</span><span><b>Kiosk</b><i>Daftar masuk</i></span></button>
+        <button class="stop" role="tab" id="s2" aria-controls="p2" aria-selected="false" tabindex="-1"><span class="plate">2</span><span><b>Reception</b><i>Kaunter</i></span></button>
+        <button class="stop" role="tab" id="s3" aria-controls="p3" aria-selected="false" tabindex="-1"><span class="plate">3</span><span><b>Doctor</b><i>Bilik doktor</i></span></button>
+        <button class="stop" role="tab" id="s4" aria-controls="p4" aria-selected="false" tabindex="-1"><span class="plate">4</span><span><b>Pay and collect</b><i>Bayaran dan farmasi</i></span></button>
+        <button class="stop" role="tab" id="s5" aria-controls="p5" aria-selected="false" tabindex="-1"><span class="plate">5</span><span><b>Patient's phone</b><i>Aplikasi pesakit</i></span></button>
+      </div>
+
+      <div class="panel on" id="p1" role="tabpanel" aria-labelledby="s1">
         <div class="copy">
-          <h3>Check-in at the kiosk, in Malay or English</h3>
-          <p>Patients key in or scan their MyKad, say how they feel in their own words, and take a queue number. New patients register in under a minute.</p>
-          <div class="triage-row"><span class="chip r">Red · immediate</span><span class="chip y">Yellow · urgent</span><span class="chip g">Green · standard</span></div>
+          <h3>The patient checks in with their MyKad</h3>
+          <p>On a tablet by the door, the patient types or scans their 12-digit IC number, says what's wrong in Malay or English, and gets a queue number. New patients register in under a minute.</p>
+          <div class="triage" aria-label="Triage colours"><span class="t-red">Red, see now</span><span class="t-yel">Yellow, urgent</span><span class="t-grn">Green, routine</span></div>
           <ul>
-            <li>Suggests a triage colour from the symptoms, including Malay phrases like "sakit dada"</li>
-            <li>Urgent patients move to the top of every queue</li>
-            <li>Works on any tablet on the clinic's Wi-Fi</li>
+            <li>MediLink suggests a triage colour from the symptoms, including phrases like "sakit dada"</li>
+            <li>Your staff make the clinical call and can change it</li>
           </ul>
         </div>
-        <div class="shot"><img src="img/kiosk-ticket.webp" loading="lazy" width="1400" height="972" alt="Kiosk screen after check-in: a red queue ticket numbered 009 with the doctor's name and a Red, immediate triage label."></div>
+        <div class="frame"><img src="img/guide-kiosk.webp" loading="lazy" width="1600" height="1112" alt="Kiosk screen saying Selamat datang, with an IC number being typed and a camera panel for scanning the MyKad."></div>
       </div>
 
-      <div class="feature flip">
+      <div class="panel" id="p2" role="tabpanel" aria-labelledby="s2">
         <div class="copy">
-          <h3>The doctor sees who matters most</h3>
-          <p>The doctor's console lists the waiting room by urgency, opens the patient's history and allergies in one click, and writes the record, prescription, MC, lab order or referral from the same screen.</p>
+          <h3>Reception sees the whole day at a glance</h3>
+          <p>Who's next, who's waiting, who's with the doctor and who still has to pay. Urgent patients rise to the top by themselves.</p>
           <ul>
-            <li>Prescriptions pick from the clinic's own stock and prices</li>
-            <li>MCs, referral letters and lab reports print on the clinic's letterhead</li>
-            <li>With the patient's consent, see their history from other MediLink clinics</li>
+            <li>Book appointments and walk-ins in the same list</li>
+            <li>Change one visit's fee before payment</li>
+            <li>Daily cash report for closing the counter</li>
           </ul>
         </div>
-        <div class="shot"><img src="img/doctor.webp" loading="lazy" width="1600" height="1000" alt="Doctor console: waiting patients sorted by triage on the left, the selected patient's details, history and lab ordering on the right."></div>
+        <div class="frame"><img src="img/guide-reception.webp" loading="lazy" width="1600" height="1000" alt="Reception screen listing today's patients with queue number, triage colour, doctor, reason, payment and status."></div>
       </div>
 
-      <div class="feature">
+      <div class="panel" id="p3" role="tabpanel" aria-labelledby="s3">
         <div class="copy">
-          <h3>Pharmacy holds the medicine until it's paid</h3>
-          <p>Patients pay by DuitNow QR at the kiosk or at the counter. Reception confirms the money has arrived, and only then does the prescription appear at the pharmacy, with the patient's allergies shown before anything is handed over.</p>
+          <h3>The doctor opens the next patient in one click</h3>
+          <p>The waiting list is sorted by urgency. The record, prescription, MC, lab order and referral are all written from the same screen.</p>
+          <ul>
+            <li>Prescriptions come from your own stock and prices</li>
+            <li>MCs and letters print on your letterhead</li>
+            <li>Allergies and past visits shown before prescribing</li>
+          </ul>
+        </div>
+        <div class="frame"><img src="img/guide-doctor.webp" loading="lazy" width="1600" height="1000" alt="Doctor's screen: three waiting patients on the left, and the selected patient's details, visit history and lab ordering on the right."></div>
+      </div>
+
+      <div class="panel" id="p4" role="tabpanel" aria-labelledby="s4">
+        <div class="copy">
+          <h3>Medicine is released once it's paid</h3>
+          <p>The patient pays by DuitNow QR at the kiosk or at the counter. When reception confirms the money has arrived, the prescription appears at the pharmacy.</p>
           <ul>
             <li>Stock levels, low-stock and expiry warnings</li>
-            <li>Daily cash report for the front desk</li>
-            <li>Receipts with the clinic's name, registration number and footer</li>
+            <li>Receipts with your clinic's name and registration number</li>
           </ul>
         </div>
-        <div class="shot"><img src="img/pharmacy.webp" loading="lazy" width="1600" height="1000" alt="Pharmacy screen: a paid prescription ready to dispense, with an allergy warning and expiring batches highlighted."></div>
+        <div class="frame"><img src="img/guide-pharmacy.webp" loading="lazy" width="1600" height="1000" alt="Pharmacy screen: a batch close to expiry flagged at the top, and a paid prescription for Metformin ready to dispense."></div>
+      </div>
+
+      <div class="panel" id="p5" role="tabpanel" aria-labelledby="s5">
+        <div class="copy">
+          <h3>Patients keep their records on their phone</h3>
+          <p>Patients sign in with their IC number to see their visits, results, prescriptions, receipts and MCs.</p>
+          <ul>
+            <li>Nothing to install: it opens in the phone's browser</li>
+            <li>Shows your clinic's name and colour</li>
+          </ul>
+        </div>
+        <div class="frame" style="max-width:340px"><img src="img/guide-patient.webp" loading="lazy" width="600" height="1298" alt="The patient's phone view of MediLink with their visits and records."></div>
       </div>
     </div>
   </section>
 
-  <section class="dark">
-    <div class="wrap">
-      <div class="section-head">
-        <h2>A waiting-room screen, included</h2>
-        <p class="lead">Put any TV or spare monitor on the clinic's Wi-Fi and open <code style="background:rgba(255,255,255,.1)">/board</code>. Numbers only, never names, readable from the back row, in Malay and English.</p>
+  <section class="tv">
+    <div class="wrap tv-grid">
+      <div class="head" style="margin:0">
+        <h2>A waiting-room screen comes with it</h2>
+        <p class="lead">Open <code>/board</code> on any TV or spare monitor on the clinic's Wi-Fi. It shows queue numbers, never names, in Malay and English, big enough to read from the back row.</p>
       </div>
-      <div class="shot"><img src="img/board.webp" loading="lazy" width="1600" height="900" alt="Waiting-room TV screen showing the clinic name, the time, numbers waiting with triage dots, and numbers ready to collect medicine."></div>
+      <div class="frame"><img src="img/guide-board.webp" loading="lazy" width="1600" height="900" alt="Waiting-room screen for Klinik Melaka showing the time, numbers waiting, and the number ready to collect medicine."></div>
     </div>
   </section>
 
   <section>
     <div class="wrap">
-      <div class="feature flip">
-        <div class="copy">
-          <h3>Your clinic's name on every screen</h3>
-          <p>Set your logo, colour, standard consultation fee, DuitNow QR, opening hours and letterhead in one place. Patients see your clinic, not ours.</p>
-          <ul>
-            <li>Add doctors, reception and pharmacy staff with their own sign-in</li>
-            <li>Change the fee for one visit, or for the whole clinic</li>
-            <li>Triage colours stay the same whatever colour you choose</li>
-          </ul>
-        </div>
-        <div class="shot"><img src="img/settings-top.webp" loading="lazy" width="1600" height="1000" alt="Clinic settings: logo upload, brand colour choices with a preview, standard consultation fee and DuitNow QR."></div>
+      <div class="head">
+        <h2>Why clinics choose it</h2>
       </div>
+      <div class="reasons">
+        <div class="reason">
+          <h3>The clinic doesn't stop when the internet does</h3>
+          <div>
+            <p>MediLink runs on a computer at your clinic, so check-in, consultations, payment and dispensing carry on through an outage. Changes upload by themselves when the line comes back.</p>
+            <p>In our reliability tests we cut the cloud link on purpose: <strong>every clinic request was still served</strong> through a 60-second outage, and <strong>all 8,190 records</strong> written offline reached the cloud afterwards.</p>
+          </div>
+        </div>
+        <div class="reason">
+          <h3>Your records stay at your clinic</h3>
+          <div>
+            <p>Records are saved on your computer first. Cloud backup is optional and keeps a copy in a database in Asia, where each clinic has its own login and can only ever reach its own records.</p>
+            <p>Identity card numbers are encrypted before they are stored. Another MediLink clinic sees a patient's history only with that patient's consent.</p>
+          </div>
+        </div>
+        <div class="reason">
+          <h3>Patients see your clinic, not ours</h3>
+          <div>
+            <p>Your logo, colour, opening hours, consultation fee, DuitNow QR and letterhead are set in one settings page and appear on every screen, receipt and MC.</p>
+          </div>
+        </div>
+        <div class="reason">
+          <h3>No server, no IT contract</h3>
+          <div>
+            <p>One download on the reception computer runs the whole clinic. The kiosk tablet, the doctor's laptop, the pharmacy and the TV only need a web browser on the same Wi-Fi.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-      <div class="feature">
-        <div class="copy">
-          <h3>Cloud backup that can't mix clinics up</h3>
-          <p>Records are always saved on the clinic's computer first. Connect cloud backup and a copy follows within seconds, or catches up by itself after an outage.</p>
-          <ul>
-            <li>Each clinic has its own cloud login; the database itself keeps clinics apart</li>
-            <li>Identity card numbers are encrypted before they're stored</li>
-            <li>Other clinics only see a patient's records with that patient's consent</li>
-          </ul>
-        </div>
-        <div class="shot"><img src="img/cloud-top.webp" loading="lazy" width="1600" height="1000" alt="Sync and cloud health: cloud online, nothing waiting to upload, and every table in the clinic matching the cloud copy."></div>
+  <section class="band" id="setup">
+    <div class="wrap">
+      <div class="head">
+        <h2>Set up in an afternoon</h2>
+        <p class="lead">Most clinics are ready the same day. The setup guide walks through each step with pictures of the real screens.</p>
       </div>
+      <ol class="route">
+        <li><span class="plate">1</span><span><b>Install on the reception computer</b><span>Unzip, open MediLink, keep its window open.</span></span></li>
+        <li><span class="plate">2</span><span><b>Name your clinic</b><span>Clinic details and your administrator login, in two short screens.</span></span></li>
+        <li><span class="plate">3</span><span><b>Add your staff</b><span>Doctors, reception and pharmacy each get their own sign-in.</span></span></li>
+        <li><span class="plate">4</span><span><b>Make it yours</b><span>Logo, colour, fee, DuitNow QR and letterhead.</span></span></li>
+        <li><span class="plate">5</span><span><b>Open the other screens</b><span>Kiosk tablet, doctor's room, pharmacy and TV.</span></span></li>
+        <li><span class="plate">6</span><span><b>Turn on cloud backup</b><span>Send us your Clinic ID, paste the key we send back.</span></span></li>
+      </ol>
+      <p style="margin-top:32px"><a class="btn btn-main" href="setup.html">Open the setup guide</a></p>
     </div>
   </section>
 
   <section id="download">
     <div class="wrap">
-      <div class="section-head">
+      <div class="head">
         <h2>Download MediLink</h2>
-        <p class="lead">One download runs the whole clinic. Install it on the reception computer; every other screen (kiosk, doctor's room, pharmacy, waiting-room TV) opens in a browser on the same Wi-Fi.</p>
+        <p class="lead">Install it on the computer at reception. Every other screen opens in a browser.</p>
       </div>
-      <div class="dl-grid">
-        <div class="dl" data-os="windows">
-          <span class="mine"></span>
-          <h3>Windows</h3>
+      <div class="dl">
+        <div class="dl-row" data-os="windows">
+          <div><h3>Windows</h3><span class="yours">This looks like your computer</span></div>
           <p class="req">Windows 10 or 11, 64-bit</p>
           <p class="file">MediLink-Windows-x64.zip</p>
-          <a class="btn btn-teal" href="https://github.com/yashhgill/Medilink/releases/latest/download/MediLink-Windows-x64.zip">Download</a>
+          <a class="btn btn-main btn-sm" href="https://github.com/yashhgill/Medilink/releases/latest/download/MediLink-Windows-x64.zip">Download for Windows</a>
         </div>
-        <div class="dl" data-os="mac-arm">
-          <span class="mine"></span>
-          <h3>Mac with Apple chip</h3>
+        <div class="dl-row" data-os="mac-arm">
+          <div><h3>Mac with Apple chip</h3><span class="yours">This looks like your computer</span></div>
           <p class="req">M1 or later, macOS 13 or newer</p>
           <p class="file">MediLink-macOS-AppleSilicon.zip</p>
-          <a class="btn btn-teal" href="https://github.com/yashhgill/Medilink/releases/latest/download/MediLink-macOS-AppleSilicon.zip">Download</a>
+          <a class="btn btn-main btn-sm" href="https://github.com/yashhgill/Medilink/releases/latest/download/MediLink-macOS-AppleSilicon.zip">Download for Mac</a>
         </div>
-        <div class="dl" data-os="mac-intel">
-          <span class="mine"></span>
-          <h3>Mac with Intel chip</h3>
+        <div class="dl-row" data-os="mac-intel">
+          <div><h3>Mac with Intel chip</h3><span class="yours">This looks like your computer</span></div>
           <p class="req">macOS 12 or newer</p>
           <p class="file">MediLink-macOS-Intel.zip</p>
-          <a class="btn btn-teal" href="https://github.com/yashhgill/Medilink/releases/latest/download/MediLink-macOS-Intel.zip">Download</a>
+          <a class="btn btn-main btn-sm" href="https://github.com/yashhgill/Medilink/releases/latest/download/MediLink-macOS-Intel.zip">Download for Intel Mac</a>
         </div>
-        <div class="dl" data-os="linux">
-          <span class="mine"></span>
-          <h3>Linux</h3>
+        <div class="dl-row" data-os="linux">
+          <div><h3>Linux</h3><span class="yours">This looks like your computer</span></div>
           <p class="req">Ubuntu 22.04 or newer, 64-bit</p>
           <p class="file">MediLink-Linux-x64.tar.gz</p>
-          <a class="btn btn-teal" href="https://github.com/yashhgill/Medilink/releases/latest/download/MediLink-Linux-x64.tar.gz">Download</a>
+          <a class="btn btn-main btn-sm" href="https://github.com/yashhgill/Medilink/releases/latest/download/MediLink-Linux-x64.tar.gz">Download for Linux</a>
         </div>
       </div>
-      <div class="dl-meta">
+      <div class="dl-more">
         <span>Needs 4 GB of memory and 1 GB of free space.</span>
+        <a href="setup.html#install">How to install</a>
         <a href="https://github.com/yashhgill/Medilink/releases/latest">Release notes and checksums</a>
-        <a href="https://github.com/yashhgill/Medilink/releases">Earlier versions</a>
       </div>
     </div>
   </section>
 
-  <section id="install">
+  <section class="band" id="trial">
     <div class="wrap">
-      <div class="section-head">
-        <h2>Install in five minutes</h2>
-        <p class="lead">No server, no IT person. If you can unzip a file, you can set up MediLink.</p>
-      </div>
-      <div class="tabs" role="tablist" aria-label="Your computer">
-        <button class="tab" role="tab" aria-selected="true" aria-controls="i-win" id="t-win">Windows</button>
-        <button class="tab" role="tab" aria-selected="false" aria-controls="i-mac" id="t-mac">Mac</button>
-        <button class="tab" role="tab" aria-selected="false" aria-controls="i-linux" id="t-linux">Linux</button>
-      </div>
-      <ol class="steps" id="i-win" role="tabpanel" aria-labelledby="t-win">
-        <li><b>Unzip the download</b><span>Right-click MediLink-Windows-x64.zip, choose Extract All, and move the MediLink folder somewhere permanent, such as Documents.</span></li>
-        <li><b>Open MediLink.exe</b><span>If Windows SmartScreen appears, choose More info, then Run anyway. This trial build isn't signed with a Microsoft certificate yet.</span></li>
-        <li><b>Set up the clinic in your browser</b><span>A window shows the clinic's address and your browser opens set-up: enter the clinic's name and the first administrator account. Allow access on private networks if Windows asks, so tablets can reach it.</span></li>
-        <li><b>Add your staff and look</b><span>Under Clinic and staff, add doctors, reception and pharmacy. Under Clinic settings, add your logo, colour, fee and DuitNow QR.</span></li>
-        <li><b>Open the other screens</b><span>On the kiosk tablet, doctor's computer and waiting-room TV, open the "Other devices" address shown in the MediLink window. Add <code>/kiosk</code> for check-in or <code>/board</code> for the TV.</span></li>
-      </ol>
-      <ol class="steps" id="i-mac" role="tabpanel" aria-labelledby="t-mac" hidden>
-        <li><b>Unzip the download</b><span>Double-click the zip and move the MediLink folder into Applications or Documents.</span></li>
-        <li><b>Open MediLink the first time with right-click</b><span>Inside the folder, right-click MediLink, choose Open, then Open again. macOS asks once because this trial build isn't notarised by Apple yet. If it still refuses, open System Settings, Privacy &amp; Security, and choose Open Anyway.</span></li>
-        <li><b>Set up the clinic in your browser</b><span>A Terminal window shows the clinic's address and your browser opens set-up. Keep that window open while the clinic is working.</span></li>
-        <li><b>Add your staff and look</b><span>Under Clinic and staff, add doctors, reception and pharmacy. Under Clinic settings, add your logo, colour, fee and DuitNow QR.</span></li>
-        <li><b>Open the other screens</b><span>On other devices on the same Wi-Fi, open the "Other devices" address shown in the window. Add <code>/kiosk</code> for check-in or <code>/board</code> for the TV.</span></li>
-      </ol>
-      <ol class="steps" id="i-linux" role="tabpanel" aria-labelledby="t-linux" hidden>
-        <li><b>Unpack it</b><span><code>tar xzf MediLink-Linux-x64.tar.gz</code></span></li>
-        <li><b>Start MediLink</b><span><code>./MediLink/MediLink</code>, or add <code>--port 8001</code> to choose the port.</span></li>
-        <li><b>Set up the clinic in your browser</b><span>Open the address it prints. Clinic data lives in <code>~/.local/share/medilink</code>.</span></li>
-        <li><b>Open the other screens</b><span>Use the "Other devices" address on the clinic's network, with <code>/kiosk</code> or <code>/board</code>.</span></li>
-      </ol>
-    </div>
-  </section>
-
-  <section id="trial" style="padding-top:0">
-    <div class="wrap">
-      <div class="section-head">
+      <div class="head">
         <h2>Try it free for a month</h2>
-        <p class="lead">Run your real clinic on MediLink for one month, with HarNova on hand to help.</p>
+        <p class="lead">Run your real clinic on MediLink for one month, with HarNova on hand to help your team.</p>
       </div>
       <div class="trial">
-        <div class="card">
-          <h3>What's included</h3>
+        <div>
+          <h3>What you get</h3>
           <ul>
-            <li>The full system: kiosk, triage, doctor console, pharmacy, payments, waiting-room screen and patient app</li>
+            <li>Everything: kiosk, triage, doctor's screen, pharmacy, payment, waiting-room screen and patient app</li>
             <li>Help setting up your staff, fee, letterhead and DuitNow QR</li>
             <li>Cloud backup for the month, with your clinic's own login</li>
             <li>Your records stay on your computer, and stay yours, whether or not you continue</li>
           </ul>
         </div>
-        <div class="card">
+        <div>
           <h3>How to start</h3>
-          <p>1. Download and install MediLink on the reception computer.</p>
-          <p>2. Open Clinic settings, Cloud backup, and copy your Clinic ID.</p>
-          <p>3. Send the Clinic ID to HarNova. We reply with your cloud key and a time to walk through the set-up with your team.</p>
-          <p style="margin-top:20px"><a class="btn btn-teal" href="https://harnova.my" rel="noopener">Contact HarNova</a></p>
+          <ol>
+            <li>Download and install MediLink on the reception computer.</li>
+            <li>In Clinic settings, under Cloud backup, copy your Clinic ID.</li>
+            <li>Send the Clinic ID to HarNova. We reply with your cloud key and a time to go through the setup with your team.</li>
+          </ol>
+          <div class="contact">
+            <span class="small">Email HarNova</span>
+            <b><a href="mailto:hello@harnova.my?subject=MediLink%20trial">hello@harnova.my</a></b>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
-  <section id="faq" style="padding-top:0">
-    <div class="wrap" style="max-width:880px">
-      <h2 style="margin-bottom:24px">Questions clinics ask</h2>
-      <details><summary>What happens when the internet goes down?</summary><p>Nothing changes at the clinic. Check-in, consultations, payment and dispensing all run on the clinic's computer. Changes wait in a queue and upload by themselves when the line returns.</p></details>
-      <details><summary>Where are patient records kept?</summary><p>On the clinic's own computer first, in the MediLink folder described in the install guide. With cloud backup connected, a copy is kept in a database in Asia where each clinic can only ever reach its own records. Identity card numbers are encrypted before they are stored.</p></details>
-      <details><summary>Does MediLink decide a patient's triage?</summary><p>No. It suggests a triage colour from what the patient types, so urgent cases stand out in the queue. The clinic's staff make every clinical decision and can change the order at any time.</p></details>
-      <details><summary>How do patients pay?</summary><p>By scanning your clinic's DuitNow QR at the kiosk or in the patient app, or at the counter. Reception confirms each payment once the money has arrived, and only then is the medicine released.</p></details>
-      <details><summary>Which computers and devices do I need?</summary><p>One computer to run MediLink (Windows, Mac or Linux). Every other screen, such as a kiosk tablet, the doctor's laptop or a waiting-room TV, only needs a web browser on the same Wi-Fi.</p></details>
-      <details><summary>What does it cost after the trial?</summary><p>The trial costs nothing. Before it ends, HarNova agrees pricing with each clinic. If you don't continue, you keep your records.</p></details>
-      <details><summary>How do I back up my data?</summary><p>Turn on cloud backup, and also copy the MediLink data folder (including keys.json) to an external drive regularly. Without keys.json, stored identity card numbers can't be read.</p></details>
+  <section id="faq">
+    <div class="wrap faq">
+      <div class="head"><h2>Questions clinics ask</h2></div>
+      <details><summary>What happens when the internet goes down?</summary><p>Nothing changes inside the clinic. Check-in, consultations, payment and dispensing all run on the clinic's computer. Changes wait and upload by themselves when the line returns.</p></details>
+      <details><summary>What if the reception computer is switched off?</summary><p>The other screens need it, so keep it on during clinic hours. Records are safe on its disk while it's off, and the cloud copy is there if the computer ever fails.</p></details>
+      <details><summary>Where are patient records kept?</summary><p>On the clinic's own computer first. With cloud backup on, a copy is kept in a database in Asia where each clinic can only reach its own records. Identity card numbers are encrypted before they are stored.</p></details>
+      <details><summary>Does MediLink decide a patient's triage?</summary><p>No. It suggests a colour from what the patient types so urgent cases stand out. Your staff make every clinical decision and can change the order at any time.</p></details>
+      <details><summary>Which devices do I need?</summary><p>One Windows, Mac or Linux computer to run MediLink. Everything else, such as a kiosk tablet, the doctor's laptop or a TV, only needs a web browser on the same Wi-Fi.</p></details>
+      <details><summary>Why does Windows or my Mac warn me when I open it?</summary><p>The trial build isn't signed with a Microsoft or Apple certificate yet, so the computer asks once before opening it. The <a href="setup.html#install">setup guide</a> shows exactly what to press.</p></details>
+      <details><summary>What does it cost after the trial?</summary><p>The trial is free. Before it ends, HarNova agrees pricing with each clinic. If you don't continue, you keep your records.</p></details>
     </div>
   </section>
 </main>
 
-<footer>
+<footer class="foot">
   <div class="wrap">
-    <span>MediLink is made in Melaka by <a href="https://harnova.my">HarNova Technology</a>.</span>
+    <a class="brand" href="./"><img src="img/icon-96.png" alt="" width="32" height="32">MediLink</a>
+    <span>Made in Melaka by <a href="https://harnova.my">HarNova Technology</a></span>
+    <a href="setup.html">Setup guide</a>
     <a href="https://github.com/yashhgill/Medilink/releases/latest">Latest release</a>
-    <span style="margin-left:auto">© 2026 HarNova Technology</span>
+    <span class="right">© 2026 HarNova Technology</span>
   </div>
 </footer>
 
 <script>
+// Visit stops: tabs with arrow-key support.
+(function () {
+  var tabs = [].slice.call(document.querySelectorAll(".stop"));
+  function pick(t, focus) {
+    tabs.forEach(function (x) {
+      var on = x === t;
+      x.setAttribute("aria-selected", on); x.tabIndex = on ? 0 : -1;
+      document.getElementById(x.getAttribute("aria-controls")).classList.toggle("on", on);
+    });
+    if (focus) t.focus();
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener("click", function () { pick(t); });
+    t.addEventListener("keydown", function (e) {
+      var d = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+      if (d) { e.preventDefault(); pick(tabs[(i + d + tabs.length) % tabs.length], true); }
+    });
+  });
+})();
+
 // Point the main button at the right download for this computer.
 (function () {
   var ua = navigator.userAgent || "", plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
-  var os = /Win/i.test(plat + ua) ? "windows" : /Mac/i.test(plat + ua) ? "mac-arm" : /Linux|X11/i.test(plat + ua) && !/Android/i.test(ua) ? "linux" : null;
-  var mobile = /Android|iPhone|iPad/i.test(ua);
-  if (!os || mobile) {
-    document.getElementById("hero-note").firstChild.textContent = "Install it on the clinic's Windows, Mac or Linux computer · ";
+  if (/Android|iPhone|iPad/i.test(ua)) {
+    document.getElementById("hero-note").textContent = "Free for one month. Install it on the clinic's Windows, Mac or Linux computer.";
     return;
   }
-  var card = document.querySelector('.dl[data-os="' + os + '"]');
-  if (!card) return;
-  card.classList.add("me");
-  card.querySelector(".mine").textContent = os === "mac-arm" ? "Your computer (Intel Mac? use the next one)" : "Your computer";
-  var link = card.querySelector("a.btn"), hero = document.getElementById("hero-dl");
-  hero.href = link.href;
-  hero.textContent = { windows: "Download for Windows", "mac-arm": "Download for Mac", linux: "Download for Linux" }[os];
-  // Chromium on a Mac can say whether the chip is Intel.
+  var os = /Win/i.test(plat + ua) ? "windows" : /Mac/i.test(plat + ua) ? "mac-arm" : /Linux|X11/i.test(plat + ua) ? "linux" : null;
+  if (!os) return;
+  var hero = document.getElementById("hero-dl");
+  function choose(key) {
+    [].forEach.call(document.querySelectorAll(".dl-row"), function (r) { r.classList.toggle("me", r.getAttribute("data-os") === key); });
+    var link = document.querySelector('.dl-row[data-os="' + key + '"] a');
+    hero.href = link.href; hero.textContent = link.textContent;
+  }
+  choose(os);
+  // Chromium on a Mac can tell us if the chip is Intel.
   if (os === "mac-arm" && navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
     navigator.userAgentData.getHighEntropyValues(["architecture"]).then(function (v) {
-      if (v.architecture === "x86") {
-        card.classList.remove("me"); card.querySelector(".mine").textContent = "";
-        var intel = document.querySelector('.dl[data-os="mac-intel"]');
-        intel.classList.add("me"); intel.querySelector(".mine").textContent = "Your computer";
-        hero.href = intel.querySelector("a.btn").href; hero.textContent = "Download for Intel Mac";
-      }
+      if (v.architecture === "x86") choose("mac-intel");
     }).catch(function () {});
   }
-})();
-
-// Install guide tabs, opening on this computer's platform.
-(function () {
-  var tabs = [].slice.call(document.querySelectorAll(".tab"));
-  function pick(t) {
-    tabs.forEach(function (x) {
-      var on = x === t; x.setAttribute("aria-selected", on);
-      document.getElementById(x.getAttribute("aria-controls")).hidden = !on;
-    });
-  }
-  tabs.forEach(function (t) { t.addEventListener("click", function () { pick(t); }); });
-  var p = ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "") + navigator.userAgent;
-  if (/Mac/i.test(p) && !/iPhone|iPad/.test(p)) pick(document.getElementById("t-mac"));
-  else if (/Linux|X11/i.test(p) && !/Android/i.test(p)) pick(document.getElementById("t-linux"));
 })();
 </script>
 </body>
