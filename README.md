@@ -8,9 +8,12 @@ computer; a copy of its records follows to the cloud whenever the line is up.
 Website: **https://medilink.harnova.my** (moving to pulih.harnova.my).
 Desktop builds are shared with trial clinics on request.
 
-Pulih ("to recover" in Malay) was called MediLink during its Final Year
-Project at Universiti Teknikal Malaysia Melaka (UTeM), by Yashpreet Singh
-Gill. Proprietary: see LICENSE.
+Pulih ("to recover" in Malay) is a commercial product by Yashpreet Singh
+Gill. It is separate from **MediLink**, his Final Year Project at Universiti
+Teknikal Malaysia Melaka, whose assessed edition is on the `medilink-fyp`
+branch. Pulih shares MediLink's core and adds the desktop installer builds,
+the patient mobile app and per-clinic cloud keys; see
+`docs/SCOPE-AND-BACKGROUND-IP.md`. Proprietary: see LICENSE.
 
 ## What's inside
 
