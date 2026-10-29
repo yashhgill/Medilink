@@ -1,4 +1,4 @@
-// MediLink entitlement helper.
+// Pulih entitlement helper.
 //
 // One /api/health call tells us everything the UI needs to branch on:
 //   deployment_mode  what this BUILD is  ("standalone" | "networked")

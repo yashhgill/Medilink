@@ -1,5 +1,5 @@
 """
-MediLink v3.0 — High-Availability Hybrid Cloud EHR Platform
+Pulih v3.0 — High-Availability Hybrid Cloud EHR Platform
 FastAPI | PostgreSQL | Groq AI (MTS Triage) | Malaysian IC | Local payments
 HP Folio 9470m (local) ↔ Cloud (Supabase/AWS)
 """
@@ -52,7 +52,7 @@ CLOUD_MANAGED_SCHEMA = os.environ.get("CLOUD_MANAGED_SCHEMA", "false").lower() =
 
 # ── Config ────────────────────────────────────────────────────────────────────
 CLOUD_DB_URL    = os.environ.get("CLOUD_DATABASE_URL", "")   # Supabase Postgres
-# The cloud node keeps MediLink's tables in their own schema, so the mirror is
+# The cloud node keeps Pulih's tables in their own schema, so the mirror is
 # separated from anything else sharing that Postgres project.
 CLOUD_SCHEMA    = os.environ.get("CLOUD_SCHEMA", "medilink")
 IS_CLOUD        = os.environ.get("IS_CLOUD_NODE", "false").lower() == "true"
@@ -120,7 +120,7 @@ def _resolve_jwt_secret() -> str:
     run and configure deliberately.
 
     Requiring it from the environment on a networked *desktop* build is what
-    made MediLink Connect die at launch with KeyError: 'JWT_SECRET'.
+    made Pulih Connect die at launch with KeyError: 'JWT_SECRET'.
     """
     env = os.environ.get("JWT_SECRET")
     if env:
@@ -174,7 +174,7 @@ def _clinic_cfg(key, default=""):
     except Exception:
         return default
 
-CLINIC_NAME     = _clinic_cfg("CLINIC_NAME", "MediLink Clinic")
+CLINIC_NAME     = _clinic_cfg("CLINIC_NAME", "Pulih Clinic")
 CLINIC_ADDR     = _clinic_cfg("CLINIC_ADDRESS", "")
 CLINIC_PHONE    = _clinic_cfg("CLINIC_PHONE", "")
 FACILITY_ID     = os.environ.get("FACILITY_ID", "main")
@@ -231,7 +231,7 @@ def _brand_b64(name: str) -> str:
     except Exception:
         return ""
 
-# ── Deployment tier (MediLink SaaS) ───────────────────────────────────────
+# ── Deployment tier (Pulih SaaS) ───────────────────────────────────────
 # STANDALONE  = runs entirely on the clinic's own machine (SQLite, offline). No
 #               cloud sync, no cross-clinic records, no public patient portal.
 # NETWORKED   = local + cloud: cross-clinic shared records, patient portal, and
@@ -250,7 +250,7 @@ IS_STANDALONE   = DEPLOYMENT_MODE == "standalone"
 APP_VERSION = "1.0.0"
 
 def effective_tier() -> str:
-    """MediLink has no commercial tiers. The deployment mode alone decides
+    """Pulih has no commercial tiers. The deployment mode alone decides
     whether cross-clinic sync is available, which keeps the FYP scope honest:
     one system, two run modes, no licensing."""
     return "connect" if (IS_CLOUD or IS_NETWORKED) else "core"
@@ -348,7 +348,7 @@ def s3():
             return None
     return _s3_client
 # Where patients go. This URL is printed on kiosk chits and encoded into the QR
-# on receipts, so it has to be the patient app, not the old MediLink hostname.
+# on receipts, so it has to be the patient app, not the old Pulih hostname.
 PUBLIC_APP_URL  = os.environ.get("PUBLIC_APP_URL", "https://app.medilink.local")
 SYNC_INTERVAL   = int(os.environ.get("SYNC_INTERVAL_SECONDS", "30"))
 # Payments. There is no payment gateway behind the kiosk or the patient app, so
@@ -813,7 +813,7 @@ sync_queue_t = Table("sync_queue", metadata,
 )
 
 # ── App ───────────────────────────────────────────────────────────────────────
-app = FastAPI(title="MediLink EHR", version="3.0.0", docs_url="/docs")
+app = FastAPI(title="Pulih EHR", version="3.0.0", docs_url="/docs")
 api = APIRouter(prefix="/api")
 
 # ── Core helpers ──────────────────────────────────────────────────────────────
@@ -1411,7 +1411,7 @@ async def enrich_appointments(rows) -> list:
 # ── Public ────────────────────────────────────────────────────────────────────
 @api.get("/")
 async def root():
-    return {"service": "MediLink EHR", "version": "3.0.0",
+    return {"service": "Pulih EHR", "version": "3.0.0",
             "facility": FACILITY_ID, "node": "cloud" if IS_CLOUD else "local", "status": "ok", "deployment_mode": DEPLOYMENT_MODE}
 
 @api.get("/ic/parse/{ic_number}")
@@ -1457,7 +1457,7 @@ def require_feature(feature: str):
             raise HTTPException(402, detail={
                 "error": "unavailable",
                 "feature": feature,
-                "message": "This feature requires MediLink in networked mode.",
+                "message": "This feature requires Pulih in networked mode.",
             })
         return u
     return dep
@@ -2391,7 +2391,7 @@ async def request_record_access(body: AccessRequestIn, u=Depends(role_required("
     await enqueue_sync("record_consents", cid, "INSERT", {})
     await audit_log(u["id"], u["role"], "REQUEST_RECORD_ACCESS", "record_consents", cid)
     return {"consent_id": cid, "code": code,
-            "message": "Ask the patient to approve this code in their MediLink app."}
+            "message": "Ask the patient to approve this code in their Pulih app."}
 
 class ConsentApproveIn(BaseModel):
     code: str
@@ -2570,7 +2570,7 @@ async def patient_records(patient_id: str, u=Depends(current_user), request: Req
     return result
 
 # ── AI Triage — Manchester Triage System (MTS) ────────────────────────────────
-MTS_SYSTEM = """You are MediLink's clinical AI running the Manchester Triage System (MTS) used in Malaysian hospitals.
+MTS_SYSTEM = """You are Pulih's clinical AI running the Manchester Triage System (MTS) used in Malaysian hospitals.
 
 Assess the patient and output ONLY a JSON object with exactly these fields:
 {
@@ -2660,7 +2660,7 @@ Apply MTS strictly. Output JSON only."""
 @api.post("/ai/symptom-check")
 async def ai_symptom_check(body: AISymptomIn, u=Depends(current_user)):
     system = (
-        "You are MediLink's symptom triage assistant for a Malaysian clinic, following the "
+        "You are Pulih's symptom triage assistant for a Malaysian clinic, following the "
         "Malaysian ED three-zone triage model (HIJAU/Green = non-critical, KUNING/Yellow = "
         "semi-critical, MERAH/Red = critical). "
         f"{'Patient context: ' + body.patient_context if body.patient_context else ''} "
@@ -2760,7 +2760,7 @@ async def ai_summary(body: AISummaryIn, u=Depends(role_required("doctor","admin"
     cached = _AI_SUMMARY_CACHE.get(cache_key)
     if cached:
         return {"summary": cached, "patient": clean(pd), "record_count": len(rows), "cached": True}
-    # MediLink runs without an AI service on a clinic machine, so build the
+    # Pulih runs without an AI service on a clinic machine, so build the
     # brief from the clinic's OWN records rather than failing. Nothing is
     # inferred: this only re-arranges data the clinic already holds.
     import ai_offline
@@ -3130,7 +3130,7 @@ async def sync_full(u=Depends(super_admin_required)):
     outside the live app (e.g. seed scripts) that never entered the sync queue."""
     if not sync_enabled():
         raise HTTPException(400, "Cloud sync is not available on this plan. "
-                                 "MediLink Connect is required.")
+                                 "Pulih Connect is required.")
     tables = {"users": users_t, "facilities": facilities_t,
               "appointments": appointments_t, "medical_records": records_t,
               "payments": payments_t, "dispense_records": dispense_t,
@@ -3393,7 +3393,7 @@ async def admin_cloudwatch(u=Depends(super_admin_required)):
 def _decode_cloud_key(key: str) -> dict:
     key = (key or "").strip()
     if not key.startswith("mlk1."):
-        raise HTTPException(400, "That doesn't look like a MediLink cloud key. It starts with mlk1.")
+        raise HTTPException(400, "That doesn't look like a Pulih cloud key. It starts with mlk1.")
     try:
         raw = key[5:]
         data = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode())
@@ -3818,7 +3818,7 @@ async def receipt_pdf(txn_ref: str, u=Depends(current_user)):
     pdf.ln(6)
     pdf.set_font("Helvetica", "I", 8)
     pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 5, _latin("Computer-generated receipt from MediLink. Thank you."), ln=1)
+    pdf.cell(0, 5, _latin("Computer-generated receipt from Pulih. Thank you."), ln=1)
     await audit_log(u["id"], u["role"], "DOWNLOAD_RECEIPT_PDF", "payments", txn_ref)
     return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="receipt-{txn_ref}.pdf"'})
@@ -3858,7 +3858,7 @@ async def history_pdf(u=Depends(role_required("patient", "admin"))):
         pdf.ln(2)
     pdf.set_font("Helvetica", "I", 8)
     pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 5, _latin("Generated by MediLink. For personal reference; not a certified medical report."), ln=1)
+    pdf.cell(0, 5, _latin("Generated by Pulih. For personal reference; not a certified medical report."), ln=1)
     await audit_log(u["id"], u["role"], "DOWNLOAD_HISTORY_PDF", "medical_records", u["id"])
     return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
                     headers={"Content-Disposition": 'attachment; filename="medical-history.pdf"'})

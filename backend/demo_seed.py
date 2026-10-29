@@ -1,4 +1,4 @@
-"""Flood MediLink with realistic demo data. Idempotent — safe to re-run.
+"""Flood Pulih with realistic demo data. Idempotent — safe to re-run.
 Run inside the backend container:  python demo_seed.py
 """
 import asyncio, random

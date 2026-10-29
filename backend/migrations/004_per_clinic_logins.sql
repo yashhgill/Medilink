@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
---  MediLink cloud node: one database login per clinic.
+--  Pulih cloud node: one database login per clinic.
 --
 --  Under 002 every clinic connected as the shared role medilink_app and told
 --  the database which clinic it was (SET app.facility_id). Row-level security

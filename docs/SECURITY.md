@@ -1,6 +1,6 @@
-# MediLink — Security Design
+# Pulih — Security Design
 
-Patient data is the highest-sensitivity data a small system can hold. MediLink's
+Patient data is the highest-sensitivity data a small system can hold. Pulih's
 controls are layered so that no single mistake exposes it.
 
 ## Authentication & authorization

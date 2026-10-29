@@ -1,15 +1,15 @@
-MediLink for clinics
+Pulih for clinics
 ====================
 
 START
-  Windows : open the MediLink folder and double-click MediLink.exe.
+  Windows : open the Pulih folder and double-click Pulih.exe.
             If Windows SmartScreen appears, choose "More info" then "Run anyway".
-  macOS   : open the MediLink folder, right-click MediLink and choose Open,
+  macOS   : open the Pulih folder, right-click Pulih and choose Open,
             then Open again. (Needed once, because this trial build is not yet
             signed by Apple.)
-  Linux   : run ./MediLink inside the MediLink folder.
+  Linux   : run ./Pulih inside the Pulih folder.
 
-A window opens showing the clinic's address, and your browser opens MediLink.
+A window opens showing the clinic's address, and your browser opens Pulih.
 Keep that window open while the clinic is working. Close it to stop.
 
 FIRST RUN
@@ -19,7 +19,7 @@ FIRST RUN
   "Clinic settings".
 
 OTHER DEVICES (kiosk tablet, doctor's room, pharmacy)
-  Use the "Other devices" address shown in the MediLink window, on the same
+  Use the "Other devices" address shown in the Pulih window, on the same
   Wi-Fi. Add /kiosk for the check-in kiosk and /board for a waiting-room TV.
 
 CLOUD BACKUP (optional)
@@ -28,9 +28,9 @@ CLOUD BACKUP (optional)
 
 YOUR DATA
   Records are kept on this computer in:
-    Windows : %LOCALAPPDATA%\MediLink
-    macOS   : ~/Library/Application Support/MediLink
-    Linux   : ~/.local/share/medilink
+    Windows : %LOCALAPPDATA%\Pulih
+    macOS   : ~/Library/Application Support/Pulih
+    Linux   : ~/.local/share/pulih
   Back up that whole folder, including keys.json. Without keys.json the
   identity card numbers stored in it cannot be read.
 

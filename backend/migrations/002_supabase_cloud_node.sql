@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
---  MediLink cloud node — Supabase Postgres
+--  Pulih cloud node — Supabase Postgres
 --
 --  This file supersedes 000_schema.sql and 001_rls_multitenancy.sql, which
 --  targeted Neon. It is the migration actually deployed, and it is recorded

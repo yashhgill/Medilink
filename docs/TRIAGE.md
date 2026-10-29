@@ -1,9 +1,9 @@
-# MediLink — AI Triage Methodology
+# Pulih — AI Triage Methodology
 
 ## Basis: the Manchester Triage System (MTS)
 
 Malaysian emergency departments operate zone-based triage derived from MTS.
-MediLink implements the five-category MTS scale, surfaced to patients as the
+Pulih implements the five-category MTS scale, surfaced to patients as the
 familiar Malaysian three-zone colours:
 
 | Category | Colour | Target wait |

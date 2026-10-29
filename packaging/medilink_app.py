@@ -1,4 +1,4 @@
-"""MediLink desktop launcher: one clinic node on this computer.
+"""Pulih desktop launcher: one clinic node on this computer.
 
 This is the program inside the downloadable builds (Windows, macOS, Linux).
 It needs no Python on the clinic's computer when frozen with PyInstaller
@@ -8,8 +8,8 @@ On first run it creates this clinic's own data folder and its own keys, so no
 two installs share a secret, then opens the first-run setup wizard in the
 browser. After that it simply starts the clinic and opens the front door.
 
-    MediLink            start the clinic
-    MediLink --port N   use another port (default 8001, or the next free one)
+    Pulih            start the clinic
+    Pulih --port N   use another port (default 8001, or the next free one)
 """
 import json
 import os
@@ -23,7 +23,7 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
-APP = "MediLink"
+APP = "Pulih"
 # The kiosk sends this token with every request. It is compiled into the
 # interface at build time (REACT_APP_KIOSK_TOKEN), so it must match the build.
 BUILD_KIOSK_TOKEN = "demo-kiosk-token"
@@ -33,10 +33,16 @@ def data_dir() -> Path:
     system = platform.system()
     if system == "Windows":
         base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
-        return base / APP
-    if system == "Darwin":
-        return Path.home() / "Library" / "Application Support" / APP
-    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "medilink"
+        names = (APP, "MediLink")
+    elif system == "Darwin":
+        base = Path.home() / "Library" / "Application Support"
+        names = (APP, "MediLink")
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+        names = (APP.lower(), "medilink")
+    # Installs made before the rename keep using their existing folder.
+    new, old = base / names[0], base / names[1]
+    return old if old.exists() and not new.exists() else new
 
 
 def bundle_dir() -> Path:

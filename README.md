@@ -1,15 +1,16 @@
-# MediLink
+# Pulih
 
 **The clinic system that keeps working when the internet doesn't.**
 Kiosk check-in with MyKad, triage, the doctor's console, pharmacy and DuitNow
-payment for Malaysian GP clinics. Each clinic runs MediLink on its own
+payment for Malaysian GP clinics. Each clinic runs Pulih on its own
 computer; a copy of its records follows to the cloud whenever the line is up.
 
-Website and downloads: **https://medilink.harnova.my**
-Latest desktop builds: [Releases](https://github.com/yashhgill/Medilink/releases/latest)
+Website: **https://medilink.harnova.my** (moving to pulih.harnova.my).
+Desktop builds are shared with trial clinics on request.
 
-Final Year Project, Universiti Teknikal Malaysia Melaka (UTeM), by
-Yashpreet Singh Gill · built and supported by HarNova Technology.
+Pulih ("to recover" in Malay) was called MediLink during its Final Year
+Project at Universiti Teknikal Malaysia Melaka (UTeM), by Yashpreet Singh
+Gill. Proprietary: see LICENSE.
 
 ## What's inside
 
@@ -28,7 +29,7 @@ Yashpreet Singh Gill · built and supported by HarNova Technology.
 
 **As a clinic would:** download the build for your computer from the
 [latest release](https://github.com/yashhgill/Medilink/releases/latest), unzip
-it and open MediLink. First run opens a short set-up in the browser.
+it and open Pulih. First run opens a short set-up in the browser.
 
 **Demo with sample patients (macOS):** double-click `Client-Demo.command`. It
 starts Klinik Melaka with a day of patients already in the queue.
@@ -59,7 +60,7 @@ per-clinic logins) and `005_issue_clinic_key.sql`.
 2. In the Supabase SQL editor:
    `select medilink.issue_clinic_key('<clinic-id>', '<clinic name>');`
    It returns a key starting `mlk1.`. Send it to the clinic privately.
-3. The clinic pastes the key and presses **Connect to cloud**. MediLink checks
+3. The clinic pastes the key and presses **Connect to cloud**. Pulih checks
    the key, restarts itself and starts uploading.
 
 Each clinic's login can only ever reach its own rows; the database decides

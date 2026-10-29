@@ -1,4 +1,4 @@
-# Builds the MediLink desktop app for every platform and publishes a release.
+# Builds the Pulih desktop app for every platform and publishes a release.
 #
 #   Tag a version:      git tag v1.1.0 && git push origin v1.1.0
 #   Or run it by hand:  Actions → Release → Run workflow
@@ -51,13 +51,13 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            asset: MediLink-Windows-x64.zip
+            asset: Pulih-Windows-x64.zip
           - os: macos-14
-            asset: MediLink-macOS-AppleSilicon.zip
+            asset: Pulih-macOS-AppleSilicon.zip
           - os: macos-15-intel
-            asset: MediLink-macOS-Intel.zip
+            asset: Pulih-macOS-Intel.zip
           - os: ubuntu-22.04
-            asset: MediLink-Linux-x64.tar.gz
+            asset: Pulih-Linux-x64.tar.gz
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -79,7 +79,7 @@ jobs:
         run: |
           export HOME="$RUNNER_TEMP/home" XDG_DATA_HOME="$RUNNER_TEMP/home/data" LOCALAPPDATA="$RUNNER_TEMP/home/appdata"
           mkdir -p "$HOME"
-          if [ "$RUNNER_OS" = "Windows" ]; then BIN=dist/MediLink/MediLink.exe; else BIN=dist/MediLink/MediLink; fi
+          if [ "$RUNNER_OS" = "Windows" ]; then BIN=dist/Pulih/Pulih.exe; else BIN=dist/Pulih/Pulih; fi
           "$BIN" --port 8421 > smoke.log 2>&1 &
           for i in $(seq 1 90); do
             curl -fsS http://127.0.0.1:8421/api/setup/status && break
@@ -90,14 +90,14 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          cp packaging/README-INSTALL.txt dist/MediLink/README.txt
+          cp packaging/README-INSTALL.txt dist/Pulih/README.txt
           cd dist
           if [ "$RUNNER_OS" = "Windows" ]; then
-            7z a -tzip "../${{ matrix.asset }}" MediLink >/dev/null
+            7z a -tzip "../${{ matrix.asset }}" Pulih >/dev/null
           elif [ "$RUNNER_OS" = "macOS" ]; then
-            ditto -c -k --keepParent MediLink "../${{ matrix.asset }}"
+            ditto -c -k --keepParent Pulih "../${{ matrix.asset }}"
           else
-            tar czf "../${{ matrix.asset }}" MediLink
+            tar czf "../${{ matrix.asset }}" Pulih
           fi
       - uses: actions/upload-artifact@v4
         with:
@@ -118,13 +118,13 @@ jobs:
           find assets -type f \( -name '*.zip' -o -name '*.tar.gz' \) -exec cp {} out/ \;
           ls -la out
           test "$(ls out | wc -l)" -ge 4
-          cd out && sha256sum MediLink-* > SHA256SUMS.txt && cat SHA256SUMS.txt
+          cd out && sha256sum Pulih-* > SHA256SUMS.txt && cat SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.version || github.ref_name }}
-          name: MediLink ${{ github.event.inputs.version || github.ref_name }}
+          name: Pulih ${{ github.event.inputs.version || github.ref_name }}
           draft: true          # downloads are by request: HarNova shares the files with approved clinics
           body: |
-            MediLink desktop for clinics. Download the file for your computer, unzip it and open MediLink.
+            Pulih desktop for clinics. Download the file for your computer, unzip it and open Pulih.
             First run opens a short set-up in your browser. Full guide: https://medilink.harnova.my/setup.html
           files: out/*

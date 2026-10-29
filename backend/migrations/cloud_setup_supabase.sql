@@ -1,7 +1,7 @@
--- MediLink cloud node set-up for Supabase: 001b + 002 + 003 + 004 in one transaction,
+-- Pulih cloud node set-up for Supabase: 001b + 002 + 003 + 004 in one transaction,
 -- then RLS on the old public tables. Safe to run again. Paste into the SQL editor as the project owner.
 BEGIN;
--- MediLink cloud node: tables in schema medilink (generated from backend/server.py)
+-- Pulih cloud node: tables in schema medilink (generated from backend/server.py)
 
 CREATE SCHEMA IF NOT EXISTS medilink;
 
@@ -245,7 +245,7 @@ CREATE TABLE IF NOT EXISTS medilink.lab_orders (
 	PRIMARY KEY (id)
 );
 -- ═══════════════════════════════════════════════════════════════════════════
---  MediLink cloud node — Supabase Postgres
+--  Pulih cloud node — Supabase Postgres
 --
 --  This file supersedes 000_schema.sql and 001_rls_multitenancy.sql, which
 --  targeted Neon. It is the migration actually deployed, and it is recorded
@@ -463,7 +463,7 @@ END $$;
 --    jasin: records readable with MALFORMED expiry ........... 0
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ═══════════════════════════════════════════════════════════════════════════
---  MediLink cloud node: uniqueness is per clinic, not global.
+--  Pulih cloud node: uniqueness is per clinic, not global.
 --
 --  The same patient registered at two clinics has two rows in medilink.users,
 --  one per facility, linked by the blind index (ic_hash). A kiosk-registered
@@ -479,7 +479,7 @@ DROP INDEX IF EXISTS medilink.users_email_key;
 CREATE UNIQUE INDEX IF NOT EXISTS users_facility_email_key
   ON medilink.users (facility_id, email);
 -- ═══════════════════════════════════════════════════════════════════════════
---  MediLink cloud node: one database login per clinic.
+--  Pulih cloud node: one database login per clinic.
 --
 --  Under 002 every clinic connected as the shared role medilink_app and told
 --  the database which clinic it was (SET app.facility_id). Row-level security

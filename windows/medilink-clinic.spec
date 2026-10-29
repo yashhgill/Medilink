@@ -1,4 +1,4 @@
-# MediLink Windows PyInstaller spec
+# Pulih Windows PyInstaller spec
 # Build: pyinstaller windows/medilink-clinic.spec
 # Output: dist/medilink-clinic/medilink-clinic.exe
 

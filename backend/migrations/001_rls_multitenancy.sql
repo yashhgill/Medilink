@@ -1,4 +1,4 @@
--- MediLink — cloud node multi-tenancy via Row-Level Security
+-- Pulih — cloud node multi-tenancy via Row-Level Security
 --
 -- Run this ONCE against the Neon cloud database, AFTER 000_schema.sql.
 -- Safe to re-run.

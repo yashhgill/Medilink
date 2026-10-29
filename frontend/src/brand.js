@@ -2,8 +2,8 @@
 // these values and the files in /public (logo, manifest). Per-clinic names and
 // logos are separate: each clinic sets its own on the Branding page.
 export const PRODUCT = {
-  name: "MediLink",
+  name: "Pulih",
   logo: "/medilink-logo.png",
-  aiName: "MediLink AI",
-  cloudName: "MediLink Cloud",
+  aiName: "Pulih AI",
+  cloudName: "Pulih Cloud",
 };

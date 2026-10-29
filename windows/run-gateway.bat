@@ -1,12 +1,12 @@
 @echo off
 REM ============================================================
-REM  MediLink — Gateway launcher  (port 8000)
+REM  Pulih — Gateway launcher  (port 8000)
 REM  Run this on the Gateway PC (or any PC that can reach
 REM  both clinic servers on the network).
 REM  Edit CLINIC_A_URL and CLINIC_B_URL to match your LAN IPs.
 REM ============================================================
 
-title MediLink - Gateway (Port 8000)
+title Pulih - Gateway (Port 8000)
 color 0E
 
 REM ── CONFIGURE THESE ─────────────────────────────────────────
@@ -22,7 +22,7 @@ set FRONTEND_DIST=%SCRIPT_DIR%static
 
 echo.
 echo  ╔══════════════════════════════════════════════════════╗
-echo  ║            MediLink — Gateway  (Port 8000)           ║
+echo  ║            Pulih — Gateway  (Port 8000)           ║
 echo  ║   Clinic A: %CLINIC_A_URL%                  ║
 echo  ║   Clinic B: %CLINIC_B_URL%                  ║
 echo  ╚══════════════════════════════════════════════════════╝

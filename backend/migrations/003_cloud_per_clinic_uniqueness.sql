@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
---  MediLink cloud node: uniqueness is per clinic, not global.
+--  Pulih cloud node: uniqueness is per clinic, not global.
 --
 --  The same patient registered at two clinics has two rows in medilink.users,
 --  one per facility, linked by the blind index (ic_hash). A kiosk-registered

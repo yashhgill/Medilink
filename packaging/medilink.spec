@@ -1,7 +1,7 @@
-# MediLink desktop build, one spec for Windows, macOS and Linux.
+# Pulih desktop build, one spec for Windows, macOS and Linux.
 #   pyinstaller packaging/medilink.spec      (run from the repo root)
 # Needs the built interface in backend/static (frontend/build copied there).
-# Output: dist/MediLink/  (MediLink.exe on Windows, MediLink elsewhere)
+# Output: dist/Pulih/  (Pulih.exe on Windows, Pulih elsewhere)
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
@@ -39,8 +39,8 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz, a.scripts, [],
     exclude_binaries=True,
-    name="MediLink",
+    name="Pulih",
     console=True,            # the window shows the clinic's address and must stay open
     upx=False,
 )
-coll = COLLECT(exe, a.binaries, a.datas, name="MediLink", upx=False)
+coll = COLLECT(exe, a.binaries, a.datas, name="Pulih", upx=False)

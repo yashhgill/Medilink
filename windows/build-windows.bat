@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================
-REM  MediLink Windows Build Script
+REM  Pulih Windows Build Script
 REM  Run this ONCE on your build machine (Windows + Python 3.11+)
 REM  to produce the distributable package.
 REM
@@ -9,7 +9,7 @@ REM    pip install pyinstaller
 REM    pip install -r ..\backend\requirements.txt
 REM    (frontend must already be built: backend\static\ must exist)
 REM
-REM  Output: dist\MediLink-Windows\
+REM  Output: dist\Pulih-Windows\
 REM          Copy this folder to each PC — no Python needed.
 REM ============================================================
 
@@ -17,11 +17,11 @@ setlocal
 set SCRIPT_DIR=%~dp0
 set ROOT=%SCRIPT_DIR%..
 set DIST=%SCRIPT_DIR%dist
-set OUT=%DIST%\MediLink-Windows
+set OUT=%DIST%\Pulih-Windows
 
 echo.
 echo  ╔══════════════════════════════════════════════════════╗
-echo  ║         MediLink Windows Build                       ║
+echo  ║         Pulih Windows Build                       ║
 echo  ╚══════════════════════════════════════════════════════╝
 echo.
 
@@ -78,7 +78,7 @@ echo  ║  Build complete!                                     ║
 echo  ║  Distributable: %OUT%
 echo  ║                                                      ║
 echo  ║  To install on each PC:                              ║
-echo  ║    1. Copy MediLink-Windows\ folder to the PC        ║
+echo  ║    1. Copy Pulih-Windows\ folder to the PC        ║
 echo  ║    2. Edit run-clinic-A.bat / run-clinic-B.bat:      ║
 echo  ║       - Set GATEWAY_URL to the Gateway PC's IP       ║
 echo  ║       - Add CLOUD_DATABASE_URL and GROQ_API_KEY      ║

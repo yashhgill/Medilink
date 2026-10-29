@@ -329,7 +329,7 @@ function CloudSection() {
       try { await api.get("/health"); window.location.reload(); return; } catch { await new Promise((r) => setTimeout(r, 1000)); }
     }
     setRestarting(false);
-    toast.error("MediLink didn't come back by itself. Close it and open it again.");
+    toast.error("Pulih didn't come back by itself. Close it and open it again.");
   };
   const connect = async () => {
     setBusy(true);
@@ -346,11 +346,11 @@ function CloudSection() {
   const copy = async () => { try { await navigator.clipboard.writeText(st.clinic_id); toast.success("Clinic ID copied"); } catch { /* user can select it */ } };
 
   return (
-    <Section title="Cloud backup" intro="Keep a copy of this clinic's records in the MediLink cloud. The clinic keeps working offline either way.">
+    <Section title="Cloud backup" intro="Keep a copy of this clinic's records in the Pulih cloud. The clinic keeps working offline either way.">
       {!st ? <p className="text-[15px] text-[#566663]">Checking…</p> : st.error ? (
         <p className="text-[15px] text-[#566663]">Only a clinic administrator can manage the cloud connection.</p>
       ) : restarting ? (
-        <p className="text-[15px]">MediLink is restarting to apply the change. This page reloads by itself in a few seconds.</p>
+        <p className="text-[15px]">Pulih is restarting to apply the change. This page reloads by itself in a few seconds.</p>
       ) : (
         <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-3">
@@ -379,7 +379,7 @@ function CloudSection() {
                   className="h-11 px-6 rounded-full bg-[var(--ml-primary)] hover:bg-[var(--ml-primary-soft)] text-white">
                   {busy ? "Checking the key…" : "Connect to cloud"}
                 </Button>
-                <span className="text-[13px] text-[#566663]">MediLink restarts once to start uploading. Keep the key private.</span>
+                <span className="text-[13px] text-[#566663]">Pulih restarts once to start uploading. Keep the key private.</span>
               </div>
             </div>
           ) : st.configured_in_app ? (

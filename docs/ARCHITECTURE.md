@@ -1,11 +1,11 @@
-# MediLink — System Architecture
+# Pulih — System Architecture
 
 **Local-first, cloud-mirrored Electronic Health Records platform**
 Final Year Project — Universiti Teknikal Malaysia Melaka (UTeM) · Yashpreet Singh Gill
 
 ## Design thesis
 
-Clinics cannot stop working when the internet does. MediLink therefore treats the
+Clinics cannot stop working when the internet does. Pulih therefore treats the
 clinic's own server as the source of truth and the cloud as a mirror — the inverse
 of most SaaS healthcare systems. Every write completes locally first (write-behind
 replication); the patient never waits on a WAN round-trip.

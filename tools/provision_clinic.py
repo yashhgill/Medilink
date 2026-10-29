@@ -1,4 +1,4 @@
-"""Issue a trial clinic its MediLink cloud key.
+"""Issue a trial clinic its Pulih cloud key.
 
     CLOUD_ADMIN_URL='postgresql://postgres.<ref>:<owner password>@<pooler host>:5432/postgres' \\
         python tools/provision_clinic.py clinic-3f2a1b "Klinik Sejahtera"

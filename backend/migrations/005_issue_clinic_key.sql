@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
---  MediLink cloud node: issue a trial clinic's cloud key from the SQL editor.
+--  Pulih cloud node: issue a trial clinic's cloud key from the SQL editor.
 --
 --      select medilink.issue_clinic_key('clinic-3f2a1b', 'Klinik Sejahtera');
 --

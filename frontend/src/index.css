@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  /* MediLink tokens. Red, orange, yellow, green and blue are reserved for triage. */
+  /* Pulih tokens. Red, orange, yellow, green and blue are reserved for triage. */
   --ml-bg: #EEF2F1;          /* clinic floor */
   --ml-surface: #FFFFFF;
   --ml-border: #DAE2DF;

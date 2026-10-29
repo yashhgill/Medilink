@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# MediLink Demo Launcher — run this every time before your demo
+# Pulih Demo Launcher — run this every time before your demo
 # Usage: bash ~/Downloads/medilink-fyp/start-demo.sh
 set -e
 
@@ -138,7 +138,7 @@ fi
 
 # ── Done ──────────────────────────────────────────────────────────────────
 printf "\n${G}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${X}\n"
-printf "${G}  MediLink Demo Ready!${X}\n\n"
+printf "${G}  Pulih Demo Ready!${X}\n\n"
 printf "  Clinic A (Melaka):  http://127.0.0.1:8001\n"
 printf "  Clinic B (Jasin):   http://127.0.0.1:8002\n"
 printf "  Gateway:            http://127.0.0.1:8000\n\n"

@@ -1,4 +1,4 @@
--- MediLink cloud node: tables in schema medilink (generated from backend/server.py)
+-- Pulih cloud node: tables in schema medilink (generated from backend/server.py)
 
 CREATE SCHEMA IF NOT EXISTS medilink;
 
