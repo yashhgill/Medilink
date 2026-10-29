@@ -70,3 +70,22 @@ jobs:
         with:
           name: patient-app-ios
           path: out/*
+
+  # Attach the app builds to the draft release of the same version, beside the desktop apps.
+  attach:
+    needs: [android, ios]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - run: ls -la out
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v26.1029.4
+          name: Pulih v26.1029.4
+          draft: true
+          files: out/*
