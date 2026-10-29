@@ -302,7 +302,7 @@ def _drug_text(medicines, allergy_terms, hits) -> str:
         "DRUG INTERACTION SCREENING",
         "  Not available offline.",
         "",
-        "  This installation has no drug interaction database, and Pulih "
+        "  This installation has no drug interaction database, and MediLink "
         "will not guess at one. Please check interactions against MIMS, the BNF, "
         "or your usual reference.",
         "",

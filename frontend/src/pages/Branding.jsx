@@ -312,48 +312,17 @@ function Section({ title, intro, children }) {
   );
 }
 
-/* Settings → Cloud. The clinic shares its Clinic ID, HarNova issues a cloud key
-   for that ID, and pasting the key here connects this computer. Records keep
-   being saved here first; the cloud is a copy that follows. */
+/* Settings → Cloud mirror: read-only status. Records are saved here first;
+   the cloud is a copy that follows. */
 function CloudSection() {
   const [st, setSt] = useState(null);
-  const [key, setKey] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [restarting, setRestarting] = useState(false);
-  const load = () => api.get("/admin/cloud").then((r) => setSt(r.data)).catch(() => setSt({ error: true }));
-  useEffect(() => { load(); }, []);
-
-  const waitForRestart = async () => {
-    setRestarting(true);
-    await new Promise((r) => setTimeout(r, 2500));
-    for (let i = 0; i < 40; i++) {
-      try { await api.get("/health"); window.location.reload(); return; } catch { await new Promise((r) => setTimeout(r, 1000)); }
-    }
-    setRestarting(false);
-    toast.error("Pulih didn't come back by itself. Close it and open it again.");
-  };
-  const connect = async () => {
-    setBusy(true);
-    try { await api.post("/admin/cloud/connect", { key }); toast.success("Key accepted. Connecting this clinic to the cloud…"); await waitForRestart(); }
-    catch (e) { toast.error(e?.response?.data?.detail || "Couldn't connect with that key."); }
-    finally { setBusy(false); }
-  };
-  const disconnect = async () => {
-    setBusy(true);
-    try { await api.post("/admin/cloud/disconnect"); await waitForRestart(); }
-    catch (e) { toast.error(e?.response?.data?.detail || "Couldn't disconnect."); }
-    finally { setBusy(false); }
-  };
-  const copy = async () => { try { await navigator.clipboard.writeText(st.clinic_id); toast.success("Clinic ID copied"); } catch { /* user can select it */ } };
-
+  useEffect(() => { api.get("/admin/cloud").then((r) => setSt(r.data)).catch(() => setSt({ error: true })); }, []);
   return (
-    <Section title="Cloud backup" intro="Keep a copy of this clinic's records in the Pulih cloud. The clinic keeps working offline either way.">
+    <Section title="Cloud mirror" intro="A copy of this clinic's records follows to the shared cloud node whenever the internet is up. The clinic keeps working offline either way.">
       {!st ? <p className="text-[15px] text-[#566663]">Checking…</p> : st.error ? (
-        <p className="text-[15px] text-[#566663]">Only a clinic administrator can manage the cloud connection.</p>
-      ) : restarting ? (
-        <p className="text-[15px]">Pulih is restarting to apply the change. This page reloads by itself in a few seconds.</p>
+        <p className="text-[15px] text-[#566663]">Only a clinic administrator can see the cloud status.</p>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             <span className={`inline-flex items-center gap-2 h-9 px-3.5 rounded-full text-[14px] font-semibold ${st.connected ? (st.online ? "bg-[var(--ml-wash)] text-[var(--ml-primary-soft)]" : "bg-[#FFF6DA] text-[#5C4600]") : "bg-[#EEF3F1] text-[#566663]"}`}>
               <span className={`w-2 h-2 rounded-full ${st.connected ? (st.online ? "bg-[var(--ml-primary)]" : "bg-[#E5A800]") : "bg-[#9AA8A4]"}`} />
@@ -361,35 +330,7 @@ function CloudSection() {
             </span>
             {st.connected && <span className="text-[14px] text-[#566663]">{st.pending ? `${st.pending} changes waiting to upload` : "Everything uploaded"}</span>}
           </div>
-          <div>
-            <div className="text-[14px] font-semibold">Your Clinic ID</div>
-            <div className="mt-1.5 flex items-center gap-2">
-              <code className="px-3 py-2 rounded-lg bg-[#EEF3F1] text-[16px] select-all" data-testid="clinic-id">{st.clinic_id}</code>
-              <Button type="button" variant="outline" onClick={copy} className="rounded-full border-[#C8D3CF]">Copy</Button>
-            </div>
-            {!st.connected && <p className="text-[13px] text-[#566663] mt-1.5">Send this ID to HarNova to receive your cloud key.</p>}
-          </div>
-          {!st.connected ? (
-            <div className="space-y-2">
-              <Label htmlFor="cloud-key" className="text-[14px] font-semibold">Cloud key</Label>
-              <textarea id="cloud-key" value={key} onChange={(e) => setKey(e.target.value)} rows={3} spellCheck={false}
-                placeholder="mlk1.…" data-testid="cloud-key"
-                className="w-full rounded-xl border border-[#C8D3CF] p-3 text-[14px] font-mono break-all focus:outline-none focus:ring-2 focus:ring-[var(--ml-primary)]" />
-              <div className="flex flex-wrap items-center gap-3">
-                <Button type="button" onClick={connect} disabled={busy || !key.trim().startsWith("mlk1.")} data-testid="cloud-connect"
-                  className="h-11 px-6 rounded-full bg-[var(--ml-primary)] hover:bg-[var(--ml-primary-soft)] text-white">
-                  {busy ? "Checking the key…" : "Connect to cloud"}
-                </Button>
-                <span className="text-[13px] text-[#566663]">Pulih restarts once to start uploading. Keep the key private.</span>
-              </div>
-            </div>
-          ) : st.configured_in_app ? (
-            <Button type="button" variant="outline" onClick={disconnect} disabled={busy} className="rounded-full border-[#C8D3CF] text-[#B4231C]">
-              {busy ? "Disconnecting…" : "Disconnect from cloud"}
-            </Button>
-          ) : (
-            <p className="text-[13px] text-[#566663]">This clinic's cloud connection is set by its installation, not here.</p>
-          )}
+          <p className="text-[14px] text-[#566663]">Clinic ID <code className="px-2 py-1 rounded bg-[#EEF3F1]">{st.clinic_id}</code>. The cloud connection is set when the clinic node is started (CLOUD_DATABASE_URL).</p>
         </div>
       )}
     </Section>

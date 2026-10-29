@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════
-#  Pulih — Public Tunnel (tries multiple services, uses first that works)
+#  MediLink — Public Tunnel (tries multiple services, uses first that works)
 #  Exposes patient gateway port 8000 to the internet.
 #  Run-Demo.command must already be running.
 # ═══════════════════════════════════════════════════════════════════════════

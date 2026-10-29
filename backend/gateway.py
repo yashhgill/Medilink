@@ -1,5 +1,5 @@
 """
-Pulih Patient Gateway — port 8000
+MediLink Patient Gateway — port 8000
 =====================================
 A lightweight reverse-proxy / federation layer that sits in front of the two
 clinic nodes (8001, 8002).  Patients reach ONE public URL; the gateway handles:
@@ -38,7 +38,7 @@ STATIC_DIR = pathlib.Path(
     os.environ.get("FRONTEND_DIST", pathlib.Path(__file__).parent / "static")
 )
 
-app = FastAPI(title="Pulih Gateway", docs_url=None, redoc_url=None)
+app = FastAPI(title="MediLink Gateway", docs_url=None, redoc_url=None)
 
 # ── shared async HTTP client ───────────────────────────────────────────────────
 _client: httpx.AsyncClient | None = None

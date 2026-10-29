@@ -1,5 +1,5 @@
 ====================================================
-  Pulih — Windows Installation Guide
+  MediLink — Windows Installation Guide
 ====================================================
 
 WHAT'S IN THIS FOLDER
@@ -26,7 +26,7 @@ STEP-BY-STEP
 ------------
 
 1. CLINIC A PC
-   a. Copy this entire Pulih-Windows\ folder to the PC.
+   a. Copy this entire MediLink-Windows\ folder to the PC.
    b. Open run-clinic-A.bat in Notepad.
    c. Set GATEWAY_URL to   http://<Gateway-PC-IP>:8000
    d. If using cloud sync, set CLOUD_DATABASE_URL.
@@ -60,7 +60,7 @@ FIREWALL
 --------
   Windows Firewall may block incoming connections.
   For each port (8000, 8001, 8002), run in an Admin CMD:
-    netsh advfirewall firewall add rule name="Pulih-800X" ^
+    netsh advfirewall firewall add rule name="MediLink-800X" ^
       dir=in action=allow protocol=TCP localport=800X
 
   Or go to: Control Panel → Windows Defender Firewall

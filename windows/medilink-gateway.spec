@@ -1,4 +1,4 @@
-# Pulih Gateway PyInstaller spec
+# MediLink Gateway PyInstaller spec
 # Build: pyinstaller windows/medilink-gateway.spec
 # Output: dist/medilink-gateway/medilink-gateway.exe
 

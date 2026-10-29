@@ -1,5 +1,5 @@
 """
-Pulih v3.0 — High-Availability Hybrid Cloud EHR Platform
+MediLink v3.0 — High-Availability Hybrid Cloud EHR Platform
 FastAPI | PostgreSQL | Groq AI (MTS Triage) | Malaysian IC | Local payments
 HP Folio 9470m (local) ↔ Cloud (Supabase/AWS)
 """
@@ -26,33 +26,12 @@ import bcrypt, jwt
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
-# ── Cloud connection saved by Settings → Cloud (cloud.json in the data folder) ─
-# Read before anything else, because it decides the deployment mode, the
-# facility and the cloud URL. Environment variables still win, so a clinic run
-# by a script or a service file is configured exactly as before.
-def _load_cloud_file():
-    d = os.environ.get("MEDILINK_DATA_DIR") or os.path.join(os.path.expanduser("~"), ".medilink")
-    path = os.path.join(d, "cloud.json")
-    if os.environ.get("CLOUD_DATABASE_URL") or not os.path.isfile(path):
-        return None
-    try:
-        with open(path, encoding="utf-8") as f:
-            c = json.load(f)
-        os.environ["CLOUD_DATABASE_URL"] = c["url"]
-        os.environ["CLOUD_SCHEMA"] = c.get("schema", "medilink")
-        os.environ["FACILITY_ID"] = c["facility"]
-        os.environ["DEPLOYMENT_MODE"] = "networked"
-        os.environ["CLOUD_MANAGED_SCHEMA"] = "true"   # tables come from the migrations, not from clinics
-        return c
-    except Exception as e:
-        logging.getLogger("medilink").warning("cloud.json unreadable, staying offline: %s", e)
-        return None
-CLOUD_FILE = _load_cloud_file()
+CLOUD_FILE = None   # in-app cloud keys are part of the commercial edition, not MediLink
 CLOUD_MANAGED_SCHEMA = os.environ.get("CLOUD_MANAGED_SCHEMA", "false").lower() == "true"
 
 # ── Config ────────────────────────────────────────────────────────────────────
 CLOUD_DB_URL    = os.environ.get("CLOUD_DATABASE_URL", "")   # Supabase Postgres
-# The cloud node keeps Pulih's tables in their own schema, so the mirror is
+# The cloud node keeps MediLink's tables in their own schema, so the mirror is
 # separated from anything else sharing that Postgres project.
 CLOUD_SCHEMA    = os.environ.get("CLOUD_SCHEMA", "medilink")
 IS_CLOUD        = os.environ.get("IS_CLOUD_NODE", "false").lower() == "true"
@@ -120,7 +99,7 @@ def _resolve_jwt_secret() -> str:
     run and configure deliberately.
 
     Requiring it from the environment on a networked *desktop* build is what
-    made Pulih Connect die at launch with KeyError: 'JWT_SECRET'.
+    made MediLink Connect die at launch with KeyError: 'JWT_SECRET'.
     """
     env = os.environ.get("JWT_SECRET")
     if env:
@@ -174,7 +153,7 @@ def _clinic_cfg(key, default=""):
     except Exception:
         return default
 
-CLINIC_NAME     = _clinic_cfg("CLINIC_NAME", "Pulih Clinic")
+CLINIC_NAME     = _clinic_cfg("CLINIC_NAME", "MediLink Clinic")
 CLINIC_ADDR     = _clinic_cfg("CLINIC_ADDRESS", "")
 CLINIC_PHONE    = _clinic_cfg("CLINIC_PHONE", "")
 FACILITY_ID     = os.environ.get("FACILITY_ID", "main")
@@ -231,7 +210,7 @@ def _brand_b64(name: str) -> str:
     except Exception:
         return ""
 
-# ── Deployment tier (Pulih SaaS) ───────────────────────────────────────
+# ── Deployment tier (MediLink SaaS) ───────────────────────────────────────
 # STANDALONE  = runs entirely on the clinic's own machine (SQLite, offline). No
 #               cloud sync, no cross-clinic records, no public patient portal.
 # NETWORKED   = local + cloud: cross-clinic shared records, patient portal, and
@@ -247,10 +226,10 @@ IS_STANDALONE   = DEPLOYMENT_MODE == "standalone"
 # Core binary, and a Core code can never use the cloud in a Connect binary.
 #
 # Cloud nodes are infrastructure we run ourselves, so they are never licensed.
-APP_VERSION = "26.1029.4"   # YY.MMDD.weekday (Mon 1 ... Sun 7)
+APP_VERSION = "1.2.0"   # MediLink FYP edition
 
 def effective_tier() -> str:
-    """Pulih has no commercial tiers. The deployment mode alone decides
+    """MediLink has no commercial tiers. The deployment mode alone decides
     whether cross-clinic sync is available, which keeps the FYP scope honest:
     one system, two run modes, no licensing."""
     return "connect" if (IS_CLOUD or IS_NETWORKED) else "core"
@@ -825,7 +804,7 @@ sync_queue_t = Table("sync_queue", metadata,
 )
 
 # ── App ───────────────────────────────────────────────────────────────────────
-app = FastAPI(title="Pulih", version=APP_VERSION, docs_url="/docs")
+app = FastAPI(title="MediLink", version=APP_VERSION, docs_url="/docs")
 api = APIRouter(prefix="/api")
 
 # ── Core helpers ──────────────────────────────────────────────────────────────
@@ -1423,7 +1402,7 @@ async def enrich_appointments(rows) -> list:
 # ── Public ────────────────────────────────────────────────────────────────────
 @api.get("/")
 async def root():
-    return {"service": "Pulih", "version": APP_VERSION,
+    return {"service": "MediLink", "version": APP_VERSION,
             "facility": FACILITY_ID, "node": "cloud" if IS_CLOUD else "local", "status": "ok", "deployment_mode": DEPLOYMENT_MODE}
 
 @api.get("/ic/parse/{ic_number}")
@@ -1469,7 +1448,7 @@ def require_feature(feature: str):
             raise HTTPException(402, detail={
                 "error": "unavailable",
                 "feature": feature,
-                "message": "This feature requires Pulih in networked mode.",
+                "message": "This feature requires MediLink in networked mode.",
             })
         return u
     return dep
@@ -2403,7 +2382,7 @@ async def request_record_access(body: AccessRequestIn, u=Depends(role_required("
     await enqueue_sync("record_consents", cid, "INSERT", {})
     await audit_log(u["id"], u["role"], "REQUEST_RECORD_ACCESS", "record_consents", cid)
     return {"consent_id": cid, "code": code,
-            "message": "Ask the patient to approve this code in their Pulih app."}
+            "message": "Ask the patient to approve this code in their MediLink app."}
 
 class ConsentApproveIn(BaseModel):
     code: str
@@ -2582,7 +2561,7 @@ async def patient_records(patient_id: str, u=Depends(current_user), request: Req
     return result
 
 # ── AI Triage — Manchester Triage System (MTS) ────────────────────────────────
-MTS_SYSTEM = """You are Pulih's clinical AI running the Manchester Triage System (MTS) used in Malaysian hospitals.
+MTS_SYSTEM = """You are MediLink's clinical AI running the Manchester Triage System (MTS) used in Malaysian hospitals.
 
 Assess the patient and output ONLY a JSON object with exactly these fields:
 {
@@ -2672,7 +2651,7 @@ Apply MTS strictly. Output JSON only."""
 @api.post("/ai/symptom-check")
 async def ai_symptom_check(body: AISymptomIn, u=Depends(current_user)):
     system = (
-        "You are Pulih's symptom triage assistant for a Malaysian clinic, following the "
+        "You are MediLink's symptom triage assistant for a Malaysian clinic, following the "
         "Malaysian ED three-zone triage model (HIJAU/Green = non-critical, KUNING/Yellow = "
         "semi-critical, MERAH/Red = critical). "
         f"{'Patient context: ' + body.patient_context if body.patient_context else ''} "
@@ -2772,7 +2751,7 @@ async def ai_summary(body: AISummaryIn, u=Depends(role_required("doctor","admin"
     cached = _AI_SUMMARY_CACHE.get(cache_key)
     if cached:
         return {"summary": cached, "patient": clean(pd), "record_count": len(rows), "cached": True}
-    # Pulih runs without an AI service on a clinic machine, so build the
+    # MediLink runs without an AI service on a clinic machine, so build the
     # brief from the clinic's OWN records rather than failing. Nothing is
     # inferred: this only re-arranges data the clinic already holds.
     import ai_offline
@@ -3142,7 +3121,7 @@ async def sync_full(u=Depends(super_admin_required)):
     outside the live app (e.g. seed scripts) that never entered the sync queue."""
     if not sync_enabled():
         raise HTTPException(400, "Cloud sync is not available on this plan. "
-                                 "Pulih Connect is required.")
+                                 "MediLink Connect is required.")
     tables = {"users": users_t, "facilities": facilities_t,
               "appointments": appointments_t, "medical_records": records_t,
               "payments": payments_t, "dispense_records": dispense_t,
@@ -3398,34 +3377,7 @@ async def admin_cloudwatch(u=Depends(super_admin_required)):
             log.warning(f"CloudWatch proxy failed: {e}")
     return {"available": False, "reason": "No AWS creds locally and cloud proxy unavailable"}
 
-# ── Settings → Cloud: connect this clinic with the key HarNova issues ─────────
-# A cloud key is "mlk1." + base64url(JSON {"u": url, "f": facility, "s": schema}).
-# It holds this clinic's own database login, so it is shown once and stored
-# only in cloud.json (readable by this computer's user alone).
-def _decode_cloud_key(key: str) -> dict:
-    key = (key or "").strip()
-    if not key.startswith("mlk1."):
-        raise HTTPException(400, "That doesn't look like a Pulih cloud key. It starts with mlk1.")
-    try:
-        raw = key[5:]
-        data = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode())
-        assert data["u"].startswith("postgres") and data["f"]
-        return {"url": data["u"], "facility": data["f"], "schema": data.get("s", "medilink")}
-    except Exception:
-        raise HTTPException(400, "The cloud key is incomplete. Copy the whole key and try again.")
-
-def _restart_soon(delay: float = 1.5):
-    """Restart this clinic node in place so the new cloud setting takes effect."""
-    import sys as _sys
-    def _go():
-        time.sleep(delay)
-        log.info("Restarting to apply the new cloud connection")
-        os.environ["MEDILINK_RESTARTED"] = "1"
-        args = _sys.argv if getattr(_sys, "frozen", False) else [_sys.executable] + _sys.argv
-        os.execv(_sys.executable, args)
-    import threading as _th
-    _th.Thread(target=_go, daemon=True).start()
-
+# ── Settings → Cloud: read-only status (cloud is configured by environment) ──
 @api.get("/admin/cloud")
 async def cloud_status(u=Depends(any_admin_required)):
     host = None
@@ -3438,50 +3390,6 @@ async def cloud_status(u=Depends(any_admin_required)):
     pending = await database.fetch_val(sync_queue_t.select().with_only_columns(func.count()).where(sync_queue_t.c.synced == False))
     return {"clinic_id": FACILITY_ID, "connected": bool(cloud_db), "configured_in_app": bool(CLOUD_FILE),
             "online": bool(cloud_db and cloud_db.online), "host": host, "pending": pending}
-
-class CloudKeyIn(BaseModel):
-    key: str
-
-@api.post("/admin/cloud/connect")
-async def cloud_connect(body: CloudKeyIn, u=Depends(any_admin_required)):
-    c = _decode_cloud_key(body.key)
-    if c["facility"] != FACILITY_ID:
-        raise HTTPException(409, f"This key belongs to clinic {c['facility']}, but this computer is clinic {FACILITY_ID}. "
-                                 "Ask HarNova for the key issued to your Clinic ID.")
-    # Prove the key works, and that the cloud itself names this clinic, before saving it.
-    try:
-        import asyncpg as _apg
-        con = await asyncio.wait_for(_apg.connect(c["url"], timeout=8, statement_cache_size=0), 12)
-        try:
-            who = await con.fetchval(f"SELECT {c['schema']}.current_facility()")
-        finally:
-            await con.close()
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(502, f"Couldn't reach the cloud with this key ({type(e).__name__}). Check the internet connection and try again.")
-    if who != FACILITY_ID:
-        raise HTTPException(409, "The cloud doesn't recognise this key as your clinic's login. Ask HarNova for a new key.")
-    path = os.path.join(DATA_DIR, "cloud.json")
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump({**c, "connected_at": now_iso()}, f)
-    try:
-        os.chmod(path, 0o600)
-    except OSError:
-        pass
-    await audit_log(u["id"], u["role"], "CLOUD_CONNECT", "cloud", FACILITY_ID)
-    _restart_soon()
-    return {"ok": True, "restarting": True}
-
-@api.post("/admin/cloud/disconnect")
-async def cloud_disconnect(u=Depends(any_admin_required)):
-    path = os.path.join(DATA_DIR, "cloud.json")
-    if not os.path.isfile(path):
-        raise HTTPException(400, "This clinic isn't connected through Settings.")
-    os.replace(path, path + ".off")
-    await audit_log(u["id"], u["role"], "CLOUD_DISCONNECT", "cloud", FACILITY_ID)
-    _restart_soon()
-    return {"ok": True, "restarting": True}
 
 @api.post("/admin/monitoring/reconcile")
 async def admin_reconcile(u=Depends(super_admin_required)):
@@ -3830,7 +3738,7 @@ async def receipt_pdf(txn_ref: str, u=Depends(current_user)):
     pdf.ln(6)
     pdf.set_font("Helvetica", "I", 8)
     pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 5, _latin("Computer-generated receipt from Pulih. Thank you."), ln=1)
+    pdf.cell(0, 5, _latin("Computer-generated receipt from MediLink. Thank you."), ln=1)
     await audit_log(u["id"], u["role"], "DOWNLOAD_RECEIPT_PDF", "payments", txn_ref)
     return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="receipt-{txn_ref}.pdf"'})
@@ -3870,7 +3778,7 @@ async def history_pdf(u=Depends(role_required("patient", "admin"))):
         pdf.ln(2)
     pdf.set_font("Helvetica", "I", 8)
     pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 5, _latin("Generated by Pulih. For personal reference; not a certified medical report."), ln=1)
+    pdf.cell(0, 5, _latin("Generated by MediLink. For personal reference; not a certified medical report."), ln=1)
     await audit_log(u["id"], u["role"], "DOWNLOAD_HISTORY_PDF", "medical_records", u["id"])
     return Response(content=_pdf_bytes(pdf), media_type="application/pdf",
                     headers={"Content-Disposition": 'attachment; filename="medical-history.pdf"'})
@@ -4620,8 +4528,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors,
     # Local-first clinic server: also accept devices on the private LAN
-    # and the Pulih phone app (https://localhost on Android, capacitor://localhost on iPhone).
-    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?|capacitor://localhost)$",
+    allow_origin_regex=r"^(https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

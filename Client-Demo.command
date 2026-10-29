@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════
-#  Pulih — client demonstration
+#  MediLink — client demonstration
 #
 #  Double-click this file. It starts one clinic, Klinik Melaka, with a
 #  realistic day already under way (patients waiting, seen, paid, at the
@@ -24,11 +24,11 @@ say(){ printf "\n${B}%s${X}\n" "$*"; }
 ok(){  printf "  ${G}OK${X}   %s\n" "$*"; }
 bad(){ printf "  ${R}FAIL${X} %s\n" "$*"; }
 die(){ bad "$*"; printf "\n"; read -r -p "  Press Return to close…" _; exit 1; }
-cleanup(){ [ "$PID" != "0" ] && kill "$PID" 2>/dev/null; wait 2>/dev/null; printf "\n  Pulih stopped.\n"; }
+cleanup(){ [ "$PID" != "0" ] && kill "$PID" 2>/dev/null; wait 2>/dev/null; printf "\n  MediLink stopped.\n"; }
 trap cleanup EXIT INT TERM
 
 mkdir -p "$HOME_DIR"
-say "Pulih client demo"
+say "MediLink client demo"
 
 # ── 1. Python environment (one time, about a minute) ────────────────────────
 say "1. Preparing Python"
@@ -105,7 +105,7 @@ curl -fsS -X POST -H "Authorization: Bearer $TOK" -H 'Content-Type: application/
 ok "staff, stock and today's queue loaded"
 
 LAN=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)
-printf "\n${G}  Pulih is running${X}\n\n"
+printf "\n${G}  MediLink is running${X}\n\n"
 printf "   Front door      ${B}http://127.0.0.1:$PORT${X}\n"
 printf "   Kiosk           ${B}http://127.0.0.1:$PORT/kiosk${X}\n"
 [ -n "$LAN" ] && printf "   On an iPad or phone (same Wi-Fi):  ${B}http://$LAN:$PORT/kiosk${X}\n"

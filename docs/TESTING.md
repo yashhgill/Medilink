@@ -1,4 +1,4 @@
-# Pulih — Test Evidence
+# MediLink — Test Evidence
 
 ## Method
 
@@ -14,9 +14,9 @@ are verified in-browser on LAN and through the public tunnel.
 | 2 | Kiosk endpoints without device token | ✅ 401 |
 | 3 | Symptom capture → AI triage → zone on ticket & queue order | ✅ (fail-safe Green verified with AI disabled) |
 | 4 | Doctor writes record + prescription | ✅ 201 |
-| 5 | DuitNow QR generation at kiosk and in patient app | ✅ |
+| 5 | DuitNow QR generation at kiosk and in patient portal | ✅ |
 | 6 | Payment confirm without token / double confirm | ✅ 401 / idempotent `already_confirmed` |
-| 7 | Paid patient appears in pharmacy queue with medicine chit | ✅ |
+| 7 | Paid patient portalears in pharmacy queue with medicine chit | ✅ |
 | 8 | Login brute force (6th attempt) | ✅ 429 |
 | 9 | Patient bills list → pay → receipt history | ✅ |
 | 10 | Doctor file upload → attached to record → patient sees & downloads it | ✅ 201/200, access audited |

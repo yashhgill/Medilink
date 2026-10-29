@@ -83,7 +83,7 @@ async def main():
                                  timeout=30) as c:
         async with server.app.router.lifespan_context(server.app):
 
-            print(f"\n{BOLD}Pulih — standalone audit{RESET}")
+            print(f"\n{BOLD}MediLink — standalone audit{RESET}")
             print(f"{DIM}data dir: {TMP}{RESET}")
             print(f"{DIM}mode: {server.DEPLOYMENT_MODE} | db: {server.DATABASE_URL}"
                   f" | cloud: {server.cloud_db}{RESET}")

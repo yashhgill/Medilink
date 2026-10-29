@@ -1,4 +1,4 @@
--- Pulih — cloud node schema (PostgreSQL).
+-- MediLink — cloud node schema (PostgreSQL).
 --
 -- Generated from the application's own SQLAlchemy metadata, so it is exactly
 -- what the app expects. Run this FIRST, then 001_rls_multitenancy.sql.

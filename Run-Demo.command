@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════
-#  Pulih — PSM 1 demonstration launcher
+#  MediLink — PSM 1 demonstration launcher
 #
 #  Double-click this file. It starts:
 #    • Klinik Melaka   http://127.0.0.1:8001  (internal)
@@ -37,7 +37,7 @@ bad(){ printf "  ${R}FAIL${X} %s\n" "$*"; }
 PY="${PYTHON:-python3}"
 command -v "$PY" >/dev/null || { bad "Python 3 not found."; read -r -p "Return to close…" _; exit 1; }
 
-say "Pulih demonstration"
+say "MediLink demonstration"
 printf "  %s\n" "$($PY --version)"
 
 # ── dependencies ─────────────────────────────────────────────────────────────
@@ -168,7 +168,7 @@ fi
 
 printf "\n"
 printf "${G}  ╔════════════════════════════════════════════════════════════╗\n"
-printf "  ║                    Pulih is running                     ║\n"
+printf "  ║                    MediLink is running                     ║\n"
 printf "  ╚════════════════════════════════════════════════════════════╝${X}\n"
 printf "\n"
 printf "   Patient portal  ${B}http://127.0.0.1:8000${X}   ← single public URL\n"

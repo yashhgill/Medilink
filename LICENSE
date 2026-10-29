@@ -1,17 +1,17 @@
-Pulih
+MediLink (Final Year Project edition)
 Copyright (c) 2026 Yashpreet Singh Gill.
 All rights reserved.
 
-This software, including its source code, desktop builds, user interface,
-documentation, website, screenshots and database designs, is proprietary.
+MediLink is the Final Year Project (PSM) of Yashpreet Singh Gill at
+Universiti Teknikal Malaysia Melaka (UTeM), Bachelor of Cloud Computing
+and Applications with Honours.
 
-No licence is granted to copy, modify, publish, distribute, sublicense or
-sell any part of it, or to use it to run a clinic, without written
-permission from the copyright owner. Viewing this repository does not grant
-any such permission.
+The project supervisor and the examiners appointed by UTeM may run, test
+and inspect this software and its documentation for the purpose of
+assessing the project. No other licence is granted to copy, modify,
+publish, distribute or sell any part of it, or to use it to run a clinic,
+without written permission from the copyright owner.
 
-Clinics taking part in a Pulih trial may install and use the desktop
-build they are sent, for the trial period only, under the terms
-agreed with them in writing.
-
-Contact: hello@harnova.my
+This edition is the assessed scope of the project. The author's separate
+commercial product, Pulih, is not part of this repository; see
+docs/SCOPE-AND-BACKGROUND-IP.md.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-#  Pulih Chaos Test Suite
+#  MediLink Chaos Test Suite
 #  Tests networked-mode resilience: node failure, latency,
 #  partition, and recovery scenarios.
 #
@@ -135,7 +135,7 @@ if [[ "${LIST_ONLY:-}" == "1" ]]; then
   exit 0
 fi
 
-say "Pulih Chaos Test Suite"
+say "MediLink Chaos Test Suite"
 printf "  Checking servers are up before starting...\n"
 for PORT in 8001 8002 8000; do
   health "$PORT" || { printf "${R}ERROR${W}: Port $PORT is not up. Run: bash start-demo.sh\n"; exit 1; }
@@ -385,7 +385,7 @@ printf "  Failed:  ${R}%d${W}\n" "$FAILURES"
 printf "  Total:   %d\n\n" "$TOTAL"
 
 if [[ "$FAILURES" -eq 0 ]]; then
-  printf "${G}✓ All chaos tests passed — Pulih is resilient!${W}\n\n"
+  printf "${G}✓ All chaos tests passed — MediLink is resilient!${W}\n\n"
   exit 0
 else
   printf "${R}✗ $FAILURES test(s) failed — review output above.${W}\n\n"

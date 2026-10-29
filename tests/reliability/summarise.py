@@ -50,7 +50,7 @@ S["e1"] = {"lf_down": e1("local-first", "down"), "lf_bh": e1("local-first", "bla
            "co_down": e1("cloud-only", "down"), "co_bh": e1("cloud-only", "blackhole")}
 
 fig, axes = plt.subplots(2, 1, figsize=(7.2, 4.6), sharex=True)
-for ax, (label, colour, title) in zip(axes, [("local-first", LOCAL, "Local-first (Pulih)"),
+for ax, (label, colour, title) in zip(axes, [("local-first", LOCAL, "Local-first (MediLink)"),
                                               ("cloud-only", CLOUD, "Same software, cloud-only")]):
     d = load(f"e1-{label}-down.json"); raw = load(f"e1-{label}-down-raw.json")
     t0 = d["t_start"]; td, tu = d["events"][0]["t"] - t0, d["events"][1]["t"] - t0

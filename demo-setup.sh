@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════
-#  Pulih — One-shot demo launcher
+#  MediLink — One-shot demo launcher
 #  Kills old servers, wipes DBs, starts clinics, sets up everything,
 #  creates cross-clinic patient with records at both clinics.
 #

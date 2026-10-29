@@ -1,6 +1,6 @@
 {
-  "short_name": "Pulih",
-  "name": "Pulih — Clinic OS",
+  "short_name": "MediLink",
+  "name": "MediLink — Clinic OS",
   "description": "Clinic check-in, records, bills and health records",
   "id": "/",
   "start_url": "/?source=pwa",

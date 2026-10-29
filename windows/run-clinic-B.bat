@@ -1,11 +1,11 @@
 @echo off
 REM ============================================================
-REM  Pulih — Clinic B launcher  (Klinik Jasin, port 8002)
+REM  MediLink — Clinic B launcher  (Klinik Jasin, port 8002)
 REM  Run this on the Clinic B PC.  Edit the env vars below
 REM  to match your clinic's settings before first launch.
 REM ============================================================
 
-title Pulih - Clinic B (Klinik Jasin)
+title MediLink - Clinic B (Klinik Jasin)
 color 0A
 
 REM ── CONFIGURE THESE ─────────────────────────────────────────
@@ -46,7 +46,7 @@ set IS_CLOUD_NODE=false
 
 echo.
 echo  ╔══════════════════════════════════════════════════════╗
-echo  ║           Pulih — Clinic B  (Port %MEDILINK_PORT%)          ║
+echo  ║           MediLink — Clinic B  (Port %MEDILINK_PORT%)          ║
 echo  ║   Facility: %FACILITY_ID%                                  ║
 echo  ║   Data:     %DATA_DIR%     ║
 echo  ╚══════════════════════════════════════════════════════╝

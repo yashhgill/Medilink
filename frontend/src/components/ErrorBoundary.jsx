@@ -18,7 +18,7 @@ export default class ErrorBoundary extends React.Component {
   componentDidCatch(error, info) {
     // Log for debugging; never throw from here.
     // eslint-disable-next-line no-console
-    console.error("Pulih caught a render error:", error, info);
+    console.error("MediLink caught a render error:", error, info);
   }
 
   render() {

@@ -3,7 +3,7 @@ import AppShell from "@/components/AppShell";
 import api from "@/lib/api";
 import { PRODUCT } from "@/brand";
 
-// About Pulih: version, where it runs, and the licence terms in plain words.
+// About MediLink: version, where it runs, and the licence terms in plain words.
 export default function Licence() {
   const [info, setInfo] = useState(null);
   useEffect(() => { api.get("/").then((r) => setInfo(r.data)).catch(() => setInfo({})); }, []);
@@ -35,7 +35,7 @@ export default function Licence() {
             ))}
           </dl>
           <p className="mt-4 text-[13px] text-[#566663]">
-            Versions are written as year, month and day, and day of the week: {PRODUCT.version} is Thursday 29 October 2026.
+            Final Year Project, Universiti Teknikal Malaysia Melaka. Supervisor: Ts. Mohd Nazrien Bin Zaraini.
           </p>
         </section>
 
@@ -43,14 +43,14 @@ export default function Licence() {
           <h2 className="font-display text-xl text-[#10201D]">Licence</h2>
           <p className="mt-3">© 2026 {PRODUCT.owner}. All rights reserved.</p>
           <p className="mt-3 text-[#566663]">
-            {PRODUCT.name} is proprietary software. This clinic may use it under the terms agreed in writing,
-            for the period agreed. It may not be copied, changed, resold or given to another clinic.
+            {PRODUCT.name} is the author's Final Year Project. The supervisor and examiners may run and test it
+            for assessment. Any other use, copying or distribution needs the author's written permission.
           </p>
           <p className="mt-3 text-[#566663]">
-            Patient records belong to the clinic and stay on this computer. Cloud backup, when switched on,
+            Patient records belong to the clinic and stay on this computer. The cloud mirror, when configured,
             keeps a copy that only this clinic can reach.
           </p>
-          <p className="mt-3 text-[#566663]">Questions: hello@harnova.my</p>
+          <p className="mt-3 text-[#566663]">Contact: yashchaal99@gmail.com</p>
         </section>
       </div>
     </AppShell>

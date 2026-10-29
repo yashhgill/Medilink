@@ -29,7 +29,6 @@ print("schema created in medilink")
 EOF
 $PG -d rlsdb -f "$ROOT/backend/migrations/002_supabase_cloud_node.sql" >/dev/null
 $PG -d rlsdb -f "$ROOT/backend/migrations/003_cloud_per_clinic_uniqueness.sql" >/dev/null
-$PG -d rlsdb -f "$ROOT/backend/migrations/004_per_clinic_logins.sql" >/dev/null
 $PG -c "ALTER ROLE medilink_app PASSWORD '$APP_PW'"
 echo "migration 002 applied; RLS forced and medilink_app cannot bypass it"
 

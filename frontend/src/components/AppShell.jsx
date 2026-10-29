@@ -14,7 +14,6 @@ import useQueueSocket from "@/hooks/useQueueSocket";
 import { Heartbeat, SignOut, Sparkle, Broadcast, List, X, Lock, House, User, Info, Hospital } from "@phosphor-icons/react";
 import { PRODUCT } from "@/brand";
 import { useMode } from "@/lib/mode";
-import { inPulihApp, changeClinic } from "@/lib/nativeApp";
 
 const roleAccent = {
   patient: "#0A6E62",      // teal
@@ -117,11 +116,6 @@ export default function AppShell({ children, title, subtitle, navItems = [], sec
         <button onClick={() => { setMenuOpen(false); setPwOpen(true); }} className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--ml-wash)] text-[15px]">
           <Lock size={18} /> Change password
         </button>
-        {inPulihApp() && (
-          <button onClick={changeClinic} className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--ml-wash)] text-[15px]">
-            <Hospital size={18} /> Change clinic
-          </button>
-        )}
         <button onClick={() => { setMenuOpen(false); nav("/about"); }} className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--ml-wash)] text-[15px]">
           <Info size={18} /> About {PRODUCT.name}
         </button>
