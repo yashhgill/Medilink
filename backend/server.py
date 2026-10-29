@@ -348,8 +348,20 @@ def s3():
             return None
     return _s3_client
 # Where patients go. This URL is printed on kiosk chits and encoded into the QR
-# on receipts, so it has to be the patient app, not the old Pulih hostname.
-PUBLIC_APP_URL  = os.environ.get("PUBLIC_APP_URL", "https://app.medilink.local")
+# on receipts, so it has to be the patient app. By default that is this clinic
+# computer's address on the clinic Wi-Fi, which patients' phones can reach.
+def _default_app_url() -> str:
+    import socket
+    port = os.environ.get("MEDILINK_PORT", "8001")
+    host = "127.0.0.1"
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("10.255.255.255", 1))   # no packet is sent; this only picks the LAN interface
+            host = s.getsockname()[0]
+    except OSError:
+        pass
+    return f"http://{host}:{port}/login?as=patient"
+PUBLIC_APP_URL  = os.environ.get("PUBLIC_APP_URL") or _default_app_url()
 SYNC_INTERVAL   = int(os.environ.get("SYNC_INTERVAL_SECONDS", "30"))
 # Payments. There is no payment gateway behind the kiosk or the patient app, so
 # a patient pressing "I've paid" proves nothing: money is only confirmed by
