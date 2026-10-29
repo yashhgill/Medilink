@@ -133,7 +133,7 @@ export default function PatientDashboard() {
       title={titles[view] || titles.overview}
       subtitle="Patient portal"
       navItems={[
-        { label: "Overview", to: "/patient" },
+        { label: "Home", to: "/patient" },
         { label: "Medical Records", to: "/patient/records" },
         { label: "Receipts & Billing", to: "/patient/billing" },
         { label: "Vaccinations", to: "/patient/vaccines" },
@@ -211,17 +211,13 @@ export default function PatientDashboard() {
 
       {view === "records" && (
         <Card>
-          <div className="flex items-center justify-between mb-4">
-            <div className="overline">Medical Records</div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => downloadPdf("/patient/history/pdf", "medical-history.pdf").catch(() => toast.error("Download failed"))}
-                className="text-xs px-3 py-1.5 rounded-full border border-[#DAE2DF] hover:bg-[var(--ml-wash)] text-[var(--ml-primary)]">Download PDF</button>
-              <button onClick={() => { setProfile({ email: user.email?.includes("@patient.medilink") ? "" : user.email, phone: user.phone || "" }); setProfileOpen(true); }}
-                className="text-xs px-3 py-1.5 rounded-full border border-[#DAE2DF] hover:bg-[var(--ml-wash)] text-[var(--ml-primary)]">Edit profile</button>
-              <FileText size={18} weight="duotone" color="#0A6E62" />
-            </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2"><FileText size={18} weight="duotone" color="#0A6E62" /><div className="overline">Medical records</div></div>
+            <button onClick={() => downloadPdf("/patient/history/pdf", "medical-history.pdf").catch(() => toast.error("Download failed"))}
+              disabled={records.length === 0}
+              className="text-[13px] px-3.5 py-1.5 rounded-full border border-[#DAE2DF] hover:bg-[var(--ml-wash)] text-[var(--ml-primary)] disabled:opacity-40">Download PDF</button>
           </div>
-          {records.length === 0 && <div className="text-sm text-[#566663]">No records yet.</div>}
+          {records.length === 0 && <div className="rounded-xl bg-[var(--ml-wash)] p-4 text-[14px] text-[#10201D]">Your records appear here after the doctor has seen you: diagnosis, notes, medicines and any files.</div>}
           <div className="grid md:grid-cols-2 gap-3">
             {records.map((r) => (
               <div key={r.id} className="p-4 rounded-xl bg-[var(--ml-wash)] border border-[#DAE2DF]">
@@ -248,8 +244,8 @@ export default function PatientDashboard() {
 
       {view === "billing" && (
         <Card>
-          <div className="flex items-center justify-between mb-4"><div className="overline">Receipts</div><CreditCard size={18} weight="duotone" color="#0A6E62" /></div>
-          {receipts.length === 0 && <div className="text-sm text-[#566663]">No payments yet.</div>}
+          <div className="flex items-center gap-2 mb-4"><CreditCard size={18} weight="duotone" color="#0A6E62" /><div className="overline">Receipts</div></div>
+          {receipts.length === 0 && <div className="rounded-xl bg-[var(--ml-wash)] p-4 text-[14px] text-[#10201D]">Receipts appear here once you've paid for a visit, at the kiosk, by DuitNow or at the counter. Each one can be downloaded as a PDF.</div>}
           <div className="grid md:grid-cols-2 gap-3">
             {receipts.map((r) => (
               <div key={r.txn_ref} className="flex items-center justify-between p-4 rounded-xl border border-[#DAE2DF]">
@@ -261,7 +257,7 @@ export default function PatientDashboard() {
                 <div className="flex items-center gap-2">
                   <button onClick={() => downloadPdf(`/patient/receipts/${r.txn_ref}/pdf`, `receipt-${r.txn_ref}.pdf`).catch(() => toast.error("Download failed"))}
                     className="text-[11px] px-2 py-1 rounded-full border border-[#DAE2DF] hover:bg-[var(--ml-wash)] text-[var(--ml-primary)]">PDF</button>
-                  <Badge className="bg-[#0A6E62]/20 text-[var(--ml-primary)]">paid</Badge>
+                  <Badge className="bg-[#0A6E62]/20 text-[var(--ml-primary)]">Paid</Badge>
                 </div>
               </div>
             ))}
@@ -276,15 +272,15 @@ export default function PatientDashboard() {
             <button onClick={() => downloadPdf(`/patients/${user.id}/vaccinations/pdf`, "vaccination-certificate.pdf").catch(() => toast.error("Download failed"))}
               className="text-xs px-3 py-1.5 rounded-full border border-[#DAE2DF] hover:bg-[var(--ml-wash)] text-[var(--ml-primary)]">Certificate PDF</button>
           </div>
-          {vax.length === 0 && <div className="text-sm text-[#566663]">No vaccinations recorded.</div>}
+          {vax.length === 0 && <div className="rounded-xl bg-[var(--ml-wash)] p-4 text-[14px] text-[#10201D]">Vaccinations given at this clinic appear here, and you can download them as a certificate.</div>}
           <div className="grid md:grid-cols-2 gap-3">
             {vax.map((v) => (
               <div key={v.id} className="flex items-center justify-between p-4 rounded-xl border border-[#DAE2DF]">
                 <div>
                   <div className="text-sm font-medium">{v.vaccine} · <span className="font-normal text-[#566663]">{v.dose}</span></div>
-                  <div className="text-[11px] text-[#566663]">{(v.administered_at || "").slice(0, 10)} · {v.doctor_name}</div>
+                  <div className="text-[11px] text-[#566663]">{v.administered_at ? fmtDate(v.administered_at) : ""} · {v.doctor_name}</div>
                 </div>
-                <Badge className="bg-[#0A6E62]/20 text-[var(--ml-primary)]">done</Badge>
+                <Badge className="bg-[#0A6E62]/20 text-[var(--ml-primary)]">Given</Badge>
               </div>
             ))}
           </div>

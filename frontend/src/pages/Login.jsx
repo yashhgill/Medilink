@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { PRODUCT } from "@/brand";
+import { inPulihApp, changeClinic } from "@/lib/nativeApp";
 
 export default function Login() {
   const { login } = useAuth();
@@ -52,11 +53,14 @@ export default function Login() {
         </div>
       </aside>
       <main className="flex flex-col px-6 sm:px-10 py-8">
+        {inPulihApp() && (
+          <button type="button" onClick={changeClinic} className="lg:hidden self-start mb-4 text-[14px] font-semibold text-[var(--ml-primary)]">Change clinic</button>
+        )}
         <Link to="/" className="lg:hidden flex items-center gap-2.5 mb-10" data-testid="brand-home-mobile">
           <img src={PRODUCT.logo} alt="" className="w-11 h-11 rounded-[10px] object-cover" />
           <span className="font-display text-[19px]">{brand?.clinic_name || PRODUCT.name}</span>
         </Link>
-        <div className="w-full max-w-[420px] m-auto">
+        <div className="w-full max-w-[420px] mx-auto lg:my-auto">
           <h1 className="text-[40px] leading-tight">{asPatient ? "Patient sign in" : "Staff sign in"}</h1>
           <p className="text-[16px] text-[#566663] mt-1 mb-8">
             {asPatient ? "Use the IC number on your MyKad." : "Doctors, reception, pharmacy and administrators."}
