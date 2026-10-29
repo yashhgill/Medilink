@@ -19,9 +19,9 @@ const typeMeta = {
 };
 
 const roleMeta = {
-  super_admin:  { label: "Super-Admin",  color: "bg-[#10262E]/15 text-[#10262E]" },
-  admin:        { label: "Super-Admin",  color: "bg-[#10262E]/15 text-[#10262E]" },
-  clinic_admin: { label: "Clinic-Admin", color: "bg-[#0A6E62]/15 text-[var(--ml-primary)]" },
+  super_admin:  { label: "Administrator", color: "bg-[#10262E]/15 text-[#10262E]" },
+  admin:        { label: "Administrator", color: "bg-[#10262E]/15 text-[#10262E]" },
+  clinic_admin: { label: "Clinic admin", color: "bg-[#0A6E62]/15 text-[var(--ml-primary)]" },
   doctor:       { label: "Doctor",       color: "bg-[#0A6E62]/15 text-[var(--ml-primary)]" },
   receptionist: { label: "Reception",    color: "bg-[#566663]/15 text-[#566663]" },
   pharmacist:   { label: "Pharmacist",   color: "bg-[#0A6E62]/15 text-[var(--ml-primary)]" },
@@ -110,14 +110,14 @@ export default function Facilities() {
         <ShieldCheck size={22} weight="duotone" color="#10262E" />
         <div>
           <div className="font-display text-base text-[#10262E]">
-            {!isNetworked ? "This clinic" : isSuperAdmin ? "Super-Admin — full network" : "Clinic-Admin — " + (user?.facility_id || "your clinic")}
+            {!isNetworked ? "This clinic" : isSuperAdmin ? "Every clinic in your network" : "Your clinic: " + (user?.facility_id || "this clinic")}
           </div>
           <div className="text-xs text-[#566663]">
             {!isNetworked
-              ? "Add your doctors, pharmacy staff and reception here, and set your clinic details. Everything runs locally on this machine."
+              ? "Add your doctors, reception and pharmacy staff here. Each person signs in with their own email and password."
               : isSuperAdmin
-              ? "You can create facilities, add clinic-admins, and view every clinic. Patient records unify across the network by IC."
-              : "You manage staff, patients, analytics and cash for your own clinic only. Facilities are managed by the super-admin."}
+              ? "Add clinics and their administrators, and see every clinic. A patient's records follow them between clinics by IC number, with their consent."
+              : "You manage staff, patients and cash for your own clinic. Clinics are added by the network administrator."}
           </div>
         </div>
       </div>
@@ -155,10 +155,10 @@ export default function Facilities() {
           </div>
         )}
 
-        <div className={(isSuperAdmin ? "lg:col-span-2" : "lg:col-span-3") + " rounded-2xl border border-[#DAE2DF] bg-white p-6"}>
+        {isNetworked && <div className={(isSuperAdmin ? "lg:col-span-2" : "lg:col-span-3") + " rounded-2xl border border-[#DAE2DF] bg-white p-6"}>
           <div className="flex items-center gap-2 mb-4">
             <Buildings size={18} weight="duotone" color="#0A6E62" />
-            <div className="overline">{isSuperAdmin ? "Network (" + facilities.length + ")" : "My facility"}</div>
+            <div className="overline">{isSuperAdmin ? "Clinics (" + facilities.length + ")" : "My clinic"}</div>
           </div>
           {facilities.length === 0 && <div className="text-sm text-[#566663]">No facilities yet.</div>}
           <div className="grid sm:grid-cols-2 gap-3">
@@ -188,10 +188,10 @@ export default function Facilities() {
               );
             })}
           </div>
-        </div>
+        </div>}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6 mt-6">
+      <div className={"grid lg:grid-cols-3 gap-6" + (isNetworked ? " mt-6" : "")}>
         <div className="rounded-2xl border border-[#DAE2DF] bg-white p-6 h-fit">
           <div className="flex items-center gap-2 mb-4">
             <UserPlus size={18} weight="bold" color="#0A6E62" />
@@ -201,7 +201,7 @@ export default function Facilities() {
             <div className="space-y-1.5"><Label>Full name</Label>
               <Input value={sf.name} onChange={(e) => setSf({ ...sf, name: e.target.value })} placeholder="Dr. Wei Tan" className="border-[#DAE2DF]" /></div>
             <div className="space-y-1.5"><Label>Login email</Label>
-              <Input value={sf.email} onChange={(e) => setSf({ ...sf, email: e.target.value })} placeholder="dr.raju@medilink.io" className="border-[#DAE2DF]" /></div>
+              <Input value={sf.email} onChange={(e) => setSf({ ...sf, email: e.target.value })} placeholder="name@yourclinic.my" className="border-[#DAE2DF]" /></div>
             <div className="space-y-1.5"><Label>Temporary password</Label>
               <Input value={sf.password} onChange={(e) => setSf({ ...sf, password: e.target.value })} placeholder="Set a strong password" className="border-[#DAE2DF]" /></div>
             <div className="space-y-1.5"><Label>Role</Label>
@@ -216,10 +216,10 @@ export default function Facilities() {
               <div className="space-y-1.5"><Label>Specialty</Label>
                 <Input value={sf.specialty} onChange={(e) => setSf({ ...sf, specialty: e.target.value })} placeholder="General Physician" className="border-[#DAE2DF]" /></div>
             )}
-            {isSuperAdmin && (
-              <div className="space-y-1.5"><Label>Facility</Label>
+            {isSuperAdmin && isNetworked && (
+              <div className="space-y-1.5"><Label>Clinic</Label>
                 <Select value={sf.facility_id} onValueChange={(v) => setSf({ ...sf, facility_id: v })}>
-                  <SelectTrigger className="border-[#DAE2DF]"><SelectValue placeholder="Choose facility" /></SelectTrigger>
+                  <SelectTrigger className="border-[#DAE2DF]"><SelectValue placeholder="Choose a clinic" /></SelectTrigger>
                   <SelectContent>
                     {facilities.map((f) => <SelectItem key={f.code} value={f.code}>{f.name} ({f.code})</SelectItem>)}
                   </SelectContent>
@@ -264,9 +264,9 @@ export default function Facilities() {
             })}
           </div>
           <p className="text-xs text-[#566663] mt-5 leading-relaxed">
-            Each facility runs its own {PRODUCT.name} node with its code as <span className="font-mono">FACILITY_ID</span>.
-            Receipts, medical certificates and chits are issued per facility, while patient medical records unify
-            across the network by IC — one patient, one record.
+            {isNetworked
+              ? "Receipts, medical certificates and letters are issued by each clinic. A patient's medical record follows them between clinics by IC number, with their consent."
+              : "The bin icon switches off someone's sign-in. Their past records stay, with their name on them."}
           </p>
         </div>
       </div>

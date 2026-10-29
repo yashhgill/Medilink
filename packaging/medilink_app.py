@@ -24,6 +24,7 @@ import webbrowser
 from pathlib import Path
 
 APP = "Pulih"
+VERSION = "26.1029.4"
 # The kiosk sends this token with every request. It is compiled into the
 # interface at build time (REACT_APP_KIOSK_TOKEN), so it must match the build.
 BUILD_KIOSK_TOKEN = "demo-kiosk-token"
@@ -136,7 +137,7 @@ def main():
 
     url = f"http://127.0.0.1:{port}"
     lan = lan_address()
-    print(f"\n  {APP} is starting…\n")
+    print(f"\n  {APP} {VERSION} is starting…\n")
     print(f"  On this computer   {url}")
     print(f"  Kiosk              {url}/kiosk")
     if lan:

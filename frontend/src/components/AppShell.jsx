@@ -11,7 +11,7 @@ import SyncIndicator from "@/components/SyncIndicator";
 import LicenceBanner from "@/components/LicenceBanner";
 import AIChat from "@/components/AIChat";
 import useQueueSocket from "@/hooks/useQueueSocket";
-import { Heartbeat, SignOut, Sparkle, Broadcast, List, X, Lock, House, User } from "@phosphor-icons/react";
+import { Heartbeat, SignOut, Sparkle, Broadcast, List, X, Lock, House, User, Info } from "@phosphor-icons/react";
 import { PRODUCT } from "@/brand";
 import { useMode } from "@/lib/mode";
 
@@ -27,7 +27,7 @@ const roleAccent = {
 
 const roleLabel = {
   patient: "Patient", doctor: "Doctor",
-  admin: "Administrator", super_admin: "Network administrator", clinic_admin: "Clinic administrator",
+  admin: "Administrator", super_admin: "Administrator", clinic_admin: "Clinic administrator",
   pharmacist: "Pharmacy", receptionist: "Reception",
 };
 
@@ -116,6 +116,9 @@ export default function AppShell({ children, title, subtitle, navItems = [], sec
         <button onClick={() => { setMenuOpen(false); setPwOpen(true); }} className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--ml-wash)] text-[15px]">
           <Lock size={18} /> Change password
         </button>
+        <button onClick={() => { setMenuOpen(false); nav("/about"); }} className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--ml-wash)] text-[15px]">
+          <Info size={18} /> About {PRODUCT.name}
+        </button>
         <button onClick={doLogout} data-testid="logout-btn" className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--ml-wash)] text-[15px]">
           <SignOut size={18} /> Sign out
         </button>
@@ -180,6 +183,7 @@ export default function AppShell({ children, title, subtitle, navItems = [], sec
                       </div>
                       <button role="menuitem" onClick={() => { setUserMenu(false); openProfile(); }} className="w-full text-left flex items-center gap-3 px-4 py-2.5 hover:bg-[#EEF2F1] text-[15px]"><User size={18} /> My profile</button>
                       <button role="menuitem" onClick={() => { setUserMenu(false); setPwOpen(true); }} className="w-full text-left flex items-center gap-3 px-4 py-2.5 hover:bg-[#EEF2F1] text-[15px]"><Lock size={18} /> Change password</button>
+                      <button role="menuitem" onClick={() => { setUserMenu(false); nav("/about"); }} className="w-full text-left flex items-center gap-3 px-4 py-2.5 hover:bg-[#EEF2F1] text-[15px]"><Info size={18} /> About {PRODUCT.name}</button>
                       <button role="menuitem" onClick={doLogout} data-testid="logout-btn" className="w-full text-left flex items-center gap-3 px-4 py-2.5 hover:bg-[#EEF2F1] text-[15px] text-[#B4231C]"><SignOut size={18} /> Sign out</button>
                     </div>
                   </>

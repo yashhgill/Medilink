@@ -19,6 +19,14 @@ const Stat = ({ label, value, tone = "teal", sub }) => {
   );
 };
 
+// Plain names for the tables, as staff know them.
+const TABLE_NAMES = {
+  users: "Staff and patient accounts", medical_records: "Medical records", appointments: "Visits",
+  payments: "Payments", lab_orders: "Lab orders", vaccinations: "Vaccinations", prescriptions: "Prescriptions",
+  medicines: "Medicines", referrals: "Referrals", facilities: "Clinics",
+};
+const tableName = (t) => TABLE_NAMES[t] || t.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+
 export default function Monitoring() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,9 +52,9 @@ export default function Monitoring() {
     setReconciling(true);
     try {
       const r = await api.post("/admin/monitoring/reconcile");
-      toast.success(`Reconciled: ${r.data.pushed || 0} row(s) uploaded, ${r.data.reconciled_patients || 0} corrected`);
+      toast.success(`Uploaded ${r.data.pushed || 0} change(s)${r.data.reconciled_patients ? `, corrected ${r.data.reconciled_patients}` : ""}`);
       load();
-    } catch (e) { toast.error(errMsg(e, "Reconcile failed")); }
+    } catch (e) { toast.error(errMsg(e, "Couldn't upload. The changes stay queued and will upload by themselves.")); }
     finally { setReconciling(false); }
   };
 
@@ -57,9 +65,9 @@ export default function Monitoring() {
   return (
     <AppShell title="Sync and cloud health" subtitle="Monitoring" navItems={nav}>
       <div className="flex items-center justify-between mb-4">
-        <div className="text-xs text-[#566663]">Auto-refreshing every 10s{data ? ` · updated ${new Date(data.generated_at).toLocaleTimeString()}` : ""}</div>
+        <div className="text-xs text-[#566663]">Refreshes every 10 seconds{data ? ` · updated ${new Date(data.generated_at).toLocaleTimeString()}` : ""}</div>
         <Button size="sm" onClick={reconcile} disabled={reconciling} className="bg-[var(--ml-primary)] hover:bg-[var(--ml-primary-soft)] text-white">
-          <ArrowsClockwise size={15} className="mr-1.5" /> {reconciling ? "Reconciling…" : "Force reconcile"}
+          <ArrowsClockwise size={15} className="mr-1.5" /> {reconciling ? "Uploading…" : "Upload now"}
         </Button>
       </div>
 
@@ -75,17 +83,17 @@ export default function Monitoring() {
         <>
           {/* Top status strip */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-            <Stat label="Cloud mirror"
-                  value={data.is_cloud_node ? "This node" : (cloud.online ? "Online" : "Offline")}
-                  tone={data.is_cloud_node || cloud.online ? "green" : "red"}
-                  sub={data.is_cloud_node ? "source of truth" : (cloud.online ? `${cloud.latency_ms} ms round-trip` : (cloud.configured ? "unreachable, changes are queued" : "not set up on this clinic"))} />
-            <Stat label="Branches" value={`${(data.facilities || []).filter(f => f.active).length}`}
+            <Stat label="Cloud backup"
+                  value={data.is_cloud_node ? "This node" : (cloud.online ? "Online" : cloud.configured ? "Offline" : "Off")}
+                  tone={data.is_cloud_node || cloud.online ? "green" : cloud.configured ? "red" : "teal"}
+                  sub={data.is_cloud_node ? "source of truth" : (cloud.online ? `${cloud.latency_ms} ms round-trip` : (cloud.configured ? "unreachable, changes are queued" : "not switched on"))} />
+            <Stat label="Clinics" value={`${(data.facilities || []).filter(f => f.active).length}`}
                   sub={`${(data.facilities || []).length} total`} />
-            <Stat label="Pending sync" value={sync.pending ?? "—"} tone={sync.pending ? "amber" : "green"}
-                  sub={sync.errors ? `${sync.errors} errored` : (sync.pending ? "waiting to upload" : "queue clear")} />
-            <Stat label="Data match" value={data.all_in_sync == null ? "—" : (data.all_in_sync ? "In sync" : "Drift")}
+            <Stat label="Waiting to upload" value={sync.pending ?? "—"} tone={sync.pending ? "amber" : "green"}
+                  sub={sync.errors ? `${sync.errors} failed, retrying` : (sync.pending ? "changes queued" : "nothing waiting")} />
+            <Stat label="Clinic and cloud match" value={data.all_in_sync == null ? "—" : (data.all_in_sync ? "Yes" : "Not yet")}
                   tone={data.all_in_sync ? "green" : (data.all_in_sync == null ? "teal" : "red")}
-                  sub="local vs cloud" />
+                  sub={data.all_in_sync == null ? "no cloud to compare" : "records on both sides"} />
           </div>
 
           {/* Data integrity table */}
@@ -94,8 +102,8 @@ export default function Monitoring() {
             <div className="divide-y divide-[var(--ml-wash)]">
               {(data.data_match || []).map((m) => (
                 <div key={m.table} className="flex items-center justify-between py-2 text-sm">
-                  <span className="font-mono text-[#10262E]">{m.table}</span>
-                  <span className="text-[#566663]">local <b className="text-[#10262E]">{m.local}</b> · cloud <b className="text-[#10262E]">{m.cloud ?? "—"}</b></span>
+                  <span className="text-[#10262E] font-medium">{tableName(m.table)}</span>
+                  <span className="text-[#566663]">this clinic <b className="text-[#10262E] tabular-nums">{m.local}</b>, cloud <b className="text-[#10262E] tabular-nums">{m.cloud ?? "—"}</b></span>
                   {data.is_cloud_node
                     ? <span className="flex items-center gap-1 text-[var(--ml-primary)] text-xs"><CheckCircle size={14} weight="fill" /> source of truth</span>
                     : m.cloud == null
@@ -111,16 +119,16 @@ export default function Monitoring() {
           {/* Charts */}
           <div className="grid lg:grid-cols-2 gap-5 mb-5">
             <div className="rounded-2xl border border-[#DAE2DF] bg-white p-5">
-              <div className="flex items-center gap-2 mb-3"><ChartBar size={16} weight="duotone" color="#0A6E62" /><h2 className="text-lg font-bold">Rows per table</h2></div>
+              <div className="flex items-center gap-2 mb-3"><ChartBar size={16} weight="duotone" color="#0A6E62" /><h2 className="text-lg font-bold">Records by type</h2></div>
               <div style={{ width: "100%", height: 240 }}>
                 <ResponsiveContainer>
-                  <BarChart data={(data.data_match || []).map(m => ({ name: m.table.replace("_"," "), local: m.local, cloud: m.cloud ?? 0 }))}>
+                  <BarChart data={(data.data_match || []).map(m => ({ name: tableName(m.table).replace("Staff and patient accounts", "Accounts"), "this clinic": m.local, cloud: m.cloud ?? 0 }))}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E1F0EC" />
                     <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#566663" }} interval={0} angle={-20} textAnchor="end" height={50} />
                     <YAxis tick={{ fontSize: 10, fill: "#566663" }} allowDecimals={false} />
                     <Tooltip />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
-                    <Bar dataKey="local" fill="#0A6E62" radius={[4,4,0,0]} />
+                    <Bar dataKey="this clinic" fill="#0A6E62" radius={[4,4,0,0]} />
                     <Bar dataKey="cloud" fill="#10262E" radius={[4,4,0,0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -156,7 +164,7 @@ export default function Monitoring() {
                   </div>
                   <div className="text-[11px] font-mono text-[#566663]">{f.code} · {f.type}</div>
                   <div className="text-sm text-[#10262E] mt-2">
-                    Records — local <b>{f.records_local}</b> · cloud <b>{f.records_cloud ?? "—"}</b>
+                    Records: this clinic <b>{f.records_local}</b>, cloud <b>{f.records_cloud ?? "—"}</b>
                     {f.records_cloud != null && f.records_cloud >= f.records_local
                       ? <span className="ml-2 text-[var(--ml-primary)] text-xs">✓</span>
                       : <span className="ml-2 text-[#C08A00] text-xs">⟳</span>}
@@ -199,8 +207,8 @@ export default function Monitoring() {
           )}
 
           <p className="text-xs text-[#566663] mt-5 leading-relaxed">
-            Offline branches keep working locally; queued changes auto-recover when they reconnect.
-            <b> Force reconcile</b> pushes any drifted or queued rows to the cloud immediately for fast recovery.
+            A clinic that loses its internet keeps working; its changes upload by themselves when the line returns.
+            <b> Upload now</b> sends anything still waiting straight away.
           </p>
         </>
       )}

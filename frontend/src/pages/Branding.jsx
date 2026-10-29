@@ -275,9 +275,10 @@ export default function Branding() {
             </div>
           </Section>
 
-          <div className="sticky bottom-4 flex justify-end">
+          <div className="sticky bottom-0 z-10 -mx-4 sm:mx-0 px-4 sm:px-5 py-3 flex flex-wrap items-center justify-end gap-3 bg-white/95 backdrop-blur border border-[#DAE2DF] sm:rounded-2xl">
+            <span className="text-[13px] text-[#566663] mr-auto">Changes apply to every screen once saved.</span>
             <Button type="submit" disabled={saving} data-testid="save-settings"
-              className="h-12 px-8 rounded-full text-[16px] font-semibold bg-[var(--ml-primary)] hover:bg-[var(--ml-primary-soft)] text-white shadow-lg">
+              className="h-11 px-7 rounded-full text-[15px] font-semibold bg-[var(--ml-primary)] hover:bg-[var(--ml-primary-soft)] text-white">
               {saving ? "Saving…" : "Save settings"}
             </Button>
           </div>

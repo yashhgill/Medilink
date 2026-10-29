@@ -23,7 +23,7 @@ import httpx
 B = os.environ.get("CLINIC_URL", "http://127.0.0.1:8001")
 CTRL = os.environ.get("NETFAULT_URL", "http://127.0.0.1:6600")
 CLOUD_DSN = os.environ.get("CLOUD_DSN_DIRECT", "postgresql://postgres@127.0.0.1:5433/cloud")
-LOCAL_DB = os.environ.get("LOCAL_DB", "/home/claude/data/melaka/medilink.db")
+LOCAL_DB = os.environ.get("LOCAL_DB", "data/melaka/medilink.db")
 KIOSK = {"X-Kiosk-Token": os.environ.get("KIOSK_TOKEN", "demo-kiosk-token")}
 OUT = Path(os.environ.get("OUT_DIR", Path(__file__).parent / "results"))
 OUT.mkdir(parents=True, exist_ok=True)

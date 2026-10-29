@@ -100,13 +100,14 @@ function App() {
               }
             />
             <Route
-              path="/settings/licence"
+              path="/about"
               element={
-                <ProtectedRoute roles={["admin"]}>
+                <ProtectedRoute>
                   <Licence />
                 </ProtectedRoute>
               }
             />
+            <Route path="/settings/licence" element={<Navigate to="/about" replace />} />
             <Route
               path="/facilities"
               element={

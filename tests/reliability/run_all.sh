@@ -5,7 +5,7 @@
 set -u
 cd "$(dirname "$0")"
 BOOT=${BOOT:?set BOOT to the clinic boot script}
-. /home/claude/venv/bin/activate
+[ -n "$VENV" ] && . "$VENV/bin/activate"
 CLOUD_URL="postgresql://postgres@127.0.0.1:7543/cloud"
 log(){ echo "[$(date +%H:%M:%S)] $*"; }
 

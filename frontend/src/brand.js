@@ -6,4 +6,7 @@ export const PRODUCT = {
   logo: "/medilink-logo.png",
   aiName: "Pulih AI",
   cloudName: "Pulih Cloud",
+  // Version = YY.MMDD.weekday (Monday 1 ... Sunday 7) of the release day.
+  version: "26.1029.4",
+  owner: "Yashpreet Singh Gill",
 };

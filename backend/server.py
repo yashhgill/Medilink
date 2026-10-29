@@ -247,7 +247,7 @@ IS_STANDALONE   = DEPLOYMENT_MODE == "standalone"
 # Core binary, and a Core code can never use the cloud in a Connect binary.
 #
 # Cloud nodes are infrastructure we run ourselves, so they are never licensed.
-APP_VERSION = "1.0.0"
+APP_VERSION = "26.1029.4"   # YY.MMDD.weekday (Mon 1 ... Sun 7)
 
 def effective_tier() -> str:
     """Pulih has no commercial tiers. The deployment mode alone decides
@@ -813,7 +813,7 @@ sync_queue_t = Table("sync_queue", metadata,
 )
 
 # ── App ───────────────────────────────────────────────────────────────────────
-app = FastAPI(title="Pulih EHR", version="3.0.0", docs_url="/docs")
+app = FastAPI(title="Pulih", version=APP_VERSION, docs_url="/docs")
 api = APIRouter(prefix="/api")
 
 # ── Core helpers ──────────────────────────────────────────────────────────────
@@ -1411,7 +1411,7 @@ async def enrich_appointments(rows) -> list:
 # ── Public ────────────────────────────────────────────────────────────────────
 @api.get("/")
 async def root():
-    return {"service": "Pulih EHR", "version": "3.0.0",
+    return {"service": "Pulih", "version": APP_VERSION,
             "facility": FACILITY_ID, "node": "cloud" if IS_CLOUD else "local", "status": "ok", "deployment_mode": DEPLOYMENT_MODE}
 
 @api.get("/ic/parse/{ic_number}")
